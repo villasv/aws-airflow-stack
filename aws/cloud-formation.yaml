@@ -11,60 +11,34 @@ Resources:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref VPC
+      CidrBlock: 10.0.0.0/24
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-  Scheduler:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      SubnetId: !Ref Subnet
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
+      ImageId: ami-80861296
+      InstanceType: t2.micro
+      PrivateIpAddress: 10.0.0.10
       SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref Security
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-  Group:
-    Type: 'AWS::AutoScaling::AutoScalingGroup'
+  Scheduler:
+    Type: 'AWS::EC2::Instance'
     Properties:
-      VPCZoneIdentifier:
-        - !Ref Subnet
-      LaunchConfigurationName: !Ref Config
+      ImageId: ami-80861296
+      InstanceType: t2.micro
+      PrivateIpAddress: 10.0.0.11
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref Security
     Metadata:
       'AWS::CloudFormation::Designer':
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-  Config:
-    Type: 'AWS::AutoScaling::LaunchConfiguration'
-    Properties:
-      ClassLinkVPCId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-  Policy:
-    Type: 'AWS::AutoScaling::ScalingPolicy'
-    Properties:
-      AutoScalingGroupName: !Ref Group
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 4b9a522b-0b18-467d-86b0-7171720b219e
-  SpotFleet:
-    Type: 'AWS::EC2::SpotFleet'
-    Properties:
-      SpotFleetRequestConfigData:
-        IamFleetRole: !Ref SpotRole
-        LaunchSpecifications:
-          - ImageId: 'ami-80861296'
-            InstanceType: !Ref SpotInstanceType
-            SubnetId: !Ref Subnet
-        SpotPrice: '0.3'
-        TargetCapacity: 5
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 5ae98138-c56f-4f7f-a90e-18b1720159be
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
   Files:
     Type: 'AWS::EFS::FileSystem'
     Properties: {}
@@ -76,66 +50,70 @@ Resources:
     Properties:
       SubnetId: !Ref Subnet
       FileSystemId: !Ref Files
+      SecurityGroups:
+        - !Ref Security
     Metadata:
       'AWS::CloudFormation::Designer':
         id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
   Database:
     Type: 'AWS::RDS::DBInstance'
     Properties:
-      DBSubnetGroupName: !Ref DBSubnet
+      AllocatedStorage: 20
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
       Engine: postgres
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      Tags:
+        - Key: Name
+          Value: Airflow
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-  DBSubnet:
-    Type: 'AWS::RDS::DBSubnetGroup'
-    Properties:
-      SubnetIds:
-        - !Ref Subnet
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ec456950-beaa-4b95-9c0c-f1e0f9d89806
   Queue:
     Type: 'AWS::SQS::Queue'
     Properties: {}
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 28cca544-d573-4b40-91dd-40e2577d5949
-  SpotRole:
-    Type: 'AWS::IAM::Role'
+  Security:
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole'
+      GroupName: HotScaleSG
+      GroupDescription: >-
+        Security Group for all instances belonging to the HotScale deployment.
+        Opens all ports for all protocols for every host in the VPC.
+      SecurityGroupEgress:
+        - CidrIp: 10.0.0.0/16
+          FromPort: -1
+          IpProtocol: -1
+          ToPort: -1
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/16
+          FromPort: -1
+          IpProtocol: -1
+          ToPort: -1
+      VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
-        id: 9df2fa31-9057-405a-95f5-18ef3f10a0c6
+        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
 Metadata:
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
-        width: 780
-        height: 300
+        width: 360
+        height: 280
       position:
         x: 180
-        'y': 120
+        'y': 30
       z: 1
       embeds:
-        - 9df2fa31-9057-405a-95f5-18ef3f10a0c6
-        - 2330aac6-8c78-44da-a211-6877405896d7
-        - 5ae98138-c56f-4f7f-a90e-18b1720159be
+        - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
     ea81a163-4d1b-4137-8169-8c84e9c7331b:
       size:
-        width: 390
-        height: 230
+        width: 310
+        height: 130
       position:
         x: 210
         'y': 160
@@ -143,8 +121,8 @@ Metadata:
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
         - 8c059690-0ad1-4922-b823-710c5ead3726
+        - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     8c059690-0ad1-4922-b823-710c5ead3726:
       size:
         width: 60
@@ -155,46 +133,26 @@ Metadata:
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
+      ismemberof:
+        - 401bffa6-76b7-4606-84ca-41c85dc73c30
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
         height: 60
       position:
-        x: 370
+        x: 330
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
-    dd8853da-68b1-4cab-a07e-7f1c9bad428e:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 380
-        'y': -10
-      z: 1
-      embeds: []
-      isconnectedto:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-      isassociatedwith:
-        - ffcc4890-52c1-4824-8260-3fef79669136
+      ismemberof:
+        - 401bffa6-76b7-4606-84ca-41c85dc73c30
     ce3ef0b5-4659-40e4-a2b7-24852dbd5451:
       source:
         id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
       target:
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
       z: 3
-    ffcc4890-52c1-4824-8260-3fef79669136:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 540
-        'y': -10
-      z: 1
-      embeds: []
-      isconnectedto:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     41a66c9c-0e16-4539-a5eb-0e9612b1cae1:
       source:
         id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
@@ -234,17 +192,6 @@ Metadata:
       target:
         id: ffcc4890-52c1-4824-8260-3fef79669136
       z: 12
-    4b9a522b-0b18-467d-86b0-7171720b219e:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 220
-        'y': -10
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - dd8853da-68b1-4cab-a07e-7f1c9bad428e
     59208362-3669-470e-8426-512e7d093df7:
       source:
         id: 4b9a522b-0b18-467d-86b0-7171720b219e
@@ -259,38 +206,27 @@ Metadata:
       target:
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
       z: 12
-    5ae98138-c56f-4f7f-a90e-18b1720159be:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 660
-        'y': 310
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      isrelatedto:
-        - 9df2fa31-9057-405a-95f5-18ef3f10a0c6
     2330aac6-8c78-44da-a211-6877405896d7:
       size:
         width: 60
         height: 60
       position:
-        x: 660
+        x: 590
         'y': 200
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      z: 0
       embeds: []
     d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7:
       size:
         width: 60
         height: 60
       position:
-        x: 480
+        x: 420
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
+      ismemberof:
+        - 401bffa6-76b7-4606-84ca-41c85dc73c30
       references:
         - 2330aac6-8c78-44da-a211-6877405896d7
     7b0e9e6e-3ae7-433b-9fb2-90eb109783f4:
@@ -304,10 +240,9 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: -20
-        'y': 250
-      z: 1
-      parent: ec456950-beaa-4b95-9c0c-f1e0f9d89806
+        x: 70
+        'y': 210
+      z: 0
       embeds: []
       ismemberof:
         - 777ec631-64c3-416d-b5bf-7f58409f55e1
@@ -318,18 +253,6 @@ Metadata:
       target:
         id: f1b0c208-e88b-4494-a5ec-39048b689565
       z: 6
-    ec456950-beaa-4b95-9c0c-f1e0f9d89806:
-      size:
-        width: 120
-        height: 120
-      position:
-        x: -50
-        'y': 220
-      z: 0
-      embeds:
-        - 361321d9-8ef0-4ec0-9f90-32079fd42268
-      isconnectedto:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
     995a3156-0e73-454a-ba26-57116eb5083d:
       source:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -367,8 +290,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 380
-        'y': 440
+        x: 360
+        'y': 350
       z: 0
       embeds: []
     6dd58195-a1d3-4d4e-bb26-18bf4e2ba736:
@@ -377,17 +300,41 @@ Metadata:
       target:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
       z: 4
-    9df2fa31-9057-405a-95f5-18ef3f10a0c6:
+    401bffa6-76b7-4606-84ca-41c85dc73c30:
       size:
         width: 60
         height: 60
       position:
-        x: 800
-        'y': 310
+        x: 330
+        'y': 50
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
+    9738d515-f8ae-4c00-b1ed-5f89295db3c4:
+      source:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      target:
+        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
+      z: 4
+    8752dc1e-b85c-4b3d-bce5-38b53155b894:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
+      z: 5
+    f8a04047-2bba-46f6-8bc7-b8079f61fd97:
+      source:
+        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+      target:
+        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
+      z: 6
 Parameters:
+  DBMasterUsername:
+    Type: String
+    Description: The username to be used in the airflow database.
+  DBMasterPassword:
+    Type: String
+    Description: The password to be used in the airflow database.
   SpotInstanceType:
     Type: String
     Default: t2.micro
