@@ -2,7 +2,8 @@ AWSTemplateFormatVersion: 2010-09-09
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
-    Properties: {}
+    Properties:
+      CidrBlock: 10.0.0.0/16
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -50,9 +51,17 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 4b9a522b-0b18-467d-86b0-7171720b219e
-  Spots:
+  SpotFleet:
     Type: 'AWS::EC2::SpotFleet'
-    Properties: {}
+    Properties:
+      SpotFleetRequestConfigData:
+        IamFleetRole: !Ref SpotRole
+        LaunchSpecifications:
+          - ImageId: 'ami-80861296'
+            InstanceType: !Ref SpotInstanceType
+            SubnetId: !Ref Subnet
+        SpotPrice: '0.3'
+        TargetCapacity: 5
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 5ae98138-c56f-4f7f-a90e-18b1720159be
@@ -70,27 +79,14 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-  Schedules:
+  Database:
     Type: 'AWS::RDS::DBInstance'
     Properties:
       DBSubnetGroupName: !Ref DBSubnet
-      OptionGroupName: !Ref Options
-      DBParameterGroupName: !Ref Parameters
+      Engine: postgres
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-  Options:
-    Type: 'AWS::RDS::OptionGroup'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 777ec631-64c3-416d-b5bf-7f58409f55e1
-  Parameters:
-    Type: 'AWS::RDS::DBParameterGroup'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: f1b0c208-e88b-4494-a5ec-39048b689565
   DBSubnet:
     Type: 'AWS::RDS::DBSubnetGroup'
     Properties:
@@ -99,18 +95,28 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ec456950-beaa-4b95-9c0c-f1e0f9d89806
-  Storage:
-    Type: 'AWS::S3::Bucket'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 8cb8637d-4874-4e7f-9086-df7e409bdb40
   Queue:
     Type: 'AWS::SQS::Queue'
     Properties: {}
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 28cca544-d573-4b40-91dd-40e2577d5949
+  SpotRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9df2fa31-9057-405a-95f5-18ef3f10a0c6
 Metadata:
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
@@ -122,6 +128,7 @@ Metadata:
         'y': 120
       z: 1
       embeds:
+        - 9df2fa31-9057-405a-95f5-18ef3f10a0c6
         - 2330aac6-8c78-44da-a211-6877405896d7
         - 5ae98138-c56f-4f7f-a90e-18b1720159be
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -262,6 +269,8 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
+      isrelatedto:
+        - 9df2fa31-9057-405a-95f5-18ef3f10a0c6
     2330aac6-8c78-44da-a211-6877405896d7:
       size:
         width: 60
@@ -295,7 +304,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 10
+        x: -20
         'y': 250
       z: 1
       parent: ec456950-beaa-4b95-9c0c-f1e0f9d89806
@@ -303,24 +312,6 @@ Metadata:
       ismemberof:
         - 777ec631-64c3-416d-b5bf-7f58409f55e1
         - f1b0c208-e88b-4494-a5ec-39048b689565
-    777ec631-64c3-416d-b5bf-7f58409f55e1:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -130
-        'y': 250
-      z: 0
-      embeds: []
-    f1b0c208-e88b-4494-a5ec-39048b689565:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 10
-        'y': 380
-      z: 0
-      embeds: []
     0f20f2c0-22e6-40b5-a242-1e878ee5e561:
       source:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -332,7 +323,7 @@ Metadata:
         width: 120
         height: 120
       position:
-        x: -20
+        x: -50
         'y': 220
       z: 0
       embeds:
@@ -359,15 +350,6 @@ Metadata:
       target:
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
       z: 4
-    8cb8637d-4874-4e7f-9086-df7e409bdb40:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 420
-        'y': 470
-      z: 0
-      embeds: []
     d7404d85-2b05-45ff-9562-df733036017b:
       source:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -385,8 +367,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 280
-        'y': 470
+        x: 380
+        'y': 440
       z: 0
       embeds: []
     6dd58195-a1d3-4d4e-bb26-18bf4e2ba736:
@@ -395,3 +377,21 @@ Metadata:
       target:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
       z: 4
+    9df2fa31-9057-405a-95f5-18ef3f10a0c6:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 800
+        'y': 310
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds: []
+Parameters:
+  SpotInstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m4.large
+    Description: EC2 instance types to use in the spot instance fleet. Default is t2.micro.
