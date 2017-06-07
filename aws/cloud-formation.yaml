@@ -32,11 +32,12 @@ Resources:
   Subnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      VpcId: !Ref VPC
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: redops-hotscale
-      CidrBlock: 10.0.0.0/24
+      VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
