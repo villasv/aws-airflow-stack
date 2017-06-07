@@ -16,7 +16,7 @@ Parameters:
       - m4.large
   KeyPair:
     Description: Amazon EC2 Key Pair to be used with SSH connections.
-    Type: "AWS::EC2::KeyPair::KeyName"
+    Type: 'AWS::EC2::KeyPair::KeyName'
 Resources:
 ## Networking
   VPC:
@@ -40,7 +40,45 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-## Machines
+  Internet:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 789e4526-8c69-4899-aa8c-300a7772119e
+  Routes:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 30fb8416-de73-44a8-b965-42697ce7803c
+  Opener:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Internet
+      RouteTableId: !Ref Routes
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref Internet
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ec649b6a-0680-463a-9804-e4ba31cc291e
+  SubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref Routes
+      SubnetId: !Ref Subnet
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
+## Instances
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -70,13 +108,13 @@ Resources:
       SecurityGroupIds:
         - !Ref Comms
       UserData:
-        Fn::Base64:
-          !Sub |
-            #!/bin/bash -xe
-            yum -y install nfs-utils
-            mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ ~/airflow
-            cd ~/airflow
-            echo "stuff" > file.txt
+        'Fn::Base64': !Sub >
+          #!/bin/bash -xe
+          yum -y install nfs-utils
+          mkdir ~/airflow
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ ~/airflow
+          cd ~/airflow
+          echo "stuff" > file.txt
       Tags:
         - Key: Name
           Value: redops-hotscale-scheduler
@@ -102,7 +140,6 @@ Resources:
         id: fe2305ec-96dc-423f-9f3b-00923341830c
     DependsOn:
       - Scheduler
-
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
@@ -202,64 +239,63 @@ Resources:
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
-    -
-      Label:
-        default: "Database Configuration"
-      Parameters:
-        - DbMasterUsername
-        - DbMasterPassword
-    -
-      Label:
-        default: "Autoscaling Configuration"
-      Parameters:
-        - SpotInstanceType
-    -
-      Label:
-        default: "Networking Configuration"
-      Parameters:
-        - KeyPair
+      - Label:
+          default: Database Configuration
+        Parameters:
+          - DbMasterUsername
+          - DbMasterPassword
+      - Label:
+          default: Autoscaling Configuration
+        Parameters:
+          - SpotInstanceType
+      - Label:
+          default: Networking Configuration
+        Parameters:
+          - KeyPair
     ParameterLabels:
       DbMasterPassword:
-        default: "Postgres Password"
+        default: Postgres Password
       DbMasterUsername:
-        default: "Postgres Username"
+        default: Postgres Username
       KeyPair:
-        default: "Key for SSH access"
+        default: Key for SSH access
       SpotInstanceType:
-        default: "Instance type for workers"
+        default: Instance type for workers
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
-        width: 350
-        height: 240
+        width: 420
+        height: 310
       position:
-        x: 210
-        'y': 130
+        x: 150
+        'y': 60
       z: 1
       embeds:
+        - 30fb8416-de73-44a8-b965-42697ce7803c
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
     ea81a163-4d1b-4137-8169-8c84e9c7331b:
       size:
-        width: 330
-        height: 100
+        width: 290
+        height: 190
       position:
-        x: 220
-        'y': 170
+        x: 270
+        'y': 80
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
         - 8c059690-0ad1-4922-b823-710c5ead3726
+        - fe2305ec-96dc-423f-9f3b-00923341830c
         - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     8c059690-0ad1-4922-b823-710c5ead3726:
       size:
         width: 60
         height: 60
       position:
-        x: 360
+        x: 390
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -275,7 +311,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 240
+        x: 290
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -348,7 +384,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 590
+        x: 600
         'y': 200
       z: 0
       embeds: []
@@ -357,7 +393,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 480
+        x: 490
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -380,8 +416,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 420
-        'y': 50
+        x: 600
+        'y': 130
       z: 0
       embeds: []
       ismemberof:
@@ -430,8 +466,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 300
-        'y': 50
+        x: 600
+        'y': 60
       z: 0
       embeds: []
     6dd58195-a1d3-4d4e-bb26-18bf4e2ba736:
@@ -445,7 +481,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 240
+        x: 290
         'y': 300
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -563,7 +599,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 480
+        x: 490
         'y': 300
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -601,7 +637,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 360
+        x: 390
         'y': 300
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -617,9 +653,10 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 360
-        'y': 420
-      z: 0
+        x: 390
+        'y': 100
+      z: 3
+      parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
       ismemberof:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
@@ -630,4 +667,54 @@ Metadata:
         id: fe2305ec-96dc-423f-9f3b-00923341830c
       target:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
+      z: 4
+    789e4526-8c69-4899-aa8c-300a7772119e:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 60
+        'y': 290
+      z: 0
+      embeds: []
+    ec649b6a-0680-463a-9804-e4ba31cc291e:
+      source:
+        id: 789e4526-8c69-4899-aa8c-300a7772119e
+      target:
+        id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      z: 0
+    30fb8416-de73-44a8-b965-42697ce7803c:
+      size:
+        width: 100
+        height: 100
+      position:
+        x: 160
+        'y': 260
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds:
+        - 1c52f5bf-8a65-4ee6-b601-810e47a51751
+    6ee4ffa7-3fb0-4326-993a-9516025fd0b7:
+      source:
+        id: 30fb8416-de73-44a8-b965-42697ce7803c
+      target:
+        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+      z: 2
+    1c52f5bf-8a65-4ee6-b601-810e47a51751:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        'y': 290
+      z: 3
+      parent: 30fb8416-de73-44a8-b965-42697ce7803c
+      embeds: []
+      references:
+        - 789e4526-8c69-4899-aa8c-300a7772119e
+    64876424-3d75-45d5-a5d2-d3693baf8619:
+      source:
+        id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
+      target:
+        id: 789e4526-8c69-4899-aa8c-300a7772119e
       z: 4
