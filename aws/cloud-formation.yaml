@@ -1,19 +1,22 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   DbMasterUsername:
-    Type: String
     Description: The username to be used in the airflow database.
-  DbMasterPassword:
     Type: String
+  DbMasterPassword:
     Description: The password to be used in the airflow database.
+    Type: String
     NoEcho: true
   SpotInstanceType:
+    Description: EC2 instance types to use in the spot instance fleet. Default is t2.micro.
     Type: String
     Default: t2.micro
     AllowedValues:
       - t2.micro
       - m4.large
-    Description: EC2 instance types to use in the spot instance fleet. Default is t2.micro.
+  KeyPair:
+    Description: Amazon EC2 Key Pair to be used with SSH connections.
+    Type: "AWS::EC2::KeyPair::KeyName"
 Resources:
 ## Networking
   VPC:
@@ -45,7 +48,7 @@ Resources:
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
       PrivateIpAddress: 10.0.0.10
-      KeyName: hotscale
+      KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
       Tags:
@@ -63,7 +66,7 @@ Resources:
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
       PrivateIpAddress: 10.0.0.11
-      KeyName: hotscale
+      KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Comms
       UserData:
@@ -91,7 +94,7 @@ Resources:
       ImageId: ami-80861296
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
-      KeyName: hotscale
+      KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Comms
     Metadata:
@@ -210,6 +213,20 @@ Metadata:
         default: "Autoscaling Configuration"
       Parameters:
         - SpotInstanceType
+    -
+      Label:
+        default: "Networking Configuration"
+      Parameters:
+        - KeyPair
+    ParameterLabels:
+      DbMasterPassword:
+        default: "Postgres Password"
+      DbMasterUsername:
+        default: "Postgres Username"
+      KeyPair:
+        default: "Key for SSH access"
+      SpotInstanceType:
+        default: "Instance type for workers"
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
