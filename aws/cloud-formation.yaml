@@ -55,16 +55,43 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-80861296
+      ImageId: ami-c58c1dd3
       InstanceType: t2.micro
       PrivateIpAddress: 10.0.0.11
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref Comms
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum install -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Scheduler --configsets init --region ${AWS::Region}
       Tags:
         - Key: Name
           Value: redops-hotscale-scheduler
     Metadata:
+      'AWs::CloudFormation::Init':
+        configSets:
+          init:
+            - "mount"
+            - "clone"
+            - "setup"
+        mount:
+          commands:
+            test:
+              command: "echo HelloWorld > mount.txt"
+              cwd: "~"
+        clone:
+          commands:
+            test:
+              command: "echo HelloWorld > clone.txt"
+              cwd: "~"
+        setup:
+          commands:
+            test:
+              command: "echo HelloWorld > setup.txt"
+              cwd: "~"
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
@@ -113,17 +140,17 @@ Resources:
     Properties:
       GroupName: HotScaleWebSG
       GroupDescription: >-
-        Security Rules with permissions for the web UI exposed by Airflow and Celery Flower.
-      SecurityGroupEgress:
-        - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
+        Security Rules with permissions for the web UI exposed by Airflow and
+        Celery Flower.
       SecurityGroupIngress:
         - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
+          IpProtocol: TCP
+          FromPort: 5555
+          ToPort: 5555
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 8080
+          ToPort: 80
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -133,12 +160,8 @@ Resources:
     Properties:
       GroupName: HotScaleAcessSG
       GroupDescription: >-
-        Security Rules with permissions for the shared filesystem across Airflow instances.
-      SecurityGroupEgress:
-        - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
+        Security Rules with permissions for the shared filesystem across Airflow
+        instances.
       SecurityGroupIngress:
         - CidrIp: 10.0.0.0/16
           FromPort: -1
@@ -153,21 +176,30 @@ Resources:
     Properties:
       GroupName: HotScaleCommsSG
       GroupDescription: >-
-        Security Rules with permissions for node intercommunication between Airflow instances.
-      SecurityGroupEgress:
-        - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
+        Security Rules with permissions for node intercommunication between
+        Airflow instances.
       SecurityGroupIngress:
         - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
+  Worker:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-80861296
+      InstanceType: t2.micro
+      SubnetId: !Ref Subnet
+      SecurityGroupIds:
+        - !Ref Comms
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: fe2305ec-96dc-423f-9f3b-00923341830c
+    DependsOn:
+      - Scheduler
 Metadata:
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
@@ -553,4 +585,23 @@ Metadata:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
       target:
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
+      z: 4
+    fe2305ec-96dc-423f-9f3b-00923341830c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 360
+        'y': 420
+      z: 0
+      embeds: []
+      ismemberof:
+        - ea67a2be-98cb-48db-8c0c-89fe99de522b
+      dependson:
+        - 8c059690-0ad1-4922-b823-710c5ead3726
+    6cd63370-60bd-4992-a3d2-1288769ae1d7:
+      source:
+        id: fe2305ec-96dc-423f-9f3b-00923341830c
+      target:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
       z: 4
