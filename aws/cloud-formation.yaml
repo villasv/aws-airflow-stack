@@ -93,6 +93,12 @@ Resources:
       Tags:
         - Key: Name
           Value: redops-hotscale-interface
+      UserData:
+        'Fn::Base64': !Sub >
+          #!/bin/bash -xe
+          apt-get -y install nfs-common
+          mkdir -p /efs
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
@@ -101,24 +107,22 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-c58c1dd3
+      ImageId: ami-80861296
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
       PrivateIpAddress: 10.0.0.11
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Comms
-      UserData:
-        'Fn::Base64': !Sub >
-          #!/bin/bash -xe
-          yum -y install nfs-utils
-          mkdir ~/airflow
-          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ ~/airflow
-          cd ~/airflow
-          echo "stuff" > file.txt
       Tags:
         - Key: Name
           Value: redops-hotscale-scheduler
+      UserData:
+        'Fn::Base64': !Sub >
+          #!/bin/bash -xe
+          apt-get -y install nfs-common
+          mkdir -p /efs
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -136,6 +140,12 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Comms
+      UserData:
+        'Fn::Base64': !Sub >
+          #!/bin/bash -xe
+          apt-get -y install nfs-common
+          mkdir -p /efs
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: fe2305ec-96dc-423f-9f3b-00923341830c
@@ -181,6 +191,42 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 28cca544-d573-4b40-91dd-40e2577d5949
 ## Security
+  Access:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: HotScaleAcessSG
+      GroupDescription: >-
+        Security Rules with permissions for the shared filesystem across Airflow
+        instances.
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 2049
+          ToPort: 2049
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
+  Comms:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: HotScaleCommsSG
+      GroupDescription: >-
+        Security Rules with permissions for node intercommunication between
+        Airflow instances.
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 22
+          ToPort: 22
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ea67a2be-98cb-48db-8c0c-89fe99de522b
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -199,44 +245,12 @@ Resources:
           ToPort: 8080
         - CidrIp: 10.0.0.0/16
           IpProtocol: TCP
-          FromPort: 8080
-          ToPort: 8080
+          FromPort: 22
+          ToPort: 22
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-  Access:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupName: HotScaleAcessSG
-      GroupDescription: >-
-        Security Rules with permissions for the shared filesystem across Airflow
-        instances.
-      SecurityGroupIngress:
-        - CidrIp: 10.0.0.0/16
-          FromPort: -1
-          IpProtocol: -1
-          ToPort: -1
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-  Comms:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupName: HotScaleCommsSG
-      GroupDescription: >-
-        Security Rules with permissions for node intercommunication between
-        Airflow instances.
-      SecurityGroupIngress:
-        - CidrIp: 10.0.0.0/16
-          IpProtocol: TCP
-          FromPort: 8793
-          ToPort: 8793
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ea67a2be-98cb-48db-8c0c-89fe99de522b
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
