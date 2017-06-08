@@ -94,10 +94,10 @@ Resources:
         - Key: Name
           Value: redops-hotscale-interface
       UserData:
-        'Fn::Base64': !Sub >
+        'Fn::Base64': !Sub |
           #!/bin/bash -xe
           apt-get -y install nfs-common
-          mkdir -p /efs
+          mkdir /efs
           mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -118,11 +118,12 @@ Resources:
         - Key: Name
           Value: redops-hotscale-scheduler
       UserData:
-        'Fn::Base64': !Sub >
+        'Fn::Base64': !Sub |
           #!/bin/bash -xe
           apt-get -y install nfs-common
-          mkdir -p /efs
+          mkdir /efs
           mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+          chown -R ubuntu /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -141,10 +142,10 @@ Resources:
       SecurityGroupIds:
         - !Ref Comms
       UserData:
-        'Fn::Base64': !Sub >
+        'Fn::Base64': !Sub |
           #!/bin/bash -xe
           apt-get -y install nfs-common
-          mkdir -p /efs
+          mkdir /efs
           mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
     Metadata:
       'AWS::CloudFormation::Designer':
