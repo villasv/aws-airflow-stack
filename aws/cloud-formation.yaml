@@ -104,7 +104,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
-      - Scheduler
+      - Repository
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -131,7 +131,6 @@ Resources:
     DependsOn:
       - Repository
       - Tasks
-      - Database
 ## Scaling
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
@@ -144,18 +143,33 @@ Resources:
         id: 90184717-25cc-4671-a70d-7becceed5c50
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
-    Properties: {}
+    Properties:
+      ImageId: ami-80861296
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref Comms
+      UserData:
+        'Fn::Base64': !Sub |
+          #!/bin/bash -xe
+          apt-get -y install nfs-common
+          mkdir /efs
+          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+          chown -R ubuntu /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-  Size:
+  Grow:
     Type: 'AWS::CloudWatch::Alarm'
     Properties: {}
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-    DependsOn:
-      - Tasks
+  Shrink:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
   ScaleOut:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
@@ -164,7 +178,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
     DependsOn:
-      - Size
+      - Grow
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
@@ -173,7 +187,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
     DependsOn:
-      - Size
+      - Shrink
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
@@ -332,7 +346,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
+        x: 490
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -342,7 +356,6 @@ Metadata:
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
         - 28cca544-d573-4b40-91dd-40e2577d5949
-        - 361321d9-8ef0-4ec0-9f90-32079fd42268
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -356,7 +369,7 @@ Metadata:
       ismemberof:
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
       dependson:
-        - 8c059690-0ad1-4922-b823-710c5ead3726
+        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
     ce3ef0b5-4659-40e4-a2b7-24852dbd5451:
       source:
         id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
@@ -421,8 +434,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 600
-        'y': 200
+        x: 390
+        'y': 60
       z: 0
       embeds: []
     d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7:
@@ -430,7 +443,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
+        x: 390
         'y': 200
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
@@ -453,8 +466,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 600
-        'y': 130
+        x: 290
+        'y': 60
       z: 0
       embeds: []
       ismemberof:
@@ -503,7 +516,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 600
+        x: 490
         'y': 60
       z: 0
       embeds: []
@@ -636,7 +649,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
+        x: 390
         'y': 300
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -674,7 +687,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
+        x: 490
         'y': 300
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -696,7 +709,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 60
+        x: 70
         'y': 290
       z: 0
       embeds: []
@@ -746,17 +759,19 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 290
-        'y': 60
+        x: 610
+        'y': 300
       z: 0
       embeds: []
+      isrelatedto:
+        - ea67a2be-98cb-48db-8c0c-89fe99de522b
     90184717-25cc-4671-a70d-7becceed5c50:
       size:
         width: 60
         height: 60
       position:
-        x: 390
-        'y': 60
+        x: 610
+        'y': 180
       z: 0
       embeds: []
       isconnectedto:
@@ -804,25 +819,23 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': -40
+        x: 710
+        'y': 60
       z: 0
       embeds: []
-      dependson:
-        - 28cca544-d573-4b40-91dd-40e2577d5949
     f12da049-cd8c-4011-8c3f-650b4463a007:
       size:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 60
+        x: 710
+        'y': 180
       z: 0
       embeds: []
       isassociatedwith:
         - 90184717-25cc-4671-a70d-7becceed5c50
       dependson:
-        - c2b1083d-7823-4926-bb80-1c17a3f52a53
+        - 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
     8a57a39c-eb9c-498d-8211-c9ccee2f8f7e:
       source:
         id: f12da049-cd8c-4011-8c3f-650b4463a007
@@ -834,8 +847,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
-        'y': -40
+        x: 610
+        'y': 60
       z: 0
       embeds: []
       isassociatedwith:
@@ -877,4 +890,25 @@ Metadata:
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
       target:
         id: 28cca544-d573-4b40-91dd-40e2577d5949
+      z: 11
+    97a1ff17-654e-4f74-bb6b-10c988a5e6e9:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 710
+        'y': 300
+      z: 0
+      embeds: []
+    cff2d88b-b690-46db-8515-e28ce8d3a212:
+      source:
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
+      target:
+        id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
+      z: 11
+    1d9ac914-e8db-48c2-b1ef-a88d11b9217d:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
       z: 11
