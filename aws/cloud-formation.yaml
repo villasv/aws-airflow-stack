@@ -148,6 +148,32 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+  Size:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+    DependsOn:
+      - Tasks
+  ScaleOut:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AutoScalingGroupName: !Ref Scaler
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
+    DependsOn:
+      - Size
+  ScaleIn:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AutoScalingGroupName: !Ref Scaler
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+    DependsOn:
+      - Size
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
@@ -720,7 +746,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 280
+        x: 290
         'y': 60
       z: 0
       embeds: []
@@ -772,4 +798,83 @@ Metadata:
         id: fe2305ec-96dc-423f-9f3b-00923341830c
       target:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
+      z: 11
+    c2b1083d-7823-4926-bb80-1c17a3f52a53:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 490
+        'y': -40
+      z: 0
+      embeds: []
+      dependson:
+        - 28cca544-d573-4b40-91dd-40e2577d5949
+    f12da049-cd8c-4011-8c3f-650b4463a007:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 490
+        'y': 60
+      z: 0
+      embeds: []
+      isassociatedwith:
+        - 90184717-25cc-4671-a70d-7becceed5c50
+      dependson:
+        - c2b1083d-7823-4926-bb80-1c17a3f52a53
+    8a57a39c-eb9c-498d-8211-c9ccee2f8f7e:
+      source:
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
+      target:
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+      z: 11
+    99a417bc-21ad-4e5f-b525-7afe1289f3e6:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 390
+        'y': -40
+      z: 0
+      embeds: []
+      isassociatedwith:
+        - 90184717-25cc-4671-a70d-7becceed5c50
+      dependson:
+        - c2b1083d-7823-4926-bb80-1c17a3f52a53
+    ad7bb3b7-2ebb-40fc-b699-0154f4433614:
+      source:
+        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+      target:
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+      z: 11
+    84b926cd-0488-4ea5-b8b4-862cb33595a4:
+      source:
+        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+      target:
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+      z: 11
+    3bbb4ad2-6eb5-4d45-8f68-fe77e6bb8277:
+      source:
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
+      target:
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+      z: 12
+    7343dc6b-1346-43d3-9582-7426bcae67b7:
+      source:
+        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+      target:
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+      z: 11
+    83d5ac20-fdb5-471f-920d-aa3a367bd2b6:
+      source:
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
+      target:
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+      z: 12
+    e125e9e1-6227-40a4-96bb-eba9fa6cc126:
+      source:
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
+      target:
+        id: 28cca544-d573-4b40-91dd-40e2577d5949
       z: 11
