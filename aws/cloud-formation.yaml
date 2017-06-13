@@ -99,6 +99,7 @@ Resources:
           apt-get -y install nfs-common
           mkdir /efs
           mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+          chown -R ubuntu /efs
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
@@ -128,30 +129,25 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
-      - Mount
+      - Repository
       - Tasks
       - Database
 ## Scaling
-  Worker:
-    Type: 'AWS::EC2::Instance'
+  Scaler:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
-      ImageId: ami-80861296
-      InstanceType: t2.micro
-      SubnetId: !Ref Subnet
-      KeyName: !Ref KeyPair
-      SecurityGroupIds:
-        - !Ref Comms
-      UserData:
-        'Fn::Base64': !Sub |
-          #!/bin/bash -xe
-          apt-get -y install nfs-common
-          mkdir /efs
-          mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+      LaunchConfigurationName: !Ref Config
+      VPCZoneIdentifier:
+        - !Ref Subnet
     Metadata:
       'AWS::CloudFormation::Designer':
-        id: fe2305ec-96dc-423f-9f3b-00923341830c
-    DependsOn:
-      - Scheduler
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+  Config:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
@@ -159,7 +155,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 2330aac6-8c78-44da-a211-6877405896d7
-  Mount:
+  Repository:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref Files
@@ -281,30 +277,29 @@ Metadata:
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
         width: 420
-        height: 310
+        height: 220
       position:
         x: 150
-        'y': 60
+        'y': 150
       z: 1
       embeds:
-        - 30fb8416-de73-44a8-b965-42697ce7803c
+        - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
-        - 401bffa6-76b7-4606-84ca-41c85dc73c30
+        - 30fb8416-de73-44a8-b965-42697ce7803c
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
     ea81a163-4d1b-4137-8169-8c84e9c7331b:
       size:
-        width: 290
-        height: 190
+        width: 280
+        height: 100
       position:
-        x: 270
-        'y': 80
+        x: 280
+        'y': 170
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
         - 8c059690-0ad1-4922-b823-710c5ead3726
-        - fe2305ec-96dc-423f-9f3b-00923341830c
         - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     8c059690-0ad1-4922-b823-710c5ead3726:
       size:
@@ -664,20 +659,6 @@ Metadata:
       target:
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
       z: 4
-    fe2305ec-96dc-423f-9f3b-00923341830c:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 390
-        'y': 100
-      z: 3
-      parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      embeds: []
-      ismemberof:
-        - ea67a2be-98cb-48db-8c0c-89fe99de522b
-      dependson:
-        - 8c059690-0ad1-4922-b823-710c5ead3726
     6cd63370-60bd-4992-a3d2-1288769ae1d7:
       source:
         id: fe2305ec-96dc-423f-9f3b-00923341830c
@@ -734,3 +715,61 @@ Metadata:
       target:
         id: 789e4526-8c69-4899-aa8c-300a7772119e
       z: 4
+    535f86f4-9cef-4823-b8bd-888153ca3b7e:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 280
+        'y': 60
+      z: 0
+      embeds: []
+    90184717-25cc-4671-a70d-7becceed5c50:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 390
+        'y': 60
+      z: 0
+      embeds: []
+      isconnectedto:
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+      isassociatedwith:
+        - 535f86f4-9cef-4823-b8bd-888153ca3b7e
+    f79e1187-387d-468f-baa9-bed58deddbb1:
+      source:
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+      target:
+        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+      z: 4
+    0e5bd697-3c7e-4fa6-9d4e-30f17fd75538:
+      source:
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+      target:
+        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+      z: 5
+    83f61389-ea0a-49fb-87a0-ecdcf941b7a7:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+      z: 11
+    bf732f70-1290-4a8e-91fb-29862c6b5ea4:
+      source:
+        id: fe2305ec-96dc-423f-9f3b-00923341830c
+      target:
+        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+      z: 12
+    ce14e9bc-9909-4050-a63f-ed2d9de50b88:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      z: 11
+    896fc7c7-eeb1-4309-bf7e-b87d982dfd8e:
+      source:
+        id: fe2305ec-96dc-423f-9f3b-00923341830c
+      target:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      z: 11
