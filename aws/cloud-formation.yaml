@@ -138,6 +138,8 @@ Resources:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       LaunchConfigurationName: !Ref Config
+      MinSize: 0
+      MaxSize: 10
       VPCZoneIdentifier:
         - !Ref Subnet
     Metadata:
@@ -197,6 +199,9 @@ Resources:
   ScaleOut:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
+      PolicyName: ScaleOut
+      PolicyType: StepScaling
+      ServiceNamespace: ec2
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -206,6 +211,9 @@ Resources:
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
+      PolicyName: ScaleIn
+      PolicyType: StepScaling
+      ServiceNamespace: ec2
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
