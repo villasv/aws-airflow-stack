@@ -199,9 +199,10 @@ Resources:
   ScaleOut:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
-      PolicyName: ScaleOut
-      PolicyType: StepScaling
-      ServiceNamespace: ec2
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: 60
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -211,9 +212,10 @@ Resources:
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
-      PolicyName: ScaleIn
-      PolicyType: StepScaling
-      ServiceNamespace: ec2
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: 60
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
