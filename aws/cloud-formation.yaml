@@ -57,10 +57,11 @@ Resources:
   Opener:
     Type: 'AWS::EC2::Route'
     Properties:
-      DependsOn: !Ref VPCGatewayAttachment
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Internet
       RouteTableId: !Ref Routes
+    DependsOn:
+      - VPCGatewayAttachment
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
