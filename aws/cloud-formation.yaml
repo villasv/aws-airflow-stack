@@ -57,6 +57,7 @@ Resources:
   Opener:
     Type: 'AWS::EC2::Route'
     Properties:
+      DependsOn: !Ref VPCGatewayAttachment
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref Internet
       RouteTableId: !Ref Routes
@@ -146,7 +147,7 @@ Resources:
     Properties:
       ImageId: ami-80861296
       InstanceType: t2.micro
-      SecurityGroupIds:
+      SecurityGroups:
         - !Ref Comms
       UserData:
         'Fn::Base64': !Sub |
@@ -160,13 +161,35 @@ Resources:
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
   Grow:
     Type: 'AWS::CloudWatch::Alarm'
-    Properties: {}
+    Properties:
+      AlarmName: QueueGrowth
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      Statistic: SampleCount
+      Period: '60'
+      EvaluationPeriods: '1'
+      Dimensions:
+        - Name: QueueName
+          Value: CeleryTaskQueue
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
   Shrink:
     Type: 'AWS::CloudWatch::Alarm'
-    Properties: {}
+    Properties:
+      AlarmName: QueueShrink
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Threshold: 5
+      ComparisonOperator: LessThanThreshold
+      Statistic: SampleCount
+      Period: '60'
+      EvaluationPeriods: '1'
+      Dimensions:
+        - Name: QueueName
+          Value: CeleryTaskQueue
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
@@ -223,7 +246,8 @@ Resources:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
   Tasks:
     Type: 'AWS::SQS::Queue'
-    Properties: {}
+    Properties:
+      QueueName: CeleryTaskQueue
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 28cca544-d573-4b40-91dd-40e2577d5949
