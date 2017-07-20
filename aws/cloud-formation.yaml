@@ -25,18 +25,31 @@ Resources:
       CidrBlock: 10.0.0.0/16
       Tags:
         - Key: Name
-          Value: redops
+          Value: redops-hotscale-vpc
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+  Dummy:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: 'us-east-1b'
+      CidrBlock: 10.0.99.0/24
+      Tags:
+        - Key: Name
+          Value: redops-hotscale-dummy
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
   Subnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
+      AvailabilityZone: 'us-east-1a'
       CidrBlock: 10.0.0.0/24
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: redops-hotscale
+          Value: redops-hotscale-subnet
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -240,6 +253,16 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+  DBs:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref Subnet
+        - !Ref Dummy
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
   Database:
     Type: 'AWS::RDS::DBInstance'
     Properties:
@@ -252,6 +275,9 @@ Resources:
       Tags:
         - Key: Name
           Value: redops-hotscale-database
+      DBSubnetGroupName: !Ref DBs
+      VPCSecurityGroups:
+        - !Ref Connection
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -323,6 +349,20 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 401bffa6-76b7-4606-84ca-41c85dc73c30
+  Connection:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: HotScaleDbConnSG
+      GroupDescription: Security Rules with permissions for database connections for Airflow.
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 5432
+          ToPort: 5432
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 4816510b-a9fb-467b-a2b6-a85d16656b59
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -351,13 +391,15 @@ Metadata:
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
-        width: 420
-        height: 220
+        width: 530
+        height: 230
       position:
-        x: 150
+        x: 40
         'y': 150
       z: 1
       embeds:
+        - 0559dceb-39c7-40fd-adf9-bb7614b20722
+        - 4816510b-a9fb-467b-a2b6-a85d16656b59
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
@@ -390,7 +432,6 @@ Metadata:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 28cca544-d573-4b40-91dd-40e2577d5949
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -501,13 +542,15 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 290
+        x: 180
         'y': 60
-      z: 0
+      z: 1
+      parent: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
       embeds: []
       ismemberof:
         - 777ec631-64c3-416d-b5bf-7f58409f55e1
         - f1b0c208-e88b-4494-a5ec-39048b689565
+        - 4816510b-a9fb-467b-a2b6-a85d16656b59
     0f20f2c0-22e6-40b5-a242-1e878ee5e561:
       source:
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -744,8 +787,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 70
-        'y': 290
+        x: -50
+        'y': 310
       z: 0
       embeds: []
     ec649b6a-0680-463a-9804-e4ba31cc291e:
@@ -759,8 +802,8 @@ Metadata:
         width: 100
         height: 100
       position:
-        x: 160
-        'y': 260
+        x: 40
+        'y': 280
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -776,8 +819,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 180
-        'y': 290
+        x: 60
+        'y': 310
       z: 3
       parent: 30fb8416-de73-44a8-b965-42697ce7803c
       embeds: []
@@ -952,4 +995,57 @@ Metadata:
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
       target:
         id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+      z: 11
+    4816510b-a9fb-467b-a2b6-a85d16656b59:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        'y': 280
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds: []
+    491c711d-2800-45b6-8b75-f20239620b87:
+      source:
+        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
+      target:
+        id: 4816510b-a9fb-467b-a2b6-a85d16656b59
+      z: 11
+    9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54:
+      size:
+        width: 80
+        height: 90
+      position:
+        x: 170
+        'y': 40
+      z: 0
+      embeds:
+        - 361321d9-8ef0-4ec0-9f90-32079fd42268
+      isconnectedto:
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - 0559dceb-39c7-40fd-adf9-bb7614b20722
+    35a8b15e-9e78-479e-ba06-c7b4a63cbb09:
+      source:
+        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
+        selector: 'g:nth-child(1) g:nth-child(5) g:nth-child(1) circle:nth-child(1)     '
+        port: 'AWS::RefLink-AWS::EC2::Subnet-SubnetIds'
+      target:
+        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+      z: 12
+    0559dceb-39c7-40fd-adf9-bb7614b20722:
+      size:
+        width: 80
+        height: 80
+      position:
+        x: 60
+        'y': 180
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds: []
+    12c23322-76f4-40c0-8155-668cf0d58155:
+      source:
+        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
+      target:
+        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
       z: 11
