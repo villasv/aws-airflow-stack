@@ -313,7 +313,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
-        - CidrIp: 10.0.0.0/16
+        - CidrIp: 0.0.0.0/0
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
@@ -337,7 +337,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 8080
           ToPort: 8080
-        - CidrIp: 10.0.0.0/16
+        - CidrIp: 0.0.0.0/0
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
