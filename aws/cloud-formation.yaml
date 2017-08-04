@@ -22,15 +22,12 @@ Parameters:
 Mappings:
   Variables:
     Scripts:
-      Mount: |
+      MountEfs: |
         #!/bin/bash -xe
         apt-get -y install nfs-common
         mkdir /efs
         mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
         chown -R ubuntu /efs
-      Interface: |
-        source /env.sh
-        echo ${DB_USERNAME}
 Resources:
 ## Networking
   VPC:
@@ -39,7 +36,7 @@ Resources:
       CidrBlock: 10.0.0.0/16
       Tags:
         - Key: Name
-          Value: redops-hotscale-vpc
+          Value: hotscale-vpc
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -50,7 +47,7 @@ Resources:
       CidrBlock: 10.0.99.0/24
       Tags:
         - Key: Name
-          Value: redops-hotscale-dummy
+          Value: hotscale-dummy
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -63,7 +60,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: redops-hotscale-subnet
+          Value: hotscale-subnet
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -123,14 +120,7 @@ Resources:
         - Key: Name
           Value: redops-hotscale-interface
       UserData:
-        'Fn::Base64':
-          'Fn::Join':
-            - "\n"
-            - [
-              !FindInMap [Variables, Scripts, Mount],
-              !Sub 'echo "export DB_USERNAME=${DbMasterUsername}" >> /env.sh',
-              !FindInMap [Variables, Scripts, Interface]
-            ]
+        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
@@ -148,7 +138,9 @@ Resources:
         - !Ref Comms
       Tags:
         - Key: Name
-          Value: redops-hotscale-scheduler
+          Value: hotscale-scheduler
+      UserData:
+        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -174,6 +166,8 @@ Resources:
       InstanceType: t2.micro
       SecurityGroups:
         - !Ref Comms
+      UserData:
+        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
@@ -276,7 +270,7 @@ Resources:
       MasterUserPassword: !Ref DbMasterPassword
       Tags:
         - Key: Name
-          Value: redops-hotscale-database
+          Value: hotscale-database
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
         - !Ref Connection
