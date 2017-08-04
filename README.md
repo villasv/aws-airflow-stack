@@ -1,13 +1,29 @@
-## Init
+# Turbine
 
- If your script did not accomplish the tasks you were expecting it to, or if you just want to verify that your script completed without errors, examine the cloud-init output log file at /var/log/cloud-init-output.log and look for error messages in the output. 
+Turbine is the set of bare metals behind a simple yet efficient Airflow instance.
 
-## Steps to Enable SSH
+## Notable Resources
 
-SSH connectivity is not enabled by default because this template tries to achieve production readyness and this is too particular for each environment to chose a one-size-fits-all approach.
+- **Interface**:
 
-At Gupy we use VPN on top of SSH, but for the sake of simplicity and completeness here we have the steps to open SSH with public access (restricted by the private key).
+    The EC2 instance hosting the `airflow webserver` and `airflow flower` processes.
 
-1. Create an Internet Gateway
-2. Assign Public IPs
-3. Add Route for Subnet
+    IP: `10.0.0.10` , Public SSH: `Enabled`
+
+- **Scheduler**:
+
+    The EC2 instance hosting the `airflow scheduler` process.
+
+    IP: `10.0.0.11`, Public SSH: `Enabled`
+
+## Simplicity
+
+Specific resources are created with hardcoded information, like private IP addresses.
+This way the template is smaller and easier to read (less variable substitutions which leads to reusable string blocks) and examples easier to follow.
+
+## Production Readiness
+
+This is a template for a testing and prototyping stack. Production environments should:
+
+- be more mindful about security (restrain public Internet access).
+- set up supervision for Airflow processes
