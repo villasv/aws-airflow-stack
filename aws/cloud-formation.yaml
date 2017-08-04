@@ -36,7 +36,7 @@ Resources:
       CidrBlock: 10.0.0.0/16
       Tags:
         - Key: Name
-          Value: hotscale-vpc
+          Value: turbine-vpc
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -47,7 +47,7 @@ Resources:
       CidrBlock: 10.0.99.0/24
       Tags:
         - Key: Name
-          Value: hotscale-dummy
+          Value: turbine-dummy
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -60,7 +60,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: hotscale-subnet
+          Value: turbine-subnet
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -118,7 +118,7 @@ Resources:
         - !Ref Web
       Tags:
         - Key: Name
-          Value: redops-hotscale-interface
+          Value: turbine-interface
       UserData:
         'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
     Metadata:
@@ -138,7 +138,7 @@ Resources:
         - !Ref Comms
       Tags:
         - Key: Name
-          Value: hotscale-scheduler
+          Value: turbine-scheduler
       UserData:
         'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
     Metadata:
@@ -270,7 +270,7 @@ Resources:
       MasterUserPassword: !Ref DbMasterPassword
       Tags:
         - Key: Name
-          Value: hotscale-database
+          Value: turbine-database
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
         - !Ref Connection
@@ -288,7 +288,7 @@ Resources:
   Access:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: HotScaleAcessSG
+      GroupName: TurbineAcessSG
       GroupDescription: >-
         Security Rules with permissions for the shared filesystem across Airflow
         instances.
@@ -304,7 +304,7 @@ Resources:
   Comms:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: HotScaleCommsSG
+      GroupName: TurbineCommsSG
       GroupDescription: >-
         Security Rules with permissions for node intercommunication between
         Airflow instances.
@@ -324,7 +324,7 @@ Resources:
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: HotScaleWebSG
+      GroupName: TurbineWebSG
       GroupDescription: >-
         Security Rules with permissions for the web UI exposed by Airflow and
         Celery Flower.
@@ -348,7 +348,7 @@ Resources:
   Connection:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: HotScaleDbConnSG
+      GroupName: TurbineDbConnSG
       GroupDescription: Security Rules with permissions for database connections for Airflow.
       SecurityGroupIngress:
         - CidrIp: 10.0.0.0/16
