@@ -1,4 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Change me.
 Parameters:
   DbMasterUsername:
     Description: The username to be used in the airflow database.
@@ -17,15 +19,15 @@ Parameters:
   KeyPair:
     Description: Amazon EC2 Key Pair to be used with SSH connections.
     Type: 'AWS::EC2::KeyPair::KeyName'
-  InitScript:
-    Description: Initializer script for Airflow machines, declared as parameter for convenience. Ignore this.
-    Type: String
-    Default: |
-      #!/bin/bash -xe
-      apt-get -y install nfs-common
-      mkdir /efs
-      mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
-      chown -R ubuntu /efs
+Mappings:
+  Variables:
+    Scripts:
+      Mount: |
+        #!/bin/bash -xe
+        apt-get -y install nfs-common
+        mkdir /efs
+        mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+        chown -R ubuntu /efs
 Resources:
 ## Networking
   VPC:
@@ -119,7 +121,12 @@ Resources:
           Value: redops-hotscale-interface
       UserData:
         'Fn::Base64':
-          'Fn::Sub': !Ref InitScript
+          'Fn::Join':
+            - "\n"
+            - [
+              !FindInMap [Variables, Scripts, Mount],
+              !Sub 'echo "export DB_USERNAME=${DbMasterUsername}" >> /env.sh'
+            ]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
@@ -138,9 +145,6 @@ Resources:
       Tags:
         - Key: Name
           Value: redops-hotscale-scheduler
-      UserData:
-        'Fn::Base64':
-          'Fn::Sub': !Ref InitScript
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -166,9 +170,6 @@ Resources:
       InstanceType: t2.micro
       SecurityGroups:
         - !Ref Comms
-      UserData:
-        'Fn::Base64':
-          'Fn::Sub': !Ref InitScript
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
