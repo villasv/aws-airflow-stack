@@ -163,7 +163,7 @@ Resources:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
       ImageId: ami-80861296
-      InstanceType: t2.micro
+      InstanceType: !Ref SpotInstanceType
       SecurityGroups:
         - !Ref Comms
       UserData:
