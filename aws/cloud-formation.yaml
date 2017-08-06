@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: >
+Description: |
   Change me.
 Parameters:
   DbMasterUsername:
@@ -28,6 +28,10 @@ Mappings:
         mkdir /efs
         mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
         chown -R ubuntu /efs
+      InstallDeps: |
+        apt-get update
+        apt-get -y install python3-pip
+        pip3 install -U pip
 Resources:
 ## Networking
   VPC:
@@ -43,7 +47,7 @@ Resources:
   Dummy:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: 'us-east-1b'
+      AvailabilityZone: us-east-1b
       CidrBlock: 10.0.99.0/24
       Tags:
         - Key: Name
@@ -55,7 +59,7 @@ Resources:
   Subnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: 'us-east-1a'
+      AvailabilityZone: us-east-1a
       CidrBlock: 10.0.0.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -359,6 +363,35 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 4816510b-a9fb-467b-a2b6-a85d16656b59
+  Secret:
+    Type: 'AWS::IAM::AccessKey'
+    Properties:
+      UserName: !Ref Celery
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 65ab6416-eeb7-4eb4-9ef2-b373b66b9825
+  Celery:
+    Type: 'AWS::IAM::User'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 106e8f70-914f-4976-82ef-bbed5867a36e
+  ReadWrite:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: turbine-tasks-policy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sqs:*'
+            Resource:
+              - !Ref Tasks
+      Users:
+        - !Ref Celery
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ac6b099f-6230-48a7-b672-6491406dde55
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -394,13 +427,13 @@ Metadata:
         'y': 150
       z: 1
       embeds:
-        - 0559dceb-39c7-40fd-adf9-bb7614b20722
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
         - 30fb8416-de73-44a8-b965-42697ce7803c
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - 0559dceb-39c7-40fd-adf9-bb7614b20722
     ea81a163-4d1b-4137-8169-8c84e9c7331b:
       size:
         width: 280
@@ -428,6 +461,7 @@ Metadata:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+        - 28cca544-d573-4b40-91dd-40e2577d5949
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -1044,4 +1078,43 @@ Metadata:
         id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
       target:
         id: 0559dceb-39c7-40fd-adf9-bb7614b20722
+      z: 11
+    65ab6416-eeb7-4eb4-9ef2-b373b66b9825:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 710
+        'y': -40
+      z: 0
+      embeds: []
+      isrelatedto:
+        - 106e8f70-914f-4976-82ef-bbed5867a36e
+    106e8f70-914f-4976-82ef-bbed5867a36e:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 610
+        'y': -40
+      z: 0
+      embeds: []
+    ac6b099f-6230-48a7-b672-6491406dde55:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 490
+        'y': -40
+      z: 0
+      embeds: []
+      isassociatedwith:
+        - 106e8f70-914f-4976-82ef-bbed5867a36e
+      isrelatedto:
+        - 28cca544-d573-4b40-91dd-40e2577d5949
+    7d991aa8-8090-4905-a2f8-381b849d9c07:
+      source:
+        id: ac6b099f-6230-48a7-b672-6491406dde55
+      target:
+        id: 106e8f70-914f-4976-82ef-bbed5867a36e
       z: 11
