@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: |
-  Change me.
+  the stack of airflow resources.
 Parameters:
   DbMasterUsername:
     Description: The username to be used in the airflow database.
@@ -116,7 +116,6 @@ Resources:
       ImageId: ami-80861296
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
-      PrivateIpAddress: 10.0.0.11
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Comms
@@ -152,7 +151,6 @@ Resources:
       ImageId: ami-80861296
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
-      PrivateIpAddress: 10.0.0.10
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
