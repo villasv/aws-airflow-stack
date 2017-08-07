@@ -134,12 +134,10 @@ Resources:
                 export AIRFLOW__CELERY__AWS_SECRET_ACCESS_KEY=${secret}
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
-            - {
-              setup: !FindInMap [Variables, Scripts, Setup],
-              rds: !GetAtt Database.Endpoint.Address,
-              key: !Ref Secret,
+            - setup: !FindInMap [Variables, Scripts, Setup]
+              rds: !GetAtt Database.Endpoint.Address
+              key: !Ref Secret
               secret: !GetAtt Secret.SecretAccessKey
-            }
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -163,7 +161,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
-      - Repository
+      - Scheduler
 ## Scaling
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
@@ -172,7 +170,7 @@ Resources:
       MinSize: 0
       MaxSize: 10
       VPCZoneIdentifier:
-        - !Ref Subnet
+        - !Ref Dummy
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
@@ -426,11 +424,11 @@ Metadata:
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
-        width: 530
-        height: 230
+        width: 550
+        height: 250
       position:
-        x: 40
-        'y': 150
+        x: 10
+        'y': 180
       z: 1
       embeds:
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
@@ -445,8 +443,8 @@ Metadata:
         width: 280
         height: 100
       position:
-        x: 280
-        'y': 170
+        x: 110
+        'y': 210
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -458,8 +456,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 200
+        x: 220
+        'y': 240
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
@@ -467,20 +465,23 @@ Metadata:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+      isrelatedto:
+        - 361321d9-8ef0-4ec0-9f90-32079fd42268
+        - 65ab6416-eeb7-4eb4-9ef2-b373b66b9825
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
         height: 60
       position:
-        x: 290
-        'y': 200
+        x: 320
+        'y': 240
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
       ismemberof:
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
       dependson:
-        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+        - 8c059690-0ad1-4922-b823-710c5ead3726
     ce3ef0b5-4659-40e4-a2b7-24852dbd5451:
       source:
         id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
@@ -545,8 +546,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
-        'y': 60
+        x: 120
+        'y': 100
       z: 0
       embeds: []
     d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7:
@@ -554,8 +555,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
-        'y': 200
+        x: 120
+        'y': 240
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
@@ -577,8 +578,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 180
-        'y': 60
+        x: 400
+        'y': 90
       z: 1
       parent: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
       embeds: []
@@ -635,8 +636,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 290
-        'y': 300
+        x: 320
+        'y': 360
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -753,8 +754,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 390
-        'y': 300
+        x: 120
+        'y': 360
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -791,8 +792,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 300
+        x: 220
+        'y': 360
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -813,8 +814,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: -50
-        'y': 310
+        x: -70
+        'y': 360
       z: 0
       embeds: []
     ec649b6a-0680-463a-9804-e4ba31cc291e:
@@ -828,8 +829,8 @@ Metadata:
         width: 100
         height: 100
       position:
-        x: 40
-        'y': 280
+        x: 10
+        'y': 330
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -845,8 +846,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 60
-        'y': 310
+        x: 30
+        'y': 360
       z: 3
       parent: 30fb8416-de73-44a8-b965-42697ce7803c
       embeds: []
@@ -865,8 +866,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 610
-        'y': 300
+        x: 590
+        'y': 360
       z: 0
       embeds: []
       ismemberof:
@@ -878,12 +879,12 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 610
-        'y': 180
+        x: 590
+        'y': 220
       z: 0
       embeds: []
       isconnectedto:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - 0559dceb-39c7-40fd-adf9-bb7614b20722
       isassociatedwith:
         - 535f86f4-9cef-4823-b8bd-888153ca3b7e
     f79e1187-387d-468f-baa9-bed58deddbb1:
@@ -927,8 +928,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 710
-        'y': 300
+        x: 690
+        'y': 360
       z: 0
       embeds: []
     f12da049-cd8c-4011-8c3f-650b4463a007:
@@ -936,8 +937,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 710
-        'y': 180
+        x: 690
+        'y': 220
       z: 0
       embeds: []
       isassociatedwith:
@@ -956,8 +957,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 610
-        'y': 60
+        x: 590
+        'y': 100
       z: 0
       embeds: []
       isassociatedwith:
@@ -1006,8 +1007,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 710
-        'y': 60
+        x: 700
+        'y': 100
       z: 0
       embeds: []
     cff2d88b-b690-46db-8515-e28ce8d3a212:
@@ -1027,8 +1028,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 180
-        'y': 280
+        x: 400
+        'y': 230
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1043,8 +1044,8 @@ Metadata:
         width: 80
         height: 90
       position:
-        x: 170
-        'y': 40
+        x: 390
+        'y': 70
       z: 0
       embeds:
         - 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -1062,10 +1063,10 @@ Metadata:
     0559dceb-39c7-40fd-adf9-bb7614b20722:
       size:
         width: 80
-        height: 80
+        height: 100
       position:
-        x: 60
-        'y': 180
+        x: 470
+        'y': 210
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1080,8 +1081,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 710
-        'y': -40
+        x: 190
+        'y': 100
       z: 0
       embeds: []
       isrelatedto:
@@ -1091,8 +1092,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 610
-        'y': -40
+        x: 250
+        'y': 100
       z: 0
       embeds: []
     ac6b099f-6230-48a7-b672-6491406dde55:
@@ -1100,8 +1101,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': -40
+        x: 310
+        'y': 100
       z: 0
       embeds: []
       isassociatedwith:
@@ -1113,4 +1114,16 @@ Metadata:
         id: ac6b099f-6230-48a7-b672-6491406dde55
       target:
         id: 106e8f70-914f-4976-82ef-bbed5867a36e
+      z: 11
+    097b78b9-173d-49f4-9422-d1af98cc46a1:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      z: 11
+    eab6a8ac-39d6-49b2-beff-227f3aedf473:
+      source:
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+      target:
+        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
       z: 11
