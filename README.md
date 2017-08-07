@@ -2,6 +2,8 @@
 
 Turbine is the set of bare metals behind a simple yet efficient Airflow instance.
 
+![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
+
 ## Prerequisites
 
 You will need a key file generated in the AWS console to be associated with the created compute instances and enable SSH.
@@ -21,7 +23,7 @@ You will need a key file generated in the AWS console to be associated with the 
     SSH into any of the instances and clone your Airflow files inside the shared folder (`/efs`).
 
     ```
-    ssh -i "yourkey.pem" ubuntu@some.public.ec2.ip
+    ssh -i "your_key.pem" ubuntu@some.public.ec2.ip
     cd /efs
     git clone https://your.git/user/repo
     ```
@@ -34,13 +36,13 @@ You will need a key file generated in the AWS console to be associated with the 
 
     The EC2 instance hosting the `airflow webserver` and `airflow flower` processes.
 
-    IP: `10.0.0.10` , Public SSH: `Enabled`
+    Public SSH: `Enabled`
 
 - **Scheduler**:
 
     The EC2 instance hosting the `airflow scheduler` process.
 
-    IP: `10.0.0.11`, Public SSH: `Enabled`
+    Public SSH: `Enabled`
 
 ## Overview
 
