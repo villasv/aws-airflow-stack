@@ -127,10 +127,19 @@ Resources:
         'Fn::Base64':
           'Fn::Sub':
             - |
-              ${Setup}
-              echo "SOME_VAR=${AWS::StackName}" >> /efs/env
+              ${setup}
+              echo "
+                export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}
+                export AIRFLOW__CELERY__BROKER_URL=sqs://
+                export AIRFLOW__CELERY__AWS_ACCESS_KEY_ID=${key}
+                export AIRFLOW__CELERY__AWS_SECRET_ACCESS_KEY=${secret}
+                export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}
+              :" | sed "s/^[ \t]*//" >> /efs/env.sh
             - {
-              Setup: !FindInMap [Variables, Scripts, Setup],
+              setup: !FindInMap [Variables, Scripts, Setup],
+              rds: !GetAtt Database.Endpoint.Address,
+              key: !Ref Secret,
+              secret: !GetAtt Secret.SecretAccessKey
             }
     Metadata:
       'AWS::CloudFormation::Designer':
