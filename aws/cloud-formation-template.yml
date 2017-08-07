@@ -131,9 +131,8 @@ Resources:
                 export AIRFLOW_HOME=/efs/airflow
                 export AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                 export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                export AIRFLOW__CELERY__BROKER_URL=sqs://
-                export AIRFLOW__CELERY__AWS_ACCESS_KEY_ID=${key}
-                export AIRFLOW__CELERY__AWS_SECRET_ACCESS_KEY=${secret}
+                export AIRFLOW__CELERY__DEFAULT_QUEUE=CeleryTaskQueue
+                export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:${secret}@
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
             - setup: !FindInMap [Variables, Scripts, Setup]
