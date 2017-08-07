@@ -150,7 +150,6 @@ Resources:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
       - Repository
-      - Tasks
 ## Scaling
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
@@ -281,13 +280,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-  Tasks:
-    Type: 'AWS::SQS::Queue'
-    Properties:
-      QueueName: CeleryTaskQueue
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
 ## Security
   Access:
     Type: 'AWS::EC2::SecurityGroup'
@@ -461,7 +453,6 @@ Metadata:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 28cca544-d573-4b40-91dd-40e2577d5949
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -619,15 +610,6 @@ Metadata:
       target:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
       z: 5
-    28cca544-d573-4b40-91dd-40e2577d5949:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 490
-        'y': 60
-      z: 0
-      embeds: []
     6dd58195-a1d3-4d4e-bb26-18bf4e2ba736:
       source:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
