@@ -22,13 +22,13 @@ Parameters:
 Mappings:
   Variables:
     Scripts:
-      MountEfs: |
+      Setup: |
         #!/bin/bash -xe
         apt-get -y install nfs-common
         mkdir /efs
         mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
         chown -R ubuntu /efs
-      InstallDeps: |
+
         apt-get update
         apt-get -y install python3-pip
         pip3 install -U pip
@@ -110,26 +110,6 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
 ## Instances
-  Interface:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      ImageId: ami-80861296
-      InstanceType: t2.micro
-      SubnetId: !Ref Subnet
-      PrivateIpAddress: 10.0.0.10
-      KeyName: !Ref KeyPair
-      SecurityGroupIds:
-        - !Ref Web
-      Tags:
-        - Key: Name
-          Value: turbine-interface
-      UserData:
-        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-    DependsOn:
-      - Repository
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -145,15 +125,36 @@ Resources:
           Value: turbine-scheduler
       UserData:
         'Fn::Base64':
-          'Fn::Join':
-          - "\n"
-          - [
-            !FindInMap [Variables, Scripts, MountEfs],
-            !FindInMap [Variables, Scripts, InstallDeps]
-          ]
+          'Fn::Sub':
+            - |
+              ${Setup}
+              echo "SOME_VAR=${AWS::StackName}" >> /efs/env
+            - {
+              Setup: !FindInMap [Variables, Scripts, Setup],
+            }
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
+    DependsOn:
+      - Repository
+  Interface:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-80861296
+      InstanceType: t2.micro
+      SubnetId: !Ref Subnet
+      PrivateIpAddress: 10.0.0.10
+      KeyName: !Ref KeyPair
+      SecurityGroupIds:
+        - !Ref Web
+      Tags:
+        - Key: Name
+          Value: turbine-interface
+      UserData:
+        'Fn::Base64': !FindInMap [Variables, Scripts, Setup]
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
       - Repository
 ## Scaling
@@ -176,7 +177,7 @@ Resources:
       SecurityGroups:
         - !Ref Comms
       UserData:
-        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
+        'Fn::Base64': !FindInMap [Variables, Scripts, Setup]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
