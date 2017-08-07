@@ -118,7 +118,7 @@ Resources:
       SubnetId: !Ref Subnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
-        - !Ref Comms
+        - !Ref Control
       Tags:
         - Key: Name
           Value: turbine-scheduler
@@ -309,7 +309,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-  Comms:
+  Control:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupName: TurbineCommsSG
@@ -396,6 +396,13 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ac6b099f-6230-48a7-b672-6491406dde55
+  Comms:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 52db1638-dd50-4e4a-be69-d5efb987900b
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -425,12 +432,13 @@ Metadata:
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
         width: 550
-        height: 250
+        height: 230
       position:
         x: 10
         'y': 180
       z: 1
       embeds:
+        - 52db1638-dd50-4e4a-be69-d5efb987900b
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
@@ -637,7 +645,7 @@ Metadata:
         height: 60
       position:
         x: 320
-        'y': 360
+        'y': 340
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -755,7 +763,7 @@ Metadata:
         height: 60
       position:
         x: 120
-        'y': 360
+        'y': 340
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -793,7 +801,7 @@ Metadata:
         height: 60
       position:
         x: 220
-        'y': 360
+        'y': 340
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -815,7 +823,7 @@ Metadata:
         height: 60
       position:
         x: -70
-        'y': 360
+        'y': 340
       z: 0
       embeds: []
     ec649b6a-0680-463a-9804-e4ba31cc291e:
@@ -830,7 +838,7 @@ Metadata:
         height: 100
       position:
         x: 10
-        'y': 330
+        'y': 310
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -847,7 +855,7 @@ Metadata:
         height: 60
       position:
         x: 30
-        'y': 360
+        'y': 340
       z: 3
       parent: 30fb8416-de73-44a8-b965-42697ce7803c
       embeds: []
@@ -867,11 +875,11 @@ Metadata:
         height: 60
       position:
         x: 590
-        'y': 360
+        'y': 340
       z: 0
       embeds: []
       ismemberof:
-        - ea67a2be-98cb-48db-8c0c-89fe99de522b
+        - 52db1638-dd50-4e4a-be69-d5efb987900b
       isrelatedto:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
     90184717-25cc-4671-a70d-7becceed5c50:
@@ -929,7 +937,7 @@ Metadata:
         height: 60
       position:
         x: 690
-        'y': 360
+        'y': 340
       z: 0
       embeds: []
     f12da049-cd8c-4011-8c3f-650b4463a007:
@@ -1127,3 +1135,27 @@ Metadata:
       target:
         id: 0559dceb-39c7-40fd-adf9-bb7614b20722
       z: 11
+    52db1638-dd50-4e4a-be69-d5efb987900b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 480
+        'y': 340
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds: []
+    07dabd76-e873-47f1-b5a3-bb46b2732814:
+      source:
+        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+      target:
+        id: 52db1638-dd50-4e4a-be69-d5efb987900b
+      z: 11
+    0f451562-ee51-49e6-8eda-68463a3659fa:
+      source:
+        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(2) circle:nth-child(1)     '
+        port: 'AWS::MembershipLInk-AWS::EC2::SecurityGroup-SecurityGroups'
+      target:
+        id: 52db1638-dd50-4e4a-be69-d5efb987900b
+      z: 12
