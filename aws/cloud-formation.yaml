@@ -31,7 +31,7 @@ Mappings:
 
         apt-get update
         apt-get -y install python3-pip
-        pip3 install -U pip
+        pip3 install -U pip "airflow[sqs, postgres]" celery[sqs]
 Resources:
 ## Networking
   VPC:
@@ -128,11 +128,11 @@ Resources:
             - |
               ${setup}
               echo "
-                export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}
+                export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                 export AIRFLOW__CELERY__BROKER_URL=sqs://
                 export AIRFLOW__CELERY__AWS_ACCESS_KEY_ID=${key}
                 export AIRFLOW__CELERY__AWS_SECRET_ACCESS_KEY=${secret}
-                export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}
+                export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
             - setup: !FindInMap [Variables, Scripts, Setup]
               rds: !GetAtt Database.Endpoint.Address
