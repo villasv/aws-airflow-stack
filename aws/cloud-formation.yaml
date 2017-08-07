@@ -144,7 +144,13 @@ Resources:
         - Key: Name
           Value: turbine-scheduler
       UserData:
-        'Fn::Base64': !FindInMap [Variables, Scripts, MountEfs]
+        'Fn::Base64':
+          'Fn::Join':
+          - "\n"
+          - [
+            !FindInMap [Variables, Scripts, MountEfs],
+            !FindInMap [Variables, Scripts, InstallDeps]
+          ]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -378,7 +384,7 @@ Resources:
             Action:
               - 'sqs:*'
             Resource:
-              - !Ref Tasks
+              - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
       Users:
         - !Ref Celery
     Metadata:
