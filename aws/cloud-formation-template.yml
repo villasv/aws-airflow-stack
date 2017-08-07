@@ -31,7 +31,7 @@ Mappings:
 
         apt-get update
         apt-get -y install python3-pip
-        pip3 install -U pip "airflow[sqs, postgres]" celery[sqs]
+        pip3 install -U pip "airflow[sqs, postgres]" celery[sqs] boto3
 Resources:
 ## Networking
   VPC:
@@ -128,6 +128,8 @@ Resources:
             - |
               ${setup}
               echo "
+                export AIRFLOW_HOME=/efs/airflow
+                export AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                 export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                 export AIRFLOW__CELERY__BROKER_URL=sqs://
                 export AIRFLOW__CELERY__AWS_ACCESS_KEY_ID=${key}
