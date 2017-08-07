@@ -312,10 +312,10 @@ Resources:
   Control:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: TurbineCommsSG
+      GroupName: TurbineControlSG
       GroupDescription: >-
         Security Rules with permissions for node intercommunication between
-        Airflow instances.
+        Airflow instances and remote access.
       SecurityGroupIngress:
         - CidrIp: 10.0.0.0/16
           IpProtocol: TCP
@@ -329,6 +329,17 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
+  Comms:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: TurbineCommsSG
+      GroupDescription: >-
+        Security Rules with permissions for node itercommunication between
+        Airflow worker instances.
+      VpcId: !Ref VPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 52db1638-dd50-4e4a-be69-d5efb987900b
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -396,13 +407,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ac6b099f-6230-48a7-b672-6491406dde55
-  Comms:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 52db1638-dd50-4e4a-be69-d5efb987900b
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
