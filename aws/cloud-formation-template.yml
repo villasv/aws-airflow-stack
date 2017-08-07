@@ -32,6 +32,8 @@ Mappings:
         apt-get update
         apt-get -y install python3-pip
         pip3 install -U pip "airflow[sqs, postgres]" celery[sqs] boto3
+    Hardcoded:
+      QueueName: CeleryTaskQueue
 Resources:
 ## Networking
   VPC:
@@ -131,7 +133,7 @@ Resources:
                 export AIRFLOW_HOME=/efs/airflow
                 export AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                 export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                export AIRFLOW__CELERY__DEFAULT_QUEUE=CeleryTaskQueue
+                export AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                 export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:${secret}@
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
@@ -139,6 +141,7 @@ Resources:
               rds: !GetAtt Database.Endpoint.Address
               key: !Ref Secret
               secret: !GetAtt Secret.SecretAccessKey
+              queue: !FindInMap [Variables, Hardcoded, QueueName]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -191,16 +194,16 @@ Resources:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmName: QueueGrowth
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: 50
-      ComparisonOperator: GreaterThanThreshold
       Statistic: SampleCount
       Period: '60'
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
-          Value: CeleryTaskQueue
+          Value: !FindInMap [Variables, Hardcoded, QueueName]
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
@@ -208,16 +211,16 @@ Resources:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmName: QueueShrink
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: 5
-      ComparisonOperator: LessThanThreshold
       Statistic: SampleCount
       Period: '60'
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
-          Value: CeleryTaskQueue
+          Value: !FindInMap [Variables, Hardcoded, QueueName]
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Threshold: 5
+      ComparisonOperator: LessThanThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
