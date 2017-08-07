@@ -1,6 +1,6 @@
 # Turbine
 
-Turbine is the set of bare metals behind a simple yet efficient Airflow instance.
+Turbine is the set of bare metals behind a simple yet efficient Airflow setup.
 
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
@@ -12,7 +12,7 @@ You will need a key file generated in the AWS console to be associated with the 
 
 1. Deploy the Cloud Formation Stack
 
-    Create a new stack using the YAML definition at `aws\cloud-formation.yaml`.
+    Create a new stack using the YAML definition at [`aws\cloud-formation-template.yaml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
     
     The following button will readily deploy the template at `us-east-1` and will name it `TurbineAirflow`:
     
