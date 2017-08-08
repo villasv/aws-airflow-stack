@@ -12,11 +12,11 @@ You will need a key file generated in the AWS console to be associated with the 
 
 1. Deploy the Cloud Formation Stack
 
-    Create a new stack using the YAML definition at [`aws\cloud-formation-template.yaml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
+    Create a new stack using the YAML definition at [`aws\cloud-formation-template.yml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
     
     The following button will readily deploy the template at `us-east-1` and will name it `TurbineAirflow`:
     
-    [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=TurbineAirflow&templateURL=https://s3.amazonaws.com/villasv/turbine/cloud-formation.yaml)
+    [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=TurbineAirflow&templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
 2. Setup your Airflow files
 
