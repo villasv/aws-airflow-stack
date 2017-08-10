@@ -129,12 +129,13 @@ Resources:
           'Fn::Sub':
             - |
               ${setup}
+              SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
               echo "
                 export AIRFLOW_HOME=/efs/airflow
                 export AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                 export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                 export AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:${secret}@
+                export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:$SECRET@
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
             - setup: !FindInMap [Variables, Scripts, Setup]
