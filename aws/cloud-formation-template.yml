@@ -404,7 +404,9 @@ Resources:
             Action:
               - 'sqs:*'
             Resource:
-              - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
+              - 'Fn::Sub'
+                - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
+                - queue: !GetAtt Tasks.QueueName
       Users:
         - !Ref Celery
     Metadata:
