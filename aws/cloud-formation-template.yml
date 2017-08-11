@@ -185,7 +185,12 @@ Resources:
       SecurityGroups:
         - !Ref Comms
       UserData:
-        'Fn::Base64': !FindInMap [Variables, Scripts, Setup]
+        'Fn::Base64':
+          'Fn::Sub':
+          - |
+            ${setup}
+            airflow worker
+          - setup: !FindInMap [Variables, Scripts, Setup]
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
@@ -402,9 +407,14 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - 'sqs:ListQueues'
+            Resource:
+              - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
+          - Effect: Allow
+            Action:
               - 'sqs:*'
             Resource:
-              - 'Fn::Sub'
+              - 'Fn::Sub':
                 - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
                 - queue: !GetAtt Tasks.QueueName
       Users:
