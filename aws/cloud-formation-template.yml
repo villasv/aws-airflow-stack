@@ -32,8 +32,6 @@ Mappings:
         apt-get update
         apt-get -y install python3-pip
         pip3 install -U pip "airflow[sqs, postgres]" celery[sqs] boto3
-    Hardcoded:
-      QueueName: CeleryTaskQueue
 Resources:
 ## Networking
   VPC:
@@ -142,7 +140,7 @@ Resources:
               rds: !GetAtt Database.Endpoint.Address
               key: !Ref Secret
               secret: !GetAtt Secret.SecretAccessKey
-              queue: !FindInMap [Variables, Hardcoded, QueueName]
+              queue: !GetAtt Tasks.QueueName
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -200,7 +198,7 @@ Resources:
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
-          Value: !FindInMap [Variables, Hardcoded, QueueName]
+          Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Threshold: 10
@@ -217,7 +215,7 @@ Resources:
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
-          Value: !FindInMap [Variables, Hardcoded, QueueName]
+          Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Threshold: 5
@@ -412,6 +410,13 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ac6b099f-6230-48a7-b672-6491406dde55
+  Tasks:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: CeleryTasks
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -447,9 +452,9 @@ Metadata:
         'y': 180
       z: 1
       embeds:
-        - 52db1638-dd50-4e4a-be69-d5efb987900b
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
+        - 52db1638-dd50-4e4a-be69-d5efb987900b
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
         - 30fb8416-de73-44a8-b965-42697ce7803c
@@ -482,9 +487,11 @@ Metadata:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
       isrelatedto:
         - 361321d9-8ef0-4ec0-9f90-32079fd42268
         - 65ab6416-eeb7-4eb4-9ef2-b373b66b9825
+        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -949,6 +956,8 @@ Metadata:
         'y': 340
       z: 0
       embeds: []
+      isrelatedto:
+        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
     f12da049-cd8c-4011-8c3f-650b4463a007:
       size:
         width: 60
@@ -1028,6 +1037,8 @@ Metadata:
         'y': 100
       z: 0
       embeds: []
+      isrelatedto:
+        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
     cff2d88b-b690-46db-8515-e28ce8d3a212:
       source:
         id: f12da049-cd8c-4011-8c3f-650b4463a007
@@ -1098,7 +1109,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 190
+        x: 200
         'y': 100
       z: 0
       embeds: []
@@ -1109,7 +1120,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 250
+        x: 260
         'y': 100
       z: 0
       embeds: []
@@ -1118,7 +1129,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 310
+        x: 320
         'y': 100
       z: 0
       embeds: []
@@ -1168,3 +1179,18 @@ Metadata:
       target:
         id: 52db1638-dd50-4e4a-be69-d5efb987900b
       z: 12
+    0c03e033-c2e8-487d-a0e9-a5bf5e851fcb:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 490
+        'y': 50
+      z: 0
+      embeds: []
+    94e74b16-cd76-40d9-ab12-0c99e20cf662:
+      source:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      target:
+        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+      z: 11
