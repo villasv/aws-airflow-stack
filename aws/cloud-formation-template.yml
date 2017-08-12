@@ -195,27 +195,12 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-  Grow:
-    Type: 'AWS::CloudWatch::Alarm'
-    Properties:
-      AlarmName: QueueGrowth
-      Statistic: Average
-      Period: '60'
-      EvaluationPeriods: '1'
-      Dimensions:
-        - Name: QueueName
-          Value: !GetAtt Tasks.QueueName
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: 10
-      ComparisonOperator: GreaterThanThreshold
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
   Shrink:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmName: QueueShrink
+      AlarmActions:
+        - !Ref ScaleIn
       Statistic: Average
       Period: '60'
       EvaluationPeriods: '1'
@@ -229,6 +214,25 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
+  Grow:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: QueueGrowth
+      AlarmActions:
+        - !Ref ScaleOut
+      Statistic: Average
+      Period: '60'
+      EvaluationPeriods: '1'
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt Tasks.QueueName
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
   ScaleOut:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
@@ -240,21 +244,17 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
-    DependsOn:
-      - Grow
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: 1
+      ScalingAdjustment: -1
       Cooldown: 60
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-    DependsOn:
-      - Shrink
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
