@@ -182,6 +182,7 @@ Resources:
     Properties:
       ImageId: ami-80861296
       InstanceType: !Ref SpotInstanceType
+      KeyName: !Ref KeyPair
       SecurityGroups:
         - !Ref Comms
       UserData:
@@ -189,6 +190,7 @@ Resources:
           'Fn::Sub':
           - |
             ${setup}
+            pip3 install -r /efs/airflow/requirements.txt
             source /efs/env.sh
             airflow worker
           - setup: !FindInMap [Variables, Scripts, Setup]
@@ -345,6 +347,15 @@ Resources:
       GroupDescription: >-
         Security Rules with permissions for node itercommunication between
         Airflow worker instances.
+      SecurityGroupIngress:
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: TCP
+          FromPort: 22
+          ToPort: 22
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
