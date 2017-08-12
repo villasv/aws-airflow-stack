@@ -1150,6 +1150,7 @@ Metadata:
         - 106e8f70-914f-4976-82ef-bbed5867a36e
       isrelatedto:
         - 28cca544-d573-4b40-91dd-40e2577d5949
+        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
     7d991aa8-8090-4905-a2f8-381b849d9c07:
       source:
         id: ac6b099f-6230-48a7-b672-6491406dde55
@@ -1197,8 +1198,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 50
+        x: 500
+        'y': 10
       z: 0
       embeds: []
     94e74b16-cd76-40d9-ab12-0c99e20cf662:
