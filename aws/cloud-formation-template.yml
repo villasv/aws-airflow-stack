@@ -173,7 +173,7 @@ Resources:
       MinSize: 0
       MaxSize: 10
       VPCZoneIdentifier:
-        - !Ref Dummy
+        - !Ref Subnet
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
