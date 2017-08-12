@@ -92,3 +92,7 @@ This is a template for a testing and prototyping stack. Production environments 
 
 
 ## FAQ
+
+1. Why is there a `Dummy` subnet in the VPC?
+
+    There's no official support on CloudFormation for choosing in which VPC an RDS Instance is deployed. So the only alternatives are to let it live in the default VPC and use peering or to use DBSubnetGroup (which requires 2 subnets on different Availability Zones).
