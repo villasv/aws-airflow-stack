@@ -30,7 +30,8 @@ Mappings:
         chown -R ubuntu /efs
 
         apt-get update
-        apt-get -y install python3-pip
+        apt-get -y install python-pip python3-pip
+        pip2 install -U pip https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
         pip3 install -U pip "airflow[sqs, postgres]" celery[sqs] boto3
 Resources:
 ## Networking
@@ -127,6 +128,7 @@ Resources:
           'Fn::Sub':
             - |
               ${setup}
+
               SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
               echo "
                 export AIRFLOW_HOME=/efs/airflow
@@ -136,12 +138,69 @@ Resources:
                 export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:$SECRET@
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
               :" | sed "s/^[ \t]*//" >> /efs/env.sh
+
+              /usr/local/bin/cfn-init --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
             - setup: !FindInMap [Variables, Scripts, Setup]
               rds: !GetAtt Database.Endpoint.Address
               key: !Ref Secret
               secret: !GetAtt Secret.SecretAccessKey
               queue: !GetAtt Tasks.QueueName
     Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - supervision
+            - formation
+        supervision:
+          packages:
+            apt:
+              supervisor: []
+          files:
+            '/etc/supervisor/conf.d/airflow.conf':
+              content: |
+                [program:airflow]
+                command=airflow scheduler
+                autorestart=true
+                startsecs=5
+                stopasgroup=true
+          commands:
+            reload:
+              command: supervisorctl update
+          services:
+            sysvinit:
+              supervisor:
+                enabled: true
+                ensureRunning: true
+                files:
+                - "/etc/supervisor/supervisord.conf"
+                sources:
+                - "/etc/supervisor/conf.d"
+        formation:
+          files:
+            '/etc/cfn/cfn-hup.conf':
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                interval=1
+              mode: '000400'
+              owner: root
+              group: root
+            '/etc/cfn/hooks.d/cfn-auto-reloader.conf':
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.VirtualMachine.Metadata.AWS::CloudFormation::Init
+                action=/usr/local/bin/cfn-init --resource=Scheduler --stack=${AWS::StackName} --region=${AWS::Region}
+                runas=root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                - '/etc/cfn/cfn-hup.conf'
+                - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
@@ -191,8 +250,6 @@ Resources:
           - |
             ${setup}
             pip3 install -r /efs/airflow/requirements.txt
-            source /efs/env.sh
-            airflow worker
           - setup: !FindInMap [Variables, Scripts, Setup]
     Metadata:
       'AWS::CloudFormation::Designer':
