@@ -114,7 +114,7 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-80861296
+      ImageId: ami-a4c7edb2
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
       KeyName: !Ref KeyPair
@@ -127,8 +127,7 @@ Resources:
         'Fn::Base64':
           'Fn::Sub':
             - |
-              ${setup}
-
+              #!/bin/bash -xe
               SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
               echo "
                 export AIRFLOW_HOME=/efs/airflow
@@ -137,9 +136,11 @@ Resources:
                 export AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                 export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:$SECRET@
                 export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-              :" | sed "s/^[ \t]*//" >> /efs/env.sh
+              :" | sed "s/^[ \t]*//" >> /env.sh
 
-              /usr/local/bin/cfn-init --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
+              yum update -y aws-cfn-bootstrap
+              /opt/aws/bin/cfn-init         --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
+              /opt/aws/bin/cfn-signal -e $? --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
             - setup: !FindInMap [Variables, Scripts, Setup]
               rds: !GetAtt Database.Endpoint.Address
               key: !Ref Secret
@@ -149,11 +150,34 @@ Resources:
       'AWS::CloudFormation::Init':
         configSets:
           default:
+            - filesystem
+            - runtime
             - supervision
             - formation
+        filesystem:
+          packages:
+            yum:
+              nfs-utils: []
+          commands:
+            mount:
+              test: test ! -d /efs
+              command: mkdir /efs & mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 10.0.0.9:/ /efs
+        runtime:
+          packages:
+            yum:
+              gcc: []
+              gcc-c++: []
+              libxml2-devel: []
+              libxslt-devel: []
+              python35: []
+              python35-pip: []
+              python35-devel: []
+            python:
+              apache-airflow[celery,postgres]: []
+              celery[sqs]: []
         supervision:
           packages:
-            apt:
+            yum:
               supervisor: []
           files:
             '/etc/supervisor/conf.d/airflow.conf':
