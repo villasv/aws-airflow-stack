@@ -124,28 +124,11 @@ Resources:
         - Key: Name
           Value: turbine-scheduler
       UserData:
-        'Fn::Base64':
-          'Fn::Sub':
-            - |
-              #!/bin/bash -xe
-              SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-              echo "
-                export AIRFLOW_HOME=/efs/airflow
-                export AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
-                export AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                export AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                export AIRFLOW__CELERY__BROKER_URL=sqs://${key}:$SECRET@
-                export AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-              :" | sed "s/^[ \t]*//" >> /env.sh
-
-              yum update -y aws-cfn-bootstrap
-              /opt/aws/bin/cfn-init         --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
-              /opt/aws/bin/cfn-signal -e $? --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
-            - setup: !FindInMap [Variables, Scripts, Setup]
-              rds: !GetAtt Database.Endpoint.Address
-              key: !Ref Secret
-              secret: !GetAtt Secret.SecretAccessKey
-              queue: !GetAtt Tasks.QueueName
+        'Fn::Base64': !Sub |
+          #!/bin/bash -xe
+          yum update -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init         --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
       'AWS::CloudFormation::Init':
         configSets:
@@ -177,6 +160,32 @@ Resources:
             python:
               apache-airflow[celery,postgres]: []
               celery[sqs]: []
+          files:
+            '/etc/environment':
+              content:
+                'Fn::Sub':
+                  - |
+                    AIRFLOW_HOME=/efs/airflow
+                    AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
+                    AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                    AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
+                    AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
+                    AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  - setup: !FindInMap [Variables, Scripts, Setup]
+                    rds: !GetAtt Database.Endpoint.Address
+                    key: !Ref Secret
+                    queue: !GetAtt Tasks.QueueName
+          commands:
+            urlescape:
+              command:
+                'Fn::Sub':
+                  - |
+                    SECRET=$(
+                      echo "${secret}" |
+                      perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg'
+                    )
+                    sed -i -e "s/INSERTSECRET/$SECRET/" /etc/environment
+                  - secret: !GetAtt Secret.SecretAccessKey
         supervision:
           packages:
             python:
