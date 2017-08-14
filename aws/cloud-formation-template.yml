@@ -209,6 +209,7 @@ Resources:
                 file=/var/run/supervisor.sock
                 [supervisord]
                 logfile=/var/log/supervisor/supervisord.log
+                childlogdir=/var/log/supervisor
                 pidfile=/var/run/supervisord.pid
                 [rpcinterface:supervisor]
                 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
