@@ -165,30 +165,28 @@ Resources:
               python35-pip: []
           files:
             '/etc/environment':
-              content:
-                'Fn::Sub':
-                  - |
-                    AIRFLOW_HOME="/efs/airflow"
-                    AIRFLOW__CORE__DAGS_FOLDER="/efs/dags"
-                    AIRFLOW__CORE__SQL_ALCHEMY_CONN="postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow"
-                    AIRFLOW__CELERY__DEFAULT_QUEUE="${queue}"
-                    AIRFLOW__CELERY__BROKER_URL="sqs://${key}:INSERTSECRET@"
-                    AIRFLOW__CELERY__CELERY_RESULT_BACKEND="db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow"
-                  - setup: !FindInMap [Variables, Scripts, Setup]
-                    rds: !GetAtt Database.Endpoint.Address
-                    key: !Ref Secret
-                    queue: !GetAtt Tasks.QueueName
+              content: !Sub
+                - |
+                  AIRFLOW_HOME="/efs/airflow"
+                  AIRFLOW__CORE__DAGS_FOLDER="/efs/dags"
+                  AIRFLOW__CORE__SQL_ALCHEMY_CONN="postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow"
+                  AIRFLOW__CELERY__DEFAULT_QUEUE="${queue}"
+                  AIRFLOW__CELERY__BROKER_URL="sqs://${key}:INSERTSECRET@"
+                  AIRFLOW__CELERY__CELERY_RESULT_BACKEND="db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow"
+                - setup: !FindInMap [Variables, Scripts, Setup]
+                  rds: !GetAtt Database.Endpoint.Address
+                  key: !Ref Secret
+                  queue: !GetAtt Tasks.QueueName
           commands:
             fixenviron:
-              command:
-                'Fn::Sub':
-                  - |
-                    SECRET=$(
-                      echo "${secret}" |
-                      perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg'
-                    )
-                    sed -i -e "s/INSERTSECRET/$SECRET/" /etc/environment
-                  - secret: !GetAtt Secret.SecretAccessKey
+              command: !Sub
+                - |
+                  SECRET=$(
+                    echo "${secret}" |
+                    perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg'
+                  )
+                  sed -i -e "s/INSERTSECRET/$SECRET/" /etc/environment
+                - secret: !GetAtt Secret.SecretAccessKey
             installdeps:
               command: |
                 pip-3.5 install -U pip setuptools wheel
@@ -197,14 +195,13 @@ Resources:
         project:
           commands:
             bootstrap:
-              command: /usr/local/bin/airflow initdb
+              command: |
+                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
+                /usr/local/bin/airflow initdb
             installreqs:
               test: test -f /efs/airflow/requirements.txt
               command: pip-3.5 install -r /efs/airflow/requirements.txt
         supervision:
-          packages:
-            python:
-              supervisor: []
           files:
             '/etc/supervisord.conf':
               content: |
@@ -349,6 +346,7 @@ Resources:
               command: mkdir -p /var/log/supervisor
             subenv:
               command: |
+                pip-2.7 install supervisor
                 ENV=$(tr '\n' ',' < /etc/environment | sed 's/%/%%/g')
                 sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
           services:
