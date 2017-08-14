@@ -194,7 +194,7 @@ Resources:
                 [supervisorctl]
                 serverurl=unix:///var/run/supervisor.sock
                 [program:airflow]
-                command=airflow scheduler
+                command=/usr/local/bin/airflow scheduler
                 autorestart=true
                 startsecs=10
                 stopasgroup=true
@@ -345,7 +345,7 @@ Resources:
                 [cfn-auto-reloader-hook]
                 triggers=post.update
                 path=Resources.Scheduler.Metadata.AWS::CloudFormation::Init
-                action=/usr/local/bin/cfn-init --resource=Scheduler --stack=${AWS::StackName} --region=${AWS::Region}
+                action=/opt/aws/bin/cfn-init --resource=Scheduler --stack=${AWS::StackName} --region=${AWS::Region}
                 runas=root
           services:
             sysvinit:
