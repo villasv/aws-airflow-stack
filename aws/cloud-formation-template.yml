@@ -135,6 +135,7 @@ Resources:
           default:
             - filesystem
             - runtime
+            - project
             - supervision
             - formation
         filesystem:
@@ -154,12 +155,14 @@ Resources:
             yum:
               gcc: []
               gcc-c++: []
+              lapack-devel: []
+              libcurl-devel: []
               libxml2-devel: []
               libxslt-devel: []
               postgresql95-devel: []
-            python:
-              apache-airflow[celery,postgres]: []
-              celery[sqs]: []
+              python35: []
+              python35-devel: []
+              python35-pip: []
           files:
             '/etc/environment':
               content:
@@ -186,6 +189,17 @@ Resources:
                     )
                     sed -i -e "s/INSERTSECRET/$SECRET/" /etc/environment
                   - secret: !GetAtt Secret.SecretAccessKey
+            setuptools:
+              command: pip-3.5 install -U pip setuptools wheel
+            symlink:
+              command: sudo ln -s /usr/local/bin/pip3.5 /usr/bin/pip-3.5 -f
+        project:
+          commands:
+            dependencies:
+              command: pip-3.5 install apache-airflow[celery,postgres] celery[sqs]
+            requirements:
+              test: test -f /efs/airflow/requirements.txt
+              command: pip-3.5 install -r /efs/airflow/requirements.txt
         supervision:
           packages:
             python:
