@@ -20,38 +20,22 @@ The following button will readily deploy the template (defaults to your last use
 
 ### 2. Setup your Airflow files
 
-SSH into the `turbine-scheduler` EC2 instance and clone your Airflow files **inside the shared folder** (`/efs`).
+This can be done in several ways. What really matters is:
+
+- You Airflow home folder should be accessible at `/efs/airflow`
+- Your DAGs folder should be accessible at `efs/dags`
+
+The home folder is assumed to contain the `airflow.cfg`. This is flexible enough to accommodate pretty much any project structure and easily set up with symbolic links. 
+
+The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2 instance, clone your Airflow files **inside the shared folder** (`/efs`), install your stuff and link your specific folders.
 
 ```
-ssh -i "your_key.pem" ubuntu@some.public.ec2.ip
+ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 cd /efs
 git clone https://your.git/user/repo
-```
-
-The environment has pre-configured folder locations, so just create links to your project's airflow home and DAGs folder:
-
-```
+sudo pip3 install -r /efs/repo/requirements.txt
 sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
-```
-
-### 3. Initialize the database and the Scheduler
-
-After installing your dependencies, go ahead and source the environment variables, initialize the system and put the scheduler to work:
-
-```
-sudo pip3 install -r /efs/airflow/requirements.txt
-```
-
-The `&` makes the process detach, so you can exit the `SSH` session without killing the scheduler.
-
-### 4. Configure the Interface
-
-SSH into the `turbine-interface` EC2 instance, install your dependencies and start the webserver process:
-
-```
-ssh -i "your_key.pem" ubuntu@other.public.ec2.ip
-sudo pip3 install -r /efs/airflow/requirements.txt
 ```
 
 ## Most Important Resources
