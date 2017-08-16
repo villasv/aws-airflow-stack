@@ -152,7 +152,7 @@ Resources:
               python35-devel: []
               python35-pip: []
           files:
-            '/etc/environment':
+            /etc/environment:
               content: !Sub
                 - |
                   AIRFLOW_HOME=/efs/airflow
@@ -188,9 +188,10 @@ Resources:
         supervision:
           packages:
             yum:
-              supervisor: ["2.1"]
+              supervisor:
+                - '2.1'
           files:
-            '/etc/supervisord.conf':
+            /etc/supervisord.conf:
               content: |
                 [supervisord]
                 http_port=/var/run/supervisor.sock
@@ -221,10 +222,10 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - "/etc/supervisord.conf"
+                  - /etc/supervisord.conf
         formation:
           files:
-            '/etc/cfn/cfn-hup.conf':
+            /etc/cfn/cfn-hup.conf:
               content: !Sub |
                 [main]
                 stack=${AWS::StackId}
@@ -233,7 +234,7 @@ Resources:
               mode: '000400'
               owner: root
               group: root
-            '/etc/cfn/hooks.d/cfn-auto-reloader.conf':
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
               content: !Sub |
                 [cfn-auto-reloader-hook]
                 triggers=post.update
@@ -246,8 +247,8 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - '/etc/cfn/cfn-hup.conf'
-                - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
@@ -307,7 +308,7 @@ Resources:
               python35-devel: []
               python35-pip: []
           files:
-            '/etc/environment':
+            /etc/environment:
               content: !Sub
                 - |
                   AIRFLOW_HOME=/efs/airflow
@@ -343,9 +344,10 @@ Resources:
         supervision:
           packages:
             yum:
-              supervisor: ["2.1"]
+              supervisor:
+                - '2.1'
           files:
-            '/etc/supervisord.conf':
+            /etc/supervisord.conf:
               content: |
                 [supervisord]
                 http_port=/var/run/supervisor.sock
@@ -376,10 +378,10 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - "/etc/supervisord.conf"
+                  - /etc/supervisord.conf
         formation:
           files:
-            '/etc/cfn/cfn-hup.conf':
+            /etc/cfn/cfn-hup.conf:
               content: !Sub |
                 [main]
                 stack=${AWS::StackId}
@@ -388,7 +390,7 @@ Resources:
               mode: '000400'
               owner: root
               group: root
-            '/etc/cfn/hooks.d/cfn-auto-reloader.conf':
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
               content: !Sub |
                 [cfn-auto-reloader-hook]
                 triggers=post.update
@@ -401,12 +403,12 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - '/etc/cfn/cfn-hup.conf'
-                - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
-      - Scheduler
+      - Repository
 ## Scaling
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
@@ -470,7 +472,7 @@ Resources:
               python35-devel: []
               python35-pip: []
           files:
-            '/etc/environment':
+            /etc/environment:
               content: !Sub
                 - |
                   AIRFLOW_HOME=/efs/airflow
@@ -506,9 +508,10 @@ Resources:
         supervision:
           packages:
             yum:
-              supervisor: ["2.1"]
+              supervisor:
+                - '2.1'
           files:
-            '/etc/supervisord.conf':
+            /etc/supervisord.conf:
               content: |
                 [supervisord]
                 http_port=/var/run/supervisor.sock
@@ -539,10 +542,10 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - "/etc/supervisord.conf"
+                  - /etc/supervisord.conf
         formation:
           files:
-            '/etc/cfn/cfn-hup.conf':
+            /etc/cfn/cfn-hup.conf:
               content: !Sub |
                 [main]
                 stack=${AWS::StackId}
@@ -551,7 +554,7 @@ Resources:
               mode: '000400'
               owner: root
               group: root
-            '/etc/cfn/hooks.d/cfn-auto-reloader.conf':
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
               content: !Sub |
                 [cfn-auto-reloader-hook]
                 triggers=post.update
@@ -564,8 +567,8 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 files:
-                - '/etc/cfn/cfn-hup.conf'
-                - '/etc/cfn/hooks.d/cfn-auto-reloader.conf'
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
   Shrink:
@@ -796,10 +799,9 @@ Resources:
           - Effect: Allow
             Action:
               - 'sqs:*'
-            Resource:
-              - 'Fn::Sub':
-                - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
-                - queue: !GetAtt Tasks.QueueName
+            Resource: !Sub
+              - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
+              - queue: !GetAtt Tasks.QueueName
       Users:
         - !Ref Celery
     Metadata:
@@ -866,19 +868,19 @@ Metadata:
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 8c059690-0ad1-4922-b823-710c5ead3726
         - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+        - 8c059690-0ad1-4922-b823-710c5ead3726
     8c059690-0ad1-4922-b823-710c5ead3726:
       size:
         width: 60
         height: 60
       position:
-        x: 220
+        x: 120
         'y': 240
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
-      ismemberof:
+      isassociatedwith:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
@@ -897,10 +899,10 @@ Metadata:
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
-      ismemberof:
+      isassociatedwith:
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
       dependson:
-        - 8c059690-0ad1-4922-b823-710c5ead3726
+        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
     ce3ef0b5-4659-40e4-a2b7-24852dbd5451:
       source:
         id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
@@ -965,8 +967,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 120
-        'y': 100
+        x: 220
+        'y': 90
       z: 0
       embeds: []
     d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7:
@@ -974,13 +976,12 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 120
+        x: 220
         'y': 240
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
-      ismemberof:
-        - 401bffa6-76b7-4606-84ca-41c85dc73c30
+      isassociatedwith:
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
       references:
         - 2330aac6-8c78-44da-a211-6877405896d7
@@ -1002,9 +1003,7 @@ Metadata:
       z: 1
       parent: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
       embeds: []
-      ismemberof:
-        - 777ec631-64c3-416d-b5bf-7f58409f55e1
-        - f1b0c208-e88b-4494-a5ec-39048b689565
+      isassociatedwith:
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
     0f20f2c0-22e6-40b5-a242-1e878ee5e561:
       source:
@@ -1173,7 +1172,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 120
+        x: 220
         'y': 340
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -1211,7 +1210,7 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 220
+        x: 120
         'y': 340
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -1285,11 +1284,11 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 590
+        x: 600
         'y': 340
       z: 0
       embeds: []
-      ismemberof:
+      isassociatedwith:
         - 52db1638-dd50-4e4a-be69-d5efb987900b
       isrelatedto:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
@@ -1298,14 +1297,13 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 590
-        'y': 220
+        x: 600
+        'y': 450
       z: 0
       embeds: []
-      isconnectedto:
-        - 0559dceb-39c7-40fd-adf9-bb7614b20722
       isassociatedwith:
         - 535f86f4-9cef-4823-b8bd-888153ca3b7e
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
     f79e1187-387d-468f-baa9-bed58deddbb1:
       source:
         id: 90184717-25cc-4671-a70d-7becceed5c50
@@ -1347,19 +1345,20 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 690
-        'y': 340
+        x: 320
+        'y': 420
       z: 0
       embeds: []
       isrelatedto:
         - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
+        - f12da049-cd8c-4011-8c3f-650b4463a007
     f12da049-cd8c-4011-8c3f-650b4463a007:
       size:
         width: 60
         height: 60
       position:
-        x: 690
-        'y': 220
+        x: 440
+        'y': 420
       z: 0
       embeds: []
       isassociatedwith:
@@ -1378,8 +1377,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 590
-        'y': 100
+        x: 440
+        'y': 480
       z: 0
       embeds: []
       isassociatedwith:
@@ -1428,12 +1427,13 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 700
-        'y': 100
+        x: 320
+        'y': 480
       z: 0
       embeds: []
       isrelatedto:
         - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
+        - 99a417bc-21ad-4e5f-b525-7afe1289f3e6
     cff2d88b-b690-46db-8515-e28ce8d3a212:
       source:
         id: f12da049-cd8c-4011-8c3f-650b4463a007
@@ -1472,7 +1472,7 @@ Metadata:
       z: 0
       embeds:
         - 361321d9-8ef0-4ec0-9f90-32079fd42268
-      isconnectedto:
+      isassociatedwith:
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
         - 0559dceb-39c7-40fd-adf9-bb7614b20722
     35a8b15e-9e78-479e-ba06-c7b4a63cbb09:
@@ -1504,8 +1504,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 200
-        'y': 100
+        x: -70
+        'y': 450
       z: 0
       embeds: []
       isrelatedto:
@@ -1515,8 +1515,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 260
-        'y': 100
+        x: -10
+        'y': 450
       z: 0
       embeds: []
     ac6b099f-6230-48a7-b672-6491406dde55:
@@ -1524,8 +1524,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 320
-        'y': 100
+        x: 50
+        'y': 450
       z: 0
       embeds: []
       isassociatedwith:
@@ -1580,8 +1580,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 500
-        'y': 10
+        x: 170
+        'y': 450
       z: 0
       embeds: []
     94e74b16-cd76-40d9-ab12-0c99e20cf662:
@@ -1589,4 +1589,10 @@ Metadata:
         id: 8c059690-0ad1-4922-b823-710c5ead3726
       target:
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+      z: 11
+    696c4b22-476b-416c-8609-51883cd0ae3f:
+      source:
+        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
+      target:
+        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
       z: 11
