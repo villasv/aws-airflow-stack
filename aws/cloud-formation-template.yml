@@ -141,6 +141,7 @@ Resources:
         runtime:
           packages:
             yum:
+              git: []
               gcc: []
               gcc-c++: []
               lapack-devel: []
@@ -297,6 +298,7 @@ Resources:
         runtime:
           packages:
             yum:
+              git: []
               gcc: []
               gcc-c++: []
               lapack-devel: []
@@ -461,6 +463,7 @@ Resources:
         runtime:
           packages:
             yum:
+              git: []
               gcc: []
               gcc-c++: []
               lapack-devel: []
