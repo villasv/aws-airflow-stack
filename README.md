@@ -1,6 +1,6 @@
 # Turbine
 
-Turbine is the set of bare metals behind a simple yet efficient Airflow setup.
+Turbine is the set of bare metals behind a simple yet complete and efficient Airflow setup.
 
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
@@ -10,64 +10,57 @@ You will need a key file generated in the AWS console to be associated with the 
 
 ## Get It Working
 
-1. Deploy the Cloud Formation Stack
+### 1. Deploy the Cloud Formation Stack
 
-    Create a new stack using the YAML definition at [`aws\cloud-formation-template.yml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
+Create a new stack using the YAML definition at [`aws\cloud-formation-template.yml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
     
-    The following button will readily deploy the template at `us-east-1` and will name it `TurbineAirflow`:
+The following button will readily deploy the template (defaults to your last used region):
     
-    [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=TurbineAirflow&templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
-2. Setup your Airflow files
+### 2. Setup your Airflow files
 
-    SSH into the `turbine-scheduler` EC2 instance and clone your Airflow files **inside the shared folder** (`/efs`).
+SSH into the `turbine-scheduler` EC2 instance and clone your Airflow files **inside the shared folder** (`/efs`).
 
-    ```
-    ssh -i "your_key.pem" ubuntu@some.public.ec2.ip
-    cd /efs
-    git clone https://your.git/user/repo
-    ```
+```
+ssh -i "your_key.pem" ubuntu@some.public.ec2.ip
+cd /efs
+git clone https://your.git/user/repo
+```
 
-    The environment has pre-configured folder locations, so just create links to your project's airflow home and DAGs folder:
+The environment has pre-configured folder locations, so just create links to your project's airflow home and DAGs folder:
 
-    ```
-    sudo ln -s /efs/repo/airflow/home /efs/airflow
-    sudo ln -s /efs/repo/airflow/dags /efs/dags
-    ```
-    > Optionally, instead of symlinks you can override the standard Airflow configuration environment variables (`AIRFLOW_HOME` and `AIRFLOW__CORE__DAGS_FOLDER`) on the `/efs/env.sh` file. Just exporting a new variable wouldn't work everywhere.
+```
+sudo ln -s /efs/repo/airflow/home /efs/airflow
+sudo ln -s /efs/repo/airflow/dags /efs/dags
+```
 
-3. Initialize the database and the Scheduler
+### 3. Initialize the database and the Scheduler
 
-    After installing your dependencies, go ahead and source the environment variables, initialize the system and put the scheduler to work:
+After installing your dependencies, go ahead and source the environment variables, initialize the system and put the scheduler to work:
 
-    ```
-    sudo pip3 install -r /efs/airflow/requirements.txt
-    source /efs/env.sh
-    airflow initdb
-    airflow scheduler &
-    ```
-    
-    The `&` makes the process detach, so you can exit the `SSH` session without killing the scheduler.
+```
+sudo pip3 install -r /efs/airflow/requirements.txt
+```
 
-4. Configure the Interface
+The `&` makes the process detach, so you can exit the `SSH` session without killing the scheduler.
 
-    SSH into the `turbine-interface` EC2 instance, install your dependencies and start the webserver process:
+### 4. Configure the Interface
 
-    ```
-    ssh -i "your_key.pem" ubuntu@other.public.ec2.ip
-    sudo pip3 install -r /efs/airflow/requirements.txt
-    source /efs/env.sh
-    airflow webserver &
-    ```
+SSH into the `turbine-interface` EC2 instance, install your dependencies and start the webserver process:
 
+```
+ssh -i "your_key.pem" ubuntu@other.public.ec2.ip
+sudo pip3 install -r /efs/airflow/requirements.txt
+```
 
 ## Most Important Resources
 
 - **Interface**:
 
-    The EC2 instance hosting the `airflow webserver` and `airflow flower` processes.
+    The EC2 instance hosting the `airflow webserver` process.
 
-    Public SSH: `Enabled`
+    Public SSH: `Enabled`, Public Web Access: `Enabled`
 
 - **Scheduler**:
 
