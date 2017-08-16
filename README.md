@@ -38,6 +38,12 @@ sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
 
+Optionally, you can reset the database to remove the default example DAGs that were loaded in the bootstrap process. Be careful to do this only when Airflow is idle, as to not leave it in an inconsistent state.
+
+```
+airflow resetdb
+```
+
 ## Most Important Resources
 
 - **Interface**:
