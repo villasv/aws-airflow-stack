@@ -360,7 +360,7 @@ Resources:
                 [supervisorctl]
                 serverurl=unix:///var/run/supervisor.sock
                 [program:airflow]
-                command=/usr/local/bin/airflow scheduler
+                command=/usr/local/bin/airflow webserver
                 log_stderr=true
                 autorestart=true
                 startsecs=10
@@ -525,7 +525,7 @@ Resources:
                 [supervisorctl]
                 serverurl=unix:///var/run/supervisor.sock
                 [program:airflow]
-                command=/usr/local/bin/airflow scheduler
+                command=/usr/local/bin/airflow worker
                 log_stderr=true
                 autorestart=true
                 startsecs=10
