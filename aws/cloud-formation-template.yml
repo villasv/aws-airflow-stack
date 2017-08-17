@@ -745,11 +745,7 @@ Resources:
         Security Rules with permissions for the web UI exposed by Airflow and
         Celery Flower.
       SecurityGroupIngress:
-        - CidrIp: 10.0.0.0/16
-          IpProtocol: TCP
-          FromPort: 5555
-          ToPort: 5555
-        - CidrIp: 10.0.0.0/16
+        - CidrIp: 0.0.0.0/0
           IpProtocol: TCP
           FromPort: 8080
           ToPort: 8080
