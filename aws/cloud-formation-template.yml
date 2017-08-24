@@ -501,6 +501,7 @@ Resources:
                 pip-3.5 install -U pip setuptools wheel
                 sudo ln -s /usr/local/bin/pip3.5 /usr/bin/pip-3.5 -f
                 pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
+                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
                 cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
         project:
           commands:
