@@ -212,7 +212,7 @@ Resources:
           commands:
             injectvars:
               command: |
-                ENV=$(tr '\n' ',' < /etc/environment | sed 's/%/%%/g')
+                ENV=$(tr '\n' ',' < /etc/environment)
                 sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
             fixpython:
               command: |
@@ -370,7 +370,7 @@ Resources:
           commands:
             injectvars:
               command: |
-                ENV=$(tr '\n' ',' < /etc/environment | sed 's/%/%%/g')
+                ENV=$(tr '\n' ',' < /etc/environment)
                 sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
             fixpython:
               command: |
@@ -530,6 +530,7 @@ Resources:
                 serverurl=unix:///var/run/supervisor.sock
                 [program:airflow]
                 command=/usr/local/bin/airflow worker
+                user=ec2-user
                 log_stderr=true
                 autorestart=true
                 startsecs=10
@@ -537,7 +538,7 @@ Resources:
           commands:
             injectvars:
               command: |
-                ENV=$(tr '\n' ',' < /etc/environment | sed 's/%/%%/g')
+                ENV=$(tr '\n' ',' < /etc/environment)
                 sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
             fixpython:
               command: |
