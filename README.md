@@ -1,4 +1,9 @@
-# Turbine
+# Turbine ![sync] ![rver]
+
+[sync]:
+https://img.shields.io/scrutinizer/build/g/villasv/turbine.svg?style=flat-square&label=sync
+[rver]:
+https://img.shields.io/github/release/villasv/turbine.svg?style=flat-square
 
 Turbine is the set of bare metals behind a simple yet complete and efficient Airflow setup.
 
@@ -71,11 +76,10 @@ This is a template for a testing and prototyping stack. Production environments 
 - set up supervision for Airflow processes
 - watch out for pricing fluctuations with spot instances
 
-## Notable Forks
-
-
 ## FAQ
 
 1. Why is there a `Dummy` subnet in the VPC?
 
     There's no official support on CloudFormation for choosing in which VPC an RDS Instance is deployed. So the only alternatives are to let it live in the default VPC and use peering or to use DBSubnetGroup (which requires 2 subnets on different Availability Zones).
+
+## Contributing
