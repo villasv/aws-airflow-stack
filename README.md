@@ -1,19 +1,33 @@
-# Turbine ![sync] ![rver]
+# Turbine [![sync]][ci] [![rver]][gh]
 
 [sync]:
 https://img.shields.io/scrutinizer/build/g/villasv/turbine.svg?style=flat-square&label=sync
+[ci]:
+https://scrutinizer-ci.com/g/villasv/turbine/build-status/master
 [rver]:
 https://img.shields.io/github/release/villasv/turbine.svg?style=flat-square
+[gh]:
+https://github.com/villasv/turbine/releases
 
-Turbine is the set of bare metals behind a simple yet complete and efficient Airflow setup.
+Turbine is the set of bare metals behind a simple yet complete and efficient Airflow setup. Deploy in a few clicks, configure in a few commands, personalize in a few fields.
 
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
-## Prerequisites
+## Overview
 
-You will need a key file generated in the AWS console to be associated with the created compute instances and enable SSH.
+The stack is composed of two main EC2 machines (one for the Airflow Web Server and one for the Airflow Scheduler). Airflow Worker machines are instantiated on demand when the job queue average length grows past a certain threshold (initially 10) and terminated when the queue average length shrinks below another threshold (initially 5).
+
+Supporting resources include a RDS instance to host the Airflow Metadata Database, a SQS instance to be used as broker backend and an EFS instance to serve as shared configuration and logging location for all machines.
+
+All other resources are the usual boilerplate to have the above working, including networking and Internet connectivity, security specifications, availability zone coverage and authentication mechanisms.
+
+The project is intended to be easily deployed, making it great for testing, demoing and showcasing Airflow solutions. It is also expected to be easily tinkered, allowing it to be used in real production environments with little extra effort.
 
 ## Get It Working
+
+### 0. Prerequisites
+
+You will need a key file generated in the AWS console to be associated with the created compute instances and enable SSH.
 
 ### 1. Deploy the Cloud Formation Stack
 
@@ -49,32 +63,6 @@ Optionally, you can reset the database to remove the default example DAGs that w
 airflow resetdb
 ```
 
-## Most Important Resources
-
-- **Interface**:
-
-    The EC2 instance hosting the `airflow webserver` process.
-
-    Public SSH: `Enabled`, Public Web Access: `Enabled`
-
-- **Scheduler**:
-
-    The EC2 instance hosting the `airflow scheduler` process.
-
-    Public SSH: `Enabled`
-
-## Overview
-
-### Simplicity
-Specific resources are created with hardcoded information, like private IP addresses.
-This way the template is smaller and easier to read (less variable substitutions which leads to reusable string blocks) and examples easier to follow.
-
-### Production Readiness
-This is a template for a testing and prototyping stack. Production environments should:
-
-- be more mindful about security (restrain public Internet access).
-- set up supervision for Airflow processes
-- watch out for pricing fluctuations with spot instances
 
 ## FAQ
 
@@ -83,3 +71,15 @@ This is a template for a testing and prototyping stack. Production environments 
     There's no official support on CloudFormation for choosing in which VPC an RDS Instance is deployed. So the only alternatives are to let it live in the default VPC and use peering or to use DBSubnetGroup (which requires 2 subnets on different Availability Zones).
 
 ## Contributing
+
+> Stacks can get quite opinionated. If you have a divergent fork, you may open a RFC issue and we will 
+
+See the [contribution guidelines](https://github.com/villasv/turbine/blob/master/CONTRIBUTING.md) for details.
+
+## Licensing
+
+> MIT License
+>
+> Copyright (c) 2017 Victor Villas
+
+See the [license file](/LICENSE) for details.
