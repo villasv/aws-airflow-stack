@@ -72,9 +72,12 @@ airflow resetdb
 
 ## Contributing
 
-> Stacks can get quite opinionated. If you have a divergent fork, you may open a RFC issue and we will 
+> Stacks can get quite opinionated. If you have a divergent fork, you may open a RFC issue and we will index it.
+> Hopefully this will help to build a diverse set of possible deployment models for various Airflow production needs.
 
-See the [contribution guidelines](https://github.com/villasv/turbine/blob/master/CONTRIBUTING.md) for details.
+See the [contribution guidelines](/CONTRIBUTING.md) for details.
+
+You may also want to take a look at the [Citizen Code of Conduct](/CODE_OF_CONDUCT.md).
 
 ## Licensing
 
