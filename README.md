@@ -68,12 +68,13 @@ airflow resetdb
 
 1. Why is there a `Dummy` subnet in the VPC?
 
-    There's no official support on CloudFormation for choosing in which VPC an RDS Instance is deployed. So the only alternatives are to let it live in the default VPC and use peering or to use DBSubnetGroup (which requires 2 subnets on different Availability Zones).
+    There's no official support on CloudFormation for choosing in which VPC a RDS Instance is deployed. The only alternatives are to let it live in the default VPC and communicate with peering or to use DBSubnetGroup, which requires associated subnets that cover at least 2 Availability Zones.
 
 ## Contributing
 
-> Stacks can get quite opinionated. If you have a divergent fork, you may open a RFC issue and we will index it.
-> Hopefully this will help to build a diverse set of possible deployment models for various Airflow production needs.
+> This project aims to be constantly evolving with newer features from Airflow and AWS tooling, as well as improving its design qualities and maintainability. Requests for Enhancement should be abundant and anyone is welcome to pick them up.
+>
+> Stacks can get quite opinionated. If you have a divergent fork, you may open a Request for Comments and we will index it. Hopefully this will help to build a diverse set of possible deployment models for various Airflow production needs.
 
 See the [contribution guidelines](/CONTRIBUTING.md) for details.
 
