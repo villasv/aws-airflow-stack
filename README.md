@@ -41,12 +41,12 @@ The following button will readily deploy the template (defaults to your last use
 
 This can be done in several ways. What really matters is:
 
-- You Airflow home folder should be accessible at `/efs/airflow`
-- Your DAGs folder should be accessible at `efs/dags`
+- The Airflow home directory should be accessible at `/efs/airflow`
+- The DAG files directory should be accessible at `/efs/dags`
 
-The home folder is assumed to contain the `airflow.cfg`. This is flexible enough to accommodate pretty much any project structure and easily set up with symbolic links. 
+The home directory is assumed to contain the Airflow configuration file (`airflow.cfg`). This is flexible enough to accommodate pretty much any project structure and is easily set up with symbolic links.
 
-The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2 instance, clone your Airflow files **inside the shared folder** (`/efs`), install your stuff and link your specific folders.
+The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2 instance, clone your Airflow files **inside the shared directory** (`/efs`), install your stuff and link your specific files.
 
 ```
 ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
