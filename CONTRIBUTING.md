@@ -1,8 +1,8 @@
 # Contributing
 
-**Thanks!** If you took interest in contributing, you're already awesome. Even more so now that you came to read these guidelines. In fact, reading through Turbine's code and documents is a free audit that every community member actively donate to the project and is much appreciated.
+**Thanks!** If you took interest in contributing, you're already awesome. Even more so now that you came to read these guidelines. In fact, reading through Turbine's code and documents is a free audit that every community member actively donates to the project and is much appreciated.
 
-**Why?** There should be plenty of work to do, which is why organization is key. Hopefully this short read will boost the community potential to achieve more and faster. Infrastructure and Data related technology tends to have slow development and adoption, but we want to change this.
+**Why?** There should be plenty of work to do, which is why organization is key. Hopefully this short read will boost the community potential to achieve more and faster. Infrastructure and Data related technology tends to have slow development and adoption, but Turbine aims the opposite.
 
 **How?** You can immediately contribute by participating in any of the [current issues](https://github.com/villasv/turbine/issues), be it by simply giving your opinion in the discussion or actively solving a problem. All forms of community interaction are welcomed contributions, so writing blog posts and tutorials or making citations at presentations and workshops are appreciated too.
 
