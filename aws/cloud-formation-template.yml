@@ -2,13 +2,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: |
   the stack of airflow resources.
 Parameters:
-  DbMasterUsername:
-    Description: The username to be used in the airflow database.
-    Type: String
-  DbMasterPassword:
-    Description: The password to be used in the airflow database.
-    Type: String
-    NoEcho: true
+## Networking
   KeyPair:
     Description: Amazon EC2 Key Pair to be used with SSH connections.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -44,6 +38,14 @@ Parameters:
     AllowedValues:
       - t2.micro
       - m4.large
+## Storage
+  DbMasterUsername:
+    Description: The username to be used in the airflow database.
+    Type: String
+  DbMasterPassword:
+    Description: The password to be used in the airflow database.
+    Type: String
+    NoEcho: true
 Resources:
 ## Networking
   VPC:
@@ -843,12 +845,11 @@ Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
       - Label:
-          default: Database Configuration
+          default: Networking
         Parameters:
-          - DbMasterUsername
-          - DbMasterPassword
+          - KeyPair
       - Label:
-          default: Autoscaling Configuration
+          default: Scaling
         Parameters:
           - MinGroupSize
           - MaxGroupSize
@@ -856,9 +857,10 @@ Metadata:
           - GrowthThreshold
           - SpotInstanceType
       - Label:
-          default: Networking Configuration
+          default: Storage
         Parameters:
-          - KeyPair
+          - DbMasterUsername
+          - DbMasterPassword
     ParameterLabels:
       DbMasterPassword:
         default: Postgres Password
