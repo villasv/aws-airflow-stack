@@ -5,6 +5,21 @@ Parameters:
     Description: >-
       The virtual machine image (AMI) to use for the instances. See
       https://aws.amazon.com/amazon-linux-ami/ for the latest Amazon Linux AMI for each region.
+  VPC:
+    Description: >-
+      The VPC in which all resources are going to reside.
+    Type: AWS::EC2::VPC::Id
+  StackSubnet:
+    Description: >-
+      The Subnet in which the default and scaled instances are going to reside.
+    Type: AWS::EC2::Subnet::Id
+  DummySubnet:
+    Description: >-
+      An extra Subnet used to fulfill the 2 AZ requirement for RDS.
+      No computing resource will reside in it.
+    Type: AWS::EC2::Subnet::Id
+  DbMasterUsername:
+    Description: The username to be used in the airflow database.
     Type: String
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
@@ -18,6 +33,11 @@ Parameters:
     Description: The IPv4 CIDR block to be used in the stack subnet.
     Type: String
     Default: 10.0.0.0/24
+  FileMountIp:
+    Description: >-
+      A valid and free private IP address inside the StackSubnet to be given to
+      the EFS Mount point.
+    Type: String
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -57,83 +77,6 @@ Parameters:
     Type: String
     NoEcho: true
 Resources:
-  VPC:
-    Type: 'AWS::EC2::VPC'
-    Properties:
-      EnableDnsSupport: 'true'
-      EnableDnsHostnames: 'true'
-      CidrBlock: !Ref VpcCidrBlock
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-vpc'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-  DummySubnet:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone: !Sub "${AWS::Region}b"
-      CidrBlock: !Ref DummySubnetBlock
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-dummy'
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-  StackSubnet:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone: !Sub "${AWS::Region}a"
-      CidrBlock: !Ref StackSubnetBlock
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-subnet'
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-  Internet:
-    Type: 'AWS::EC2::InternetGateway'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 789e4526-8c69-4899-aa8c-300a7772119e
-  Routes:
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 30fb8416-de73-44a8-b965-42697ce7803c
-  Opener:
-    Type: 'AWS::EC2::Route'
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref Internet
-      RouteTableId: !Ref Routes
-    DependsOn:
-      - VPCGatewayAttachment
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
-  VPCGatewayAttachment:
-    Type: 'AWS::EC2::VPCGatewayAttachment'
-    Properties:
-      InternetGatewayId: !Ref Internet
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ec649b6a-0680-463a-9804-e4ba31cc291e
-  SubnetRouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Properties:
-      RouteTableId: !Ref Routes
-      SubnetId: !Ref StackSubnet
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -292,6 +235,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref Files
+      IpAddress: !Ref FileMountIp
       SubnetId: !Ref StackSubnet
       SecurityGroups:
         - !Ref Access
@@ -643,6 +587,11 @@ Metadata:
         Parameters:
           - DbMasterUsername
           - DbMasterPassword
+          - VPC
+          - StackSubnet
+          - DummySubnet
+          - FileMountIp
+          - KeyPair
     ParameterLabels:
       DbMasterPassword:
         default: Postgres Password
