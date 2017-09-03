@@ -9,16 +9,41 @@ Parameters:
     Description: The password to be used in the airflow database.
     Type: String
     NoEcho: true
+  KeyPair:
+    Description: Amazon EC2 Key Pair to be used with SSH connections.
+    Type: 'AWS::EC2::KeyPair::KeyName'
+## Scaling
+  MinGroupSize:
+    Description: >-
+      The minimum number of (worker) instances active in the AutoScaling group.
+    Type: Number
+    Default: 0
+  MaxGroupSize:
+    Description: >-
+      The maximum number of (worker) instances active in the AutoScaling group.
+    Type: Number
+    Default: 10
+  ShrinkThreshold:
+    Description: >-
+      The threshold for the queue size from which going equal or below will
+      trigger the AutoScaling group to Scale In (killing one worker instance).
+    Type: Number
+    Default: 0
+  GrowthThreshold:
+    Description: >-
+      The threshold for the queue size from which going equal or above will
+      trigger the AutoScaling group to Scale Out (allocating one worker instance).
+    Type: Number
+    Default: 1
   SpotInstanceType:
-    Description: EC2 instance types to use in the spot instance fleet. Default is t2.micro.
+    Description: >-
+      EC2 instance types to use as AutoScaling worker.
+      Default is t2.micro.
     Type: String
     Default: t2.micro
     AllowedValues:
       - t2.micro
       - m4.large
-  KeyPair:
-    Description: Amazon EC2 Key Pair to be used with SSH connections.
-    Type: 'AWS::EC2::KeyPair::KeyName'
 Resources:
 ## Networking
   VPC:
@@ -418,8 +443,8 @@ Resources:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       LaunchConfigurationName: !Ref Config
-      MinSize: 0
-      MaxSize: 10
+      MinSize: !Ref MinGroupSize
+      MaxSize: !Ref MaxGroupSize
       VPCZoneIdentifier:
         - !Ref Subnet
     Metadata:
@@ -592,12 +617,12 @@ Resources:
           Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: 5
-      ComparisonOperator: LessThanThreshold
+      Threshold: !Ref ShrinkThreshold
+      ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
-  Grow:
+  Growth:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmActions:
@@ -610,8 +635,8 @@ Resources:
           Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: 10
-      ComparisonOperator: GreaterThanThreshold
+      Threshold: !Ref GrowthThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
@@ -621,7 +646,7 @@ Resources:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: 1
-      Cooldown: 60
+      Cooldown: 300
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -632,7 +657,7 @@ Resources:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: -1
-      Cooldown: 60
+      Cooldown: 300
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -825,6 +850,10 @@ Metadata:
       - Label:
           default: Autoscaling Configuration
         Parameters:
+          - MinGroupSize
+          - MaxGroupSize
+          - ShrinkThreshold
+          - GrowthThreshold
           - SpotInstanceType
       - Label:
           default: Networking Configuration
@@ -838,7 +867,7 @@ Metadata:
       KeyPair:
         default: Key for SSH access
       SpotInstanceType:
-        default: Instance type for workers
+        default: Instance Type
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
