@@ -21,12 +21,6 @@ Parameters:
       VpcCidrBlock.
     Type: String
     Default: 10.0.0.0/24
-  FileMountIp:
-    Description: >-
-      A valid and free private IP address inside the StackSubnet to be given to
-      the EFS Mount point.
-    Type: String
-    Default: 10.0.0.9
   KeyPair:
     Description: Amazon EC2 Key Pair to be used with SSH connections.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -75,6 +69,8 @@ Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
       CidrBlock: !Ref VpcCidrBlock
       Tags:
         - Key: Name
@@ -187,7 +183,7 @@ Resources:
                 mkdir -p /efs
                 mount -t nfs4 -o \
                   nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${FileMountIp}:/ /efs
+                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
                 chown -R ec2-user /efs
         runtime:
           packages:
@@ -345,7 +341,7 @@ Resources:
                 mkdir -p /efs
                 mount -t nfs4 -o \
                   nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${FileMountIp}:/ /efs
+                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
                 chown -R ec2-user /efs
         runtime:
           packages:
@@ -511,7 +507,7 @@ Resources:
                 mkdir -p /efs
                 mount -t nfs4 -o \
                   nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${FileMountIp}:/ /efs
+                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
                 chown -R ec2-user /efs
         runtime:
           packages:
@@ -698,7 +694,6 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref Files
-      IpAddress: !Ref FileMountIp
       SubnetId: !Ref Subnet
       SecurityGroups:
         - !Ref Access
@@ -874,7 +869,6 @@ Metadata:
           - VpcCidrBlock
           - DummySubnetBlock
           - StackSubnetBlock
-          - FileMountIp
           - KeyPair
       - Label:
           default: Scaling
