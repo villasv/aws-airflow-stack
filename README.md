@@ -72,9 +72,9 @@ airflow resetdb
 
 ## Contributing
 
-> This project aims to be constantly evolving with newer features from Airflow and AWS tooling, as well as improving its design qualities and maintainability. Requests for Enhancement should be abundant and anyone is welcome to pick them up.
+> This project aims to be constantly evolving with up to date tooling and newer AWS features, as well as improving its design qualities and maintainability. Requests for Enhancement should be abundant and anyone is welcome to pick them up.
 >
-> Stacks can get quite opinionated. If you have a divergent fork, you may open a Request for Comments and we will index it. Hopefully this will help to build a diverse set of possible deployment models for various Airflow production needs.
+> Stacks can get quite opinionated. If you have a divergent fork, you may open a Request for Comments and we will index it. Hopefully this will help to build a diverse set of possible deployment models for various production needs.
 
 See the [contribution guidelines](/CONTRIBUTING.md) for details.
 
