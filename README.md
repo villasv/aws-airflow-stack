@@ -15,11 +15,9 @@ Turbine is the set of bare metals behind a simple yet complete and efficient Air
 
 ## Overview
 
-The stack is composed of two main EC2 machines (one for the Airflow Web Server and one for the Airflow Scheduler). Airflow Worker machines are instantiated on demand when the job queue average length grows past a certain threshold (initially 10) and terminated when the queue average length shrinks below another threshold (initially 5).
+The stack is composed of two main EC2 machines (one for the Airflow Web Server and one for the Airflow Scheduler). Airflow Worker machines are instantiated on demand when the job queue average length grows past a certain threshold and terminated when the queue stays empty for too long.
 
-Supporting resources include a RDS instance to host the Airflow Metadata Database, a SQS instance to be used as broker backend and an EFS instance to serve as shared configuration and logging location for all machines.
-
-All other resources are the usual boilerplate to have the above working, including networking and Internet connectivity, security specifications, availability zone coverage and authentication mechanisms.
+Supporting resources include a RDS instance to host the Airflow Metadata Database, a SQS instance to be used as broker backend, an EFS instance to serve as shared configuration and a S3 bucket for remote logging storage. All other resources are the usual boilerplate to have the above working, including networking and Internet connectivity, security specifications, availability zone coverage and authentication mechanisms.
 
 The project is intended to be easily deployed, making it great for testing, demoing and showcasing Airflow solutions. It is also expected to be easily tinkered, allowing it to be used in real production environments with little extra effort.
 
@@ -27,7 +25,7 @@ The project is intended to be easily deployed, making it great for testing, demo
 
 ### 0. Prerequisites
 
-You will need a key file generated in the AWS console to be associated with the created compute instances and enable SSH.
+You will need a key file generated in the AWS console to be associated with the EC2 instances and enable SSH.
 
 ### 1. Deploy the Cloud Formation Stack
 
@@ -57,12 +55,11 @@ sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
 
-Optionally, you can reset the database to remove the default example DAGs that were loaded in the bootstrap process. Be careful to do this only when Airflow is idle, as to not leave it in an inconsistent state.
+### 3. Clean Up
 
-```
-airflow resetdb
-```
+In order to get a healthy initial bootstrap for your Airflow setup, it's best to make sure we're writing on a blank slate. The stack comes with Airflow already running by default because it's easier to demo and to setup supervision.
 
+One way to be completely safe is to stop all airflow process (webserver, scheduler and workers), reset the airflow database, reset the database, empty the queue and resume all airflow processes back again. If you have many workers, the easiest option is to downscale beforehand.
 
 ## FAQ
 
