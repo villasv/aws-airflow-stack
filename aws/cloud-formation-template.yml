@@ -695,7 +695,10 @@ Resources:
 ## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
-    Properties: {}
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: turbine-filesystem
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 2330aac6-8c78-44da-a211-6877405896d7
