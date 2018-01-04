@@ -1,38 +1,27 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: |
-  the stack of airflow resources.
+Description: the stack of airflow resources.
 Parameters:
-## Networking
   VpcCidrBlock:
-    Description: >-
-      The IPv4 CIDR block to be used in the VPC. Will be used to define Security Group
-      ingress rules.
+    Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
     Default: 10.0.0.0/16
   DummySubnetBlock:
-    Description: >-
-      The IPv4 CIDR block to be used in the dummy subnet. Must be consistent with the
-      VpcCidrBlock.
+    Description: The IPv4 CIDR block to be used in the dummy subnet.
     Type: String
     Default: 10.0.99.0/24
   StackSubnetBlock:
-    Description: >-
-      The IPv4 CIDR block to be used in the stack subnet. Must be consistent with the
-      VpcCidrBlock.
+    Description: The IPv4 CIDR block to be used in the stack subnet.
     Type: String
     Default: 10.0.0.0/24
   KeyPair:
-    Description: Amazon EC2 Key Pair to be used with SSH connections.
+    Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
-## Scaling
   MinGroupSize:
-    Description: >-
-      The minimum number of (worker) instances active in the AutoScaling group.
+    Description: The minimum number of active worker instances.
     Type: Number
     Default: 0
   MaxGroupSize:
-    Description: >-
-      The maximum number of (worker) instances active in the AutoScaling group.
+    Description: The maximum number of active worker instances.
     Type: Number
     Default: 10
   ShrinkThreshold:
@@ -44,19 +33,17 @@ Parameters:
   GrowthThreshold:
     Description: >-
       The threshold for the queue size from which going equal or above will
-      trigger the AutoScaling group to Scale Out (allocating one worker instance).
+      trigger the AutoScaling group to Scale Out (allocating one worker
+      instance).
     Type: Number
     Default: 1
   SpotInstanceType:
-    Description: >-
-      EC2 instance types to use as AutoScaling worker.
-      Default is t2.micro.
+    Description: EC2 instance types to use as worker.
     Type: String
     Default: t2.micro
     AllowedValues:
       - t2.micro
       - m4.large
-## Storage
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -65,7 +52,6 @@ Parameters:
     Type: String
     NoEcho: true
 Resources:
-## Networking
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -143,7 +129,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
-## Instances
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -159,149 +144,18 @@ Resources:
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -xe
+          echo $'#!/bin/sh\nexec airflow scheduler' > /usr/bin/turbine
+          chmod +x /usr/bin/turbine
           yum update -y
           yum-config-manager --enable epel
-          /opt/aws/bin/cfn-init         --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
-          /opt/aws/bin/cfn-signal -e $? --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init \
+            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
-      'AWS::CloudFormation::Init':
-        configSets:
-          default:
-            - filesystem
-            - runtime
-            - project
-            - supervision
-            - formation
-        filesystem:
-          packages:
-            yum:
-              nfs-utils: []
-          commands:
-            mount:
-              test: test ! "$(mount | grep efs)"
-              command: !Sub |
-                mkdir -p /efs
-                mount -t nfs4 -o \
-                  nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
-                chown -R ec2-user /efs
-        runtime:
-          packages:
-            yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              postgresql95-devel: []
-              python35: []
-              python35-devel: []
-              python35-pip: []
-          files:
-            /etc/environment:
-              content: !Sub
-                - |
-                  AIRFLOW_HOME=/efs/airflow
-                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
-                  AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                - rds: !GetAtt Database.Endpoint.Address
-                  key: !Ref Secret
-                  queue: !GetAtt Tasks.QueueName
-          commands:
-            injectvars:
-              command: !Sub
-                - |
-                  SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INSERTSECRET~$SECRET~" /etc/environment
-                - secret: !GetAtt Secret.SecretAccessKey
-            installdeps:
-              command: |
-                pip-3.5 install -U pip setuptools wheel
-                pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
-                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
-        project:
-          commands:
-            bootstrap:
-              command: |
-                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
-                /usr/local/bin/airflow initdb
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip-3.5 install -r /efs/airflow/requirements.txt
-        supervision:
-          packages:
-            yum:
-              supervisor:
-                - '2.1'
-          files:
-            /etc/supervisord.conf:
-              content: |
-                [supervisord]
-                http_port=/var/run/supervisor.sock
-                logfile=/var/log/supervisor/supervisord.log
-                childlogdir=/var/log/supervisor
-                pidfile=/var/run/supervisord.pid
-                environment=INSERTENVIRONMENT
-                [supervisorctl]
-                serverurl=unix:///var/run/supervisor.sock
-                [program:airflow]
-                command=/usr/local/bin/airflow scheduler
-                log_stderr=true
-                autorestart=true
-                startsecs=10
-                stopasgroup=true
-          commands:
-            injectvars:
-              command: |
-                ENV=$(tr '\n' ',' < /etc/environment)
-                sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
-            fixpython:
-              command: |
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisord
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisorctl
-          services:
-            sysvinit:
-              supervisord:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/supervisord.conf
-        formation:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                interval=1
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Scheduler.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init --resource Scheduler --stack ${AWS::StackName} --region ${AWS::Region}
-                runas=root
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
       - Repository
+      - Meta
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -317,159 +171,18 @@ Resources:
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -xe
+          echo $'#!/bin/sh\nexec airflow webserver' > /usr/bin/turbine
+          chmod +x /usr/bin/turbine
           yum update -y
           yum-config-manager --enable epel
-          /opt/aws/bin/cfn-init         --resource Interface --stack ${AWS::StackName} --region ${AWS::Region}
-          /opt/aws/bin/cfn-signal -e $? --resource Interface --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init \
+            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
-      'AWS::CloudFormation::Init':
-        configSets:
-          default:
-            - filesystem
-            - runtime
-            - project
-            - supervision
-            - formation
-        filesystem:
-          packages:
-            yum:
-              nfs-utils: []
-          commands:
-            mount:
-              test: test ! "$(mount | grep efs)"
-              command: !Sub |
-                mkdir -p /efs
-                mount -t nfs4 -o \
-                  nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
-                chown -R ec2-user /efs
-        runtime:
-          packages:
-            yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              postgresql95-devel: []
-              python35: []
-              python35-devel: []
-              python35-pip: []
-          files:
-            /etc/environment:
-              content: !Sub
-                - |
-                  AIRFLOW_HOME=/efs/airflow
-                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                  AIRFLOW__WEBSERVER__BASE_URL=http://INSERTHOST
-                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=80
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
-                  AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                - rds: !GetAtt Database.Endpoint.Address
-                  key: !Ref Secret
-                  queue: !GetAtt Tasks.QueueName
-          commands:
-            injectvars:
-              command: !Sub
-                - |
-                  PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4)
-                  PUBLIC_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
-                  LOCAL_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
-                  if [ PUBLIC = "200" ]
-                  then sed -i -e "s~INSERTHOST~$PUBLIC_IPV4~" /etc/environment
-                  else sed -i -e "s~INSERTHOST~$LOCAL_IPV4~" /etc/environment
-                  fi
-                  SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INSERTSECRET~$SECRET~" /etc/environment
-                - secret: !GetAtt Secret.SecretAccessKey
-            installdeps:
-              command: |
-                pip-3.5 install -U pip setuptools wheel
-                pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
-                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
-        project:
-          commands:
-            bootstrap:
-              command: |
-                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
-                /usr/local/bin/airflow initdb
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip-3.5 install -r /efs/airflow/requirements.txt
-        supervision:
-          packages:
-            yum:
-              supervisor:
-                - '2.1'
-          files:
-            /etc/supervisord.conf:
-              content: |
-                [supervisord]
-                http_port=/var/run/supervisor.sock
-                logfile=/var/log/supervisor/supervisord.log
-                childlogdir=/var/log/supervisor
-                pidfile=/var/run/supervisord.pid
-                environment=INSERTENVIRONMENT
-                [supervisorctl]
-                serverurl=unix:///var/run/supervisor.sock
-                [program:airflow]
-                command=/usr/local/bin/airflow webserver
-                log_stderr=true
-                autorestart=true
-                startsecs=10
-                stopasgroup=true
-          commands:
-            injectvars:
-              command: |
-                ENV=$(tr '\n' ',' < /etc/environment)
-                sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
-            fixpython:
-              command: |
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisord
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisorctl
-          services:
-            sysvinit:
-              supervisord:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/supervisord.conf
-        formation:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                interval=1
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Interface.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init --resource Interface --stack ${AWS::StackName} --region ${AWS::Region}
-                runas=root
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
       - Repository
-## Scaling
+      - Meta
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
@@ -492,148 +205,17 @@ Resources:
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -xe
+          echo $'#!/bin/sh\nexec airflow worker' > /usr/bin/turbine
+          chmod +x /usr/bin/turbine
           yum update -y
           yum-config-manager --enable epel
-          /opt/aws/bin/cfn-init         --resource Config --stack ${AWS::StackName} --region ${AWS::Region}
-          /opt/aws/bin/cfn-signal -e $? --resource Config --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init \
+            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
-      'AWS::CloudFormation::Init':
-        configSets:
-          default:
-            - filesystem
-            - runtime
-            - project
-            - supervision
-            - formation
-        filesystem:
-          packages:
-            yum:
-              nfs-utils: []
-          commands:
-            mount:
-              test: test ! "$(mount | grep efs)"
-              command: !Sub |
-                mkdir -p /efs
-                mount -t nfs4 -o \
-                  nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
-                chown -R ec2-user /efs
-        runtime:
-          packages:
-            yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              postgresql95-devel: []
-              python35: []
-              python35-devel: []
-              python35-pip: []
-          files:
-            /etc/environment:
-              content: !Sub
-                - |
-                  AIRFLOW_HOME=/efs/airflow
-                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
-                  AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                - rds: !GetAtt Database.Endpoint.Address
-                  key: !Ref Secret
-                  queue: !GetAtt Tasks.QueueName
-          commands:
-            injectvars:
-              command: !Sub
-                - |
-                  SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INSERTSECRET~$SECRET~" /etc/environment
-                - secret: !GetAtt Secret.SecretAccessKey
-            installdeps:
-              command: |
-                pip-3.5 install -U pip setuptools wheel
-                pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
-                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
-        project:
-          commands:
-            bootstrap:
-              command: |
-                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
-                /usr/local/bin/airflow initdb
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip-3.5 install -r /efs/airflow/requirements.txt
-        supervision:
-          packages:
-            yum:
-              supervisor:
-                - '2.1'
-          files:
-            /etc/supervisord.conf:
-              content: |
-                [supervisord]
-                http_port=/var/run/supervisor.sock
-                logfile=/var/log/supervisor/supervisord.log
-                childlogdir=/var/log/supervisor
-                pidfile=/var/run/supervisord.pid
-                environment=INSERTENVIRONMENT
-                [supervisorctl]
-                serverurl=unix:///var/run/supervisor.sock
-                [program:airflow]
-                command=/usr/local/bin/airflow worker
-                user=ec2-user
-                log_stderr=true
-                autorestart=true
-                startsecs=10
-                stopasgroup=true
-          commands:
-            injectvars:
-              command: |
-                ENV=$(tr '\n' ',' < /etc/environment)
-                sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
-            fixpython:
-              command: |
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisord
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisorctl
-          services:
-            sysvinit:
-              supervisord:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/supervisord.conf
-        formation:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                interval=1
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Config.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init --resource Config --stack ${AWS::StackName} --region ${AWS::Region}
-                runas=root
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+    DependsOn:
+      - Meta
   Shrink:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
@@ -692,7 +274,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-## Storage
   Files:
     Type: 'AWS::EFS::FileSystem'
     Properties:
@@ -746,7 +327,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
-## Security
   Access:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -812,13 +392,12 @@ Resources:
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: >-
-        Security Rules with permissions for the web UI exposed by Airflow.
+      GroupDescription: Security Rules with permissions for the web UI exposed by Airflow.
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
           IpProtocol: TCP
-          FromPort: 80
-          ToPort: 80
+          FromPort: 8080
+          ToPort: 8080
         - CidrIp: 0.0.0.0/0
           IpProtocol: TCP
           FromPort: 22
@@ -833,8 +412,7 @@ Resources:
   Connection:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: >-
-        Security Rules with permissions for database connections for Airflow.
+      GroupDescription: Security Rules with permissions for database connections for Airflow.
       SecurityGroupIngress:
         - CidrIp: !Ref VpcCidrBlock
           IpProtocol: TCP
@@ -874,7 +452,7 @@ Resources:
           - Effect: Allow
             Action:
               - 'sqs:*'
-            Resource: !Sub
+            Resource: !Sub 
               - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
               - queue: !GetAtt Tasks.QueueName
       Users:
@@ -882,6 +460,156 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ac6b099f-6230-48a7-b672-6491406dde55
+  Meta:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - filesystem
+            - runtime
+            - project
+            - supervision
+            - formation
+        filesystem:
+          packages:
+            yum:
+              nfs-utils: []
+          commands:
+            mount:
+              test: test ! "$(mount | grep efs)"
+              command: !Sub |
+                mkdir -p /efs
+                mount -t nfs4 -o \
+                  nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
+                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
+                chown -R ec2-user /efs
+        runtime:
+          packages:
+            yum:
+              git: []
+              gcc: []
+              gcc-c++: []
+              lapack-devel: []
+              libcurl-devel: []
+              libxml2-devel: []
+              libxslt-devel: []
+              postgresql95-devel: []
+              python35: []
+              python35-devel: []
+              python35-pip: []
+          files:
+            /etc/environment:
+              content: !Sub
+                - |
+                  AIRFLOW_HOME=/efs/airflow
+                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
+                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__WEBSERVER__BASE_URL=http://INSERTHOST:8080
+                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=8080
+                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
+                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
+                  AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                - rds: !GetAtt Database.Endpoint.Address
+                  key: !Ref Secret
+                  queue: !GetAtt Tasks.QueueName
+          commands:
+            injectvars:
+              command: !Sub
+                - |
+                  PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4)
+                  PUBLIC_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
+                  LOCAL_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
+                  if [ PUBLIC = "200" ]
+                  then sed -i -e "s~INSERTHOST~$PUBLIC_IPV4~" /etc/environment
+                  else sed -i -e "s~INSERTHOST~$LOCAL_IPV4~" /etc/environment
+                  fi
+                  SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
+                  sed -i -e "s~INSERTSECRET~$SECRET~" /etc/environment
+                - secret: !GetAtt Secret.SecretAccessKey
+            installdeps:
+              command: |
+                pip-3.5 install -U pip setuptools wheel
+                pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
+                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
+        project:
+          commands:
+            bootstrap:
+              command: |
+                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
+                su -c '/usr/local/bin/airflow initdb' ec2-user
+            installreqs:
+              test: test -f /efs/airflow/requirements.txt
+              command: pip-3.5 install -r /efs/airflow/requirements.txt
+        supervision:
+          packages:
+            yum:
+              supervisor:
+                - '2.1'
+          files:
+            /etc/supervisord.conf:
+              content: |
+                [supervisord]
+                http_port=/var/run/supervisor.sock
+                logfile=/var/log/supervisor/supervisord.log
+                childlogdir=/var/log/supervisor
+                pidfile=/var/run/supervisord.pid
+                environment=INSERTENVIRONMENT
+                [supervisorctl]
+                serverurl=unix:///var/run/supervisor.sock
+                [program:airflow]
+                command=/usr/bin/turbine
+                user=ec2-user
+                log_stderr=true
+                autorestart=true
+                startsecs=10
+                stopasgroup=true
+          commands:
+            injectvars:
+              command: |
+                ENV=$(tr '\n' ',' < /etc/environment)
+                sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
+            fixpython:
+              command: |
+                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisord
+                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisorctl
+          services:
+            sysvinit:
+              supervisord:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/supervisord.conf
+        formation:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                interval=1
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Scheduler.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
+                runas=root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+      'AWS::CloudFormation::Designer':
+        id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -924,6 +652,7 @@ Metadata:
         'y': 180
       z: 1
       embeds:
+        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
         - 52db1638-dd50-4e4a-be69-d5efb987900b
@@ -945,6 +674,9 @@ Metadata:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
         - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
         - 8c059690-0ad1-4922-b823-710c5ead3726
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     8c059690-0ad1-4922-b823-710c5ead3726:
       size:
         width: 60
@@ -957,13 +689,13 @@ Metadata:
       embeds: []
       isassociatedwith:
         - ea67a2be-98cb-48db-8c0c-89fe99de522b
+      iscontainedinside:
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
-      isrelatedto:
-        - 361321d9-8ef0-4ec0-9f90-32079fd42268
-        - 65ab6416-eeb7-4eb4-9ef2-b373b66b9825
-        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
+        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
@@ -976,67 +708,12 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 401bffa6-76b7-4606-84ca-41c85dc73c30
+      iscontainedinside:
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
       dependson:
         - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-    ce3ef0b5-4659-40e4-a2b7-24852dbd5451:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 3
-    41a66c9c-0e16-4539-a5eb-0e9612b1cae1:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-      target:
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-      z: 4
-    2c506008-9509-4815-93fc-1d982cdc1f4e:
-      source:
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-      target:
-        id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      z: 5
-    9fcb6e6d-e542-4133-9ac9-e7c85da09156:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(1) circle:nth-child(1)     '
-        port: >-
-          AWS::RefLink-AWS::AutoScaling::LaunchConfiguration-LaunchConfigurationName
-      target:
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-      z: 12
-    96caf7d9-4011-4470-be85-b1c939fcfc49:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(1) circle:nth-child(1)     '
-        port: >-
-          AWS::RefLink-AWS::AutoScaling::LaunchConfiguration-LaunchConfigurationName
-      target:
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-      z: 12
-    79ba83b2-e42a-4095-b50a-6681e69e0bc8:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(1) circle:nth-child(1)     '
-        port: >-
-          AWS::RefLink-AWS::AutoScaling::LaunchConfiguration-LaunchConfigurationName
-      target:
-        id: ffcc4890-52c1-4824-8260-3fef79669136
-      z: 12
-    59208362-3669-470e-8426-512e7d093df7:
-      source:
-        id: 4b9a522b-0b18-467d-86b0-7171720b219e
-      target:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-      z: 11
-    1be6e1e3-4ba5-46af-9d4d-6cca269fe2f9:
-      source:
-        id: dd8853da-68b1-4cab-a07e-7f1c9bad428e
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(2) circle:nth-child(1)     '
-        port: 'AWS::RefLink-AWS::EC2::Subnet-VPCZoneIdentifier'
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 12
+        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
     2330aac6-8c78-44da-a211-6877405896d7:
       size:
         width: 60
@@ -1058,16 +735,10 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 245a8e14-0dbf-42f3-a982-e206e15083b9
-      references:
         - 2330aac6-8c78-44da-a211-6877405896d7
-      isrelatedto:
-        - 245a8e14-0dbf-42f3-a982-e206e15083b9
-    7b0e9e6e-3ae7-433b-9fb2-90eb109783f4:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      target:
-        id: 2330aac6-8c78-44da-a211-6877405896d7
-      z: 11
+      iscontainedinside:
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
+        - ea81a163-4d1b-4137-8169-8c84e9c7331b
     361321d9-8ef0-4ec0-9f90-32079fd42268:
       size:
         width: 60
@@ -1080,50 +751,9 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
-    0f20f2c0-22e6-40b5-a242-1e878ee5e561:
-      source:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      target:
-        id: f1b0c208-e88b-4494-a5ec-39048b689565
-      z: 6
-    995a3156-0e73-454a-ba26-57116eb5083d:
-      source:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(4) circle:nth-child(1)     '
-        port: 'AWS::MembershipLInk-AWS::RDS::DBParameterGroup-DBParameterGroupName'
-      target:
-        id: f1b0c208-e88b-4494-a5ec-39048b689565
-      z: 5
-    0b177df5-31f8-4d0d-b36b-b52ce423b991:
-      source:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      target:
-        id: 777ec631-64c3-416d-b5bf-7f58409f55e1
-      z: 4
-    7f1ccb5b-8899-4717-bdbf-d2547c734bb9:
-      source:
-        id: ec456950-beaa-4b95-9c0c-f1e0f9d89806
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 4
-    d7404d85-2b05-45ff-9562-df733036017b:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 4
-    8305877a-c795-48b3-9a64-537d10c9e52a:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 5
-    6dd58195-a1d3-4d4e-bb26-18bf4e2ba736:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 4
+      iscontainedinside:
+        - 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
+        - 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
     401bffa6-76b7-4606-84ca-41c85dc73c30:
       size:
         width: 60
@@ -1134,114 +764,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    9738d515-f8ae-4c00-b1ed-5f89295db3c4:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-      z: 4
-    8752dc1e-b85c-4b3d-bce5-38b53155b894:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-      z: 5
-    f8a04047-2bba-46f6-8bc7-b8079f61fd97:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      target:
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-      z: 6
-    2c9d0658-064c-4079-964c-9bf99b3cee05:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 4
-    490aa2b3-3b70-4100-93e6-caa7561da57a:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 5
-    93347888-6bd7-4256-bba8-79929b8f9c6f:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 6
-    37f93012-eb7b-4bb4-b211-933f65a8e930:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 7
-    8812cf46-d6dd-443a-9aac-cdaa532a3a65:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 8
-    0698439d-7d15-418c-9bea-58de5db27bc5:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 9
-    65300d10-afdf-427d-bba5-49d9bc6cd3e4:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 4
-    985ddd34-a28d-4418-ae8e-0abac433880c:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 5
-    99a0f9ba-850a-4c91-b588-7599643c1998:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 4
-    cb227298-1b4d-4f91-9e28-c265e78e90d3:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 4
-    d4b003c7-5f57-4652-9015-0ec14afc3921:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 4
-    f3ca66ca-e16e-469a-b06b-23d24752d4e1:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 5
-    024a0583-b32e-47f7-9280-d241360c3efa:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 4
-    429a9337-aa1c-4b24-95cf-3fa97c1d810f:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      target:
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-      z: 5
-    d292f00a-a9f5-443f-8372-df13bfcb1d94:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      z: 4
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     245a8e14-0dbf-42f3-a982-e206e15083b9:
       size:
         width: 60
@@ -1252,34 +777,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    ff48a8d2-fc6b-489b-bca6-12ab5c6c172f:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(2) circle:nth-child(1)     '
-        port: 'AWS::MembershipLInk-AWS::EC2::SecurityGroup-SecurityGroups'
-      target:
-        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-      z: 5
-    8e794b28-c1dd-4130-b4ca-e208ce71c800:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(2) circle:nth-child(1)     '
-        port: 'AWS::MembershipLInk-AWS::EC2::SecurityGroup-SecurityGroups'
-      target:
-        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-      z: 5
-    0cab7d19-1990-4491-bb3f-775a1c5dd6a3:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      target:
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
-      z: 4
-    3e48af6c-d087-49e1-82f8-ba78bbd60989:
-      source:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      target:
-        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-      z: 4
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     ea67a2be-98cb-48db-8c0c-89fe99de522b:
       size:
         width: 60
@@ -1290,18 +790,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    f58ce9fd-710c-44bf-8df1-b88f9fbc457b:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: ea67a2be-98cb-48db-8c0c-89fe99de522b
-      z: 4
-    6cd63370-60bd-4992-a3d2-1288769ae1d7:
-      source:
-        id: fe2305ec-96dc-423f-9f3b-00923341830c
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 4
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     789e4526-8c69-4899-aa8c-300a7772119e:
       size:
         width: 60
@@ -1313,10 +804,10 @@ Metadata:
       embeds: []
     ec649b6a-0680-463a-9804-e4ba31cc291e:
       source:
-        id: 789e4526-8c69-4899-aa8c-300a7772119e
-      target:
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      z: 0
+      target:
+        id: 789e4526-8c69-4899-aa8c-300a7772119e
+      z: 1
     30fb8416-de73-44a8-b965-42697ce7803c:
       size:
         width: 100
@@ -1328,6 +819,9 @@ Metadata:
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
         - 1c52f5bf-8a65-4ee6-b601-810e47a51751
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     6ee4ffa7-3fb0-4326-993a-9516025fd0b7:
       source:
         id: 30fb8416-de73-44a8-b965-42697ce7803c
@@ -1344,16 +838,13 @@ Metadata:
       z: 3
       parent: 30fb8416-de73-44a8-b965-42697ce7803c
       embeds: []
-      references:
+      isassociatedwith:
         - 789e4526-8c69-4899-aa8c-300a7772119e
+      iscontainedinside:
+        - 30fb8416-de73-44a8-b965-42697ce7803c
+        - 30fb8416-de73-44a8-b965-42697ce7803c
       dependson:
         - ec649b6a-0680-463a-9804-e4ba31cc291e
-    64876424-3d75-45d5-a5d2-d3693baf8619:
-      source:
-        id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
-      target:
-        id: 789e4526-8c69-4899-aa8c-300a7772119e
-      z: 4
     535f86f4-9cef-4823-b8bd-888153ca3b7e:
       size:
         width: 60
@@ -1365,8 +856,8 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 52db1638-dd50-4e4a-be69-d5efb987900b
-      isrelatedto:
-        - ea67a2be-98cb-48db-8c0c-89fe99de522b
+      dependson:
+        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
     90184717-25cc-4671-a70d-7becceed5c50:
       size:
         width: 60
@@ -1378,43 +869,8 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 535f86f4-9cef-4823-b8bd-888153ca3b7e
+      iscontainedinside:
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
-    f79e1187-387d-468f-baa9-bed58deddbb1:
-      source:
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-      target:
-        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-      z: 4
-    0e5bd697-3c7e-4fa6-9d4e-30f17fd75538:
-      source:
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 5
-    83f61389-ea0a-49fb-87a0-ecdcf941b7a7:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 11
-    bf732f70-1290-4a8e-91fb-29862c6b5ea4:
-      source:
-        id: fe2305ec-96dc-423f-9f3b-00923341830c
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 12
-    ce14e9bc-9909-4050-a63f-ed2d9de50b88:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 11
-    896fc7c7-eeb1-4309-bf7e-b87d982dfd8e:
-      source:
-        id: fe2305ec-96dc-423f-9f3b-00923341830c
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 11
     c2b1083d-7823-4926-bb80-1c17a3f52a53:
       size:
         width: 60
@@ -1424,9 +880,6 @@ Metadata:
         'y': 420
       z: 0
       embeds: []
-      isrelatedto:
-        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
-        - f12da049-cd8c-4011-8c3f-650b4463a007
     f12da049-cd8c-4011-8c3f-650b4463a007:
       size:
         width: 60
@@ -1441,12 +894,6 @@ Metadata:
       dependson:
         - 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
         - c2b1083d-7823-4926-bb80-1c17a3f52a53
-    8a57a39c-eb9c-498d-8211-c9ccee2f8f7e:
-      source:
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
-      target:
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-      z: 11
     99a417bc-21ad-4e5f-b525-7afe1289f3e6:
       size:
         width: 60
@@ -1461,42 +908,6 @@ Metadata:
       dependson:
         - c2b1083d-7823-4926-bb80-1c17a3f52a53
         - 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
-    ad7bb3b7-2ebb-40fc-b699-0154f4433614:
-      source:
-        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-      target:
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-      z: 11
-    84b926cd-0488-4ea5-b8b4-862cb33595a4:
-      source:
-        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-      target:
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-      z: 11
-    3bbb4ad2-6eb5-4d45-8f68-fe77e6bb8277:
-      source:
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
-      target:
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-      z: 12
-    7343dc6b-1346-43d3-9582-7426bcae67b7:
-      source:
-        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-      target:
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-      z: 11
-    83d5ac20-fdb5-471f-920d-aa3a367bd2b6:
-      source:
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
-      target:
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-      z: 12
-    e125e9e1-6227-40a4-96bb-eba9fa6cc126:
-      source:
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-      target:
-        id: 28cca544-d573-4b40-91dd-40e2577d5949
-      z: 11
     97a1ff17-654e-4f74-bb6b-10c988a5e6e9:
       size:
         width: 60
@@ -1506,21 +917,6 @@ Metadata:
         'y': 480
       z: 0
       embeds: []
-      isrelatedto:
-        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
-        - 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-    cff2d88b-b690-46db-8515-e28ce8d3a212:
-      source:
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
-      target:
-        id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
-      z: 11
-    1d9ac914-e8db-48c2-b1ef-a88d11b9217d:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-      z: 11
     4816510b-a9fb-467b-a2b6-a85d16656b59:
       size:
         width: 60
@@ -1531,12 +927,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    491c711d-2800-45b6-8b75-f20239620b87:
-      source:
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
-      target:
-        id: 4816510b-a9fb-467b-a2b6-a85d16656b59
-      z: 11
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54:
       size:
         width: 80
@@ -1547,17 +940,9 @@ Metadata:
       z: 0
       embeds:
         - 361321d9-8ef0-4ec0-9f90-32079fd42268
-      isassociatedwith:
+      iscontainedinside:
         - ea81a163-4d1b-4137-8169-8c84e9c7331b
         - 0559dceb-39c7-40fd-adf9-bb7614b20722
-    35a8b15e-9e78-479e-ba06-c7b4a63cbb09:
-      source:
-        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
-        selector: 'g:nth-child(1) g:nth-child(5) g:nth-child(1) circle:nth-child(1)     '
-        port: 'AWS::RefLink-AWS::EC2::Subnet-SubnetIds'
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 12
     0559dceb-39c7-40fd-adf9-bb7614b20722:
       size:
         width: 80
@@ -1568,12 +953,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    12c23322-76f4-40c0-8155-668cf0d58155:
-      source:
-        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
-      target:
-        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-      z: 11
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     65ab6416-eeb7-4eb4-9ef2-b373b66b9825:
       size:
         width: 60
@@ -1583,8 +965,6 @@ Metadata:
         'y': 450
       z: 0
       embeds: []
-      isrelatedto:
-        - 106e8f70-914f-4976-82ef-bbed5867a36e
     106e8f70-914f-4976-82ef-bbed5867a36e:
       size:
         width: 60
@@ -1605,27 +985,6 @@ Metadata:
       embeds: []
       isassociatedwith:
         - 106e8f70-914f-4976-82ef-bbed5867a36e
-      isrelatedto:
-        - 28cca544-d573-4b40-91dd-40e2577d5949
-        - 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
-    7d991aa8-8090-4905-a2f8-381b849d9c07:
-      source:
-        id: ac6b099f-6230-48a7-b672-6491406dde55
-      target:
-        id: 106e8f70-914f-4976-82ef-bbed5867a36e
-      z: 11
-    097b78b9-173d-49f4-9422-d1af98cc46a1:
-      source:
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-      target:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      z: 11
-    eab6a8ac-39d6-49b2-beff-227f3aedf473:
-      source:
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-      target:
-        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-      z: 11
     52db1638-dd50-4e4a-be69-d5efb987900b:
       size:
         width: 60
@@ -1636,20 +995,9 @@ Metadata:
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
-    07dabd76-e873-47f1-b5a3-bb46b2732814:
-      source:
-        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-      target:
-        id: 52db1638-dd50-4e4a-be69-d5efb987900b
-      z: 11
-    0f451562-ee51-49e6-8eda-68463a3659fa:
-      source:
-        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-        selector: 'g:nth-child(1) g:nth-child(4) g:nth-child(2) circle:nth-child(1)     '
-        port: 'AWS::MembershipLInk-AWS::EC2::SecurityGroup-SecurityGroups'
-      target:
-        id: 52db1638-dd50-4e4a-be69-d5efb987900b
-      z: 12
+      iscontainedinside:
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
+        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
     0c03e033-c2e8-487d-a0e9-a5bf5e851fcb:
       size:
         width: 60
@@ -1659,15 +1007,31 @@ Metadata:
         'y': 450
       z: 0
       embeds: []
-    94e74b16-cd76-40d9-ab12-0c99e20cf662:
-      source:
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 11
-    696c4b22-476b-416c-8609-51883cd0ae3f:
+    7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 400
+        'y': 320
+      z: 2
+      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
+      embeds: []
+    1fb1abd5-8565-459c-9366-d2cabf3dba34:
       source:
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
       target:
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+        id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
       z: 11
+    0016ece4-99da-494b-920f-2cf546b08681:
+      source:
+        id: 8c059690-0ad1-4922-b823-710c5ead3726
+      target:
+        id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
+      z: 12
+    8a359be1-4842-403a-9c4c-9a61a05c8250:
+      source:
+        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
+      target:
+        id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
+      z: 13
