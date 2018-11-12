@@ -1,6 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: the stack of airflow resources.
+Description: The Airflow cluster stack
 Parameters:
+  AMI:
+    Description: >-
+      The virtual machine image (AMI) to use for the instances. See
+      https://aws.amazon.com/amazon-linux-ami/ for the latest Amazon Linux AMI for each region.
+    Type: String
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
@@ -37,7 +42,7 @@ Parameters:
       instance).
     Type: Number
     Default: 1
-  SpotInstanceType:
+  WorkerInstanceType:
     Description: EC2 instance types to use as worker.
     Type: String
     Default: t2.micro
@@ -67,7 +72,7 @@ Resources:
   Dummy:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: us-east-1b
+      AvailabilityZone: !Sub "${AWS::Region}b"
       CidrBlock: !Ref DummySubnetBlock
       Tags:
         - Key: Name
@@ -79,7 +84,7 @@ Resources:
   Subnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: us-east-1a
+      AvailabilityZone: !Sub "${AWS::Region}a"
       CidrBlock: !Ref StackSubnetBlock
       MapPublicIpOnLaunch: true
       Tags:
@@ -132,8 +137,8 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-a4c7edb2
       InstanceType: t2.micro
+      ImageId: !Ref AMI
       SubnetId: !Ref Subnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
@@ -159,7 +164,7 @@ Resources:
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-a4c7edb2
+      ImageId: !Ref AMI
       InstanceType: t2.micro
       SubnetId: !Ref Subnet
       KeyName: !Ref KeyPair
@@ -197,8 +202,8 @@ Resources:
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
-      ImageId: ami-a4c7edb2
-      InstanceType: !Ref SpotInstanceType
+      ImageId: !Ref AMI
+      InstanceType: !Ref WorkerInstanceType
       KeyName: !Ref KeyPair
       SecurityGroups:
         - !Ref Comms
@@ -481,9 +486,8 @@ Resources:
               test: test ! "$(mount | grep efs)"
               command: !Sub |
                 mkdir -p /efs
-                mount -t nfs4 -o \
-                  nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 \
-                  ${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs
+                echo "${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2  0 0" >> /etc/fstab
+                mount /efs
                 chown -R ec2-user /efs
         runtime:
           packages:
@@ -511,6 +515,7 @@ Resources:
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
                   AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AWS_DEFAULT_REGION=${AWS::Region}
                 - rds: !GetAtt Database.Endpoint.Address
                   key: !Ref Secret
                   queue: !GetAtt Tasks.QueueName
@@ -530,9 +535,10 @@ Resources:
                 - secret: !GetAtt Secret.SecretAccessKey
             installdeps:
               command: |
-                pip-3.5 install -U pip setuptools wheel
-                pip-3.5 install apache-airflow[celery,postgres] celery[sqs] boto3
-                pip-3.5 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                alternatives --set python /usr/bin/python3.5
+                PYCURL_SSL_LIBRARY=nss pip install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                pip install wheel
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip install apache-airflow[celery,postgres]==1.10.1b1 celery[sqs] boto3
                 cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
         project:
           commands:
@@ -542,7 +548,7 @@ Resources:
                 su -c '/usr/local/bin/airflow initdb' ec2-user
             installreqs:
               test: test -f /efs/airflow/requirements.txt
-              command: pip-3.5 install -r /efs/airflow/requirements.txt
+              command: pip install -r /efs/airflow/requirements.txt
         supervision:
           packages:
             yum:
@@ -614,6 +620,10 @@ Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
       - Label:
+          default: Instance Configuration
+        Parameters:
+          - AMI
+      - Label:
           default: Networking
         Parameters:
           - VpcCidrBlock
@@ -627,7 +637,7 @@ Metadata:
           - MaxGroupSize
           - ShrinkThreshold
           - GrowthThreshold
-          - SpotInstanceType
+          - WorkerInstanceType
       - Label:
           default: Storage
         Parameters:
@@ -640,8 +650,8 @@ Metadata:
         default: Postgres Username
       KeyPair:
         default: Key for SSH access
-      SpotInstanceType:
-        default: Instance Type
+      WorkerInstanceType:
+        default: Worker Instance Type
   'AWS::CloudFormation::Designer':
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
       size:
