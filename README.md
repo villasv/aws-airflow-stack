@@ -75,25 +75,39 @@ sudo ln -s /efs/repo/airflow/dags /efs/dags
 
 ### 3. Clean Up
 
-In order to get a healthy initial bootstrap for your Airflow setup, it's best to make sure we're writing on a blank slate. The stack comes with Airflow already running by default because it's easier to demo and to setup supervision.
+In order to get a healthy initial bootstrap for your Airflow setup, it's best to
+make sure we're writing on a blank slate. The stack comes with Airflow already
+running by default because it's easier to demo and to setup supervision.
 
-One way to be completely safe is to stop all airflow process (webserver, scheduler and workers), reset the airflow database, reset the database, empty the queue and resume all airflow processes back again. If you have many workers, the easiest option is to downscale beforehand.
+One way to be completely safe is to stop all airflow process (webserver,
+scheduler and workers), reset the airflow database, empty the queue and resume
+all airflow processes back again. If you have many workers, the easiest option
+is to downscale beforehand.
 
 ## FAQ
 
 1. Why is there a `Dummy` subnet in the VPC?
 
-    There's no official support on CloudFormation for choosing in which VPC a RDS Instance is deployed. The only alternatives are to let it live in the default VPC and communicate with peering or to use DBSubnetGroup, which requires associated subnets that cover at least 2 Availability Zones.
+    There's no official support on CloudFormation for choosing in which VPC a
+    RDS Instance is deployed. The only alternatives are to let it live in the
+    default VPC and communicate with peering or to use DBSubnetGroup, which
+    requires associated subnets that cover at least 2 Availability Zones.
 
 ## Contributing
 
-> This project aims to be constantly evolving with up to date tooling and newer AWS features, as well as improving its design qualities and maintainability. Requests for Enhancement should be abundant and anyone is welcome to pick them up.
+>This project aims to be constantly evolving with up to date tooling and newer
+>AWS features, as well as improving its design qualities and maintainability.
+>Requests for Enhancement should be abundant and anyone is welcome to pick them
+>up.
 >
-> Stacks can get quite opinionated. If you have a divergent fork, you may open a Request for Comments and we will index it. Hopefully this will help to build a diverse set of possible deployment models for various production needs.
+>Stacks can get quite opinionated. If you have a divergent fork, you may open a
+>Request for Comments and we will index it. Hopefully this will help to build a
+>diverse set of possible deployment models for various production needs.
 
 See the [contribution guidelines](/CONTRIBUTING.md) for details.
 
-You may also want to take a look at the [Citizen Code of Conduct](/CODE_OF_CONDUCT.md).
+You may also want to take a look at the [Citizen Code of
+Conduct](/CODE_OF_CONDUCT.md).
 
 ## Licensing
 
