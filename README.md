@@ -1,15 +1,12 @@
-# Turbine [![sync]][ci] [![rver]][gh]
+# Turbine [![sync]][ci]
 
 [sync]:
-https://img.shields.io/scrutinizer/build/g/villasv/turbine.svg?style=flat-square&label=sync
-[ci]:
-https://scrutinizer-ci.com/g/villasv/turbine/build-status/master
-[rver]:
-https://img.shields.io/github/release/villasv/turbine.svg?style=flat-square
-[gh]:
-https://github.com/villasv/turbine/releases
+https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon
+[ci]: #get-it-working
 
-Turbine is the set of bare metals behind a simple yet complete and efficient Airflow setup. Deploy in a few clicks, configure in a few commands, personalize in a few fields.
+Turbine is the set of bare metals behind a simple yet complete and efficient
+Airflow setup. Deploy in a few clicks, configure in a few commands, personalize
+in a few fields.
 
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
