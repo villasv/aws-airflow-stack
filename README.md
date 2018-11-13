@@ -31,13 +31,21 @@ resources are the usual boilerplate to keep the wind flowing.
 
 ### 0. Prerequisites
 
-You will need a key file generated in the AWS console to be associated with the EC2 instances and enable SSH.
+- [A key file for remote SSH access][awsdocs-keys]
+
+[awsdocs-keys]:
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
+
 
 ### 1. Deploy the Cloud Formation Stack
 
-Create a new stack using the YAML definition at [`aws\cloud-formation-template.yml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
+Create a new stack using the latest template definition at
+[`aws\cloud-formation-template.yml`][raw-template]. The following button will
+readily deploy the stack (defaults to your last used region):
 
-The following button will readily deploy the template (defaults to your last used region):
+[raw-template]:
+https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml
+
 
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
@@ -48,15 +56,19 @@ This can be done in several ways. What really matters is:
 - The Airflow home directory should be accessible at `/efs/airflow`
 - The DAG files directory should be accessible at `/efs/dags`
 
-The home directory is assumed to contain the Airflow configuration file (`airflow.cfg`). This is flexible enough to accommodate pretty much any project structure and is easily set up with symbolic links.
+The home directory is assumed to contain the Airflow configuration file
+(`airflow.cfg`). This is flexible enough to accommodate pretty much any project
+structure and is easily set up with symbolic links.
 
-The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2 instance, clone your Airflow files **inside the shared directory** (`/efs`), install your stuff and link your specific files.
+The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2
+instance, clone your Airflow files **inside the shared directory** (`/efs`),
+install your stuff and link your specific files.
 
 ```
 ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 cd /efs
 git clone https://your.git/user/repo
-sudo pip3 install -r /efs/repo/requirements.txt
+sudo pip install -r /efs/repo/requirements.txt
 sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
