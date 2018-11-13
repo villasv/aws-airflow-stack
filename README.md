@@ -8,15 +8,24 @@ Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup. Deploy in a few clicks, configure in a few commands, personalize
 in a few fields.
 
-![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
+The project is intended to be easily deployed, making it great for testing,
+demos and showcasing Airflow solutions. It is also expected to be easily
+tinkered with, allowing it to be used in real production environments with
+little extra effort.
 
 ## Overview
 
-The stack is composed of two main EC2 machines (one for the Airflow Web Server and one for the Airflow Scheduler). Airflow Worker machines are instantiated on demand when the job queue average length grows past a certain threshold and terminated when the queue stays empty for too long.
+![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
-Supporting resources include a RDS instance to host the Airflow Metadata Database, a SQS instance to be used as broker backend, an EFS instance to serve as shared configuration and a S3 bucket for remote logging storage. All other resources are the usual boilerplate to have the above working, including networking and Internet connectivity, security specifications, availability zone coverage and authentication mechanisms.
+The stack is composed of two main EC2 machines, one for the Airflow UI and one
+for the job scheduler. Airflow worker machines are instantiated on demand when
+the job queue average length grows past a certain threshold and terminated when
+the queue stays empty for too long.
 
-The project is intended to be easily deployed, making it great for testing, demoing and showcasing Airflow solutions. It is also expected to be easily tinkered, allowing it to be used in real production environments with little extra effort.
+Supporting resources include a RDS instance to host the Airflow metadata
+database, a SQS instance to be used as broker backend, an EFS instance to serve
+as shared configuration and auto-scaling triggers for workers. All other
+resources are the usual boilerplate to keep the wind flowing.
 
 ## Get It Working
 
@@ -27,9 +36,9 @@ You will need a key file generated in the AWS console to be associated with the 
 ### 1. Deploy the Cloud Formation Stack
 
 Create a new stack using the YAML definition at [`aws\cloud-formation-template.yml`](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-template.yml).
-    
+
 The following button will readily deploy the template (defaults to your last used region):
-    
+
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
 ### 2. Setup your Airflow files
