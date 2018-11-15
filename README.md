@@ -46,8 +46,11 @@ readily deploy the stack (defaults to your last used region):
 [raw-template]:
 https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml
 
-
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
+
+The stack resources take around 10 minutes to create, while the airflow
+installation and bootstrap another 3 to 5 minutes. After that you can
+already access the Airflow UI and setup your own Airflow DAGs.
 
 ### 2. Setup your Airflow files
 
