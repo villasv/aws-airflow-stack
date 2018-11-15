@@ -65,7 +65,7 @@ Resources:
       CidrBlock: !Ref VpcCidrBlock
       Tags:
         - Key: Name
-          Value: turbine-vpc
+          Value: !Sub '${AWS::StackName}-vpc'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
@@ -76,7 +76,7 @@ Resources:
       CidrBlock: !Ref DummySubnetBlock
       Tags:
         - Key: Name
-          Value: turbine-dummy
+          Value: !Sub '${AWS::StackName}-dummy'
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -89,7 +89,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: turbine-subnet
+          Value: !Sub '${AWS::StackName}-subnet'
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -145,7 +145,7 @@ Resources:
         - !Ref Control
       Tags:
         - Key: Name
-          Value: turbine-scheduler
+          Value: !Sub '${AWS::StackName}-scheduler'
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -xe
@@ -172,7 +172,7 @@ Resources:
         - !Ref Web
       Tags:
         - Key: Name
-          Value: turbine-interface
+          Value: !Sub '${AWS::StackName}-interface'
       UserData:
         'Fn::Base64': !Sub |
           #!/bin/bash -xe
@@ -284,7 +284,7 @@ Resources:
     Properties:
       FileSystemTags:
         - Key: Name
-          Value: turbine-filesystem
+          Value: !Sub '${AWS::StackName}-filesystem'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 2330aac6-8c78-44da-a211-6877405896d7
@@ -319,7 +319,7 @@ Resources:
       MasterUserPassword: !Ref DbMasterPassword
       Tags:
         - Key: Name
-          Value: turbine-database
+          Value: !Sub '${AWS::StackName}-database'
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
         - !Ref Connection
@@ -346,7 +346,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: turbine-access
+          Value: !Sub '${AWS::StackName}-access'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 245a8e14-0dbf-42f3-a982-e206e15083b9
@@ -368,7 +368,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: turbine-control
+          Value: !Sub '${AWS::StackName}-control'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
@@ -390,7 +390,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: turbine-comms
+          Value: !Sub '${AWS::StackName}-comms'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 52db1638-dd50-4e4a-be69-d5efb987900b
@@ -410,7 +410,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: turbine-web
+          Value: !Sub '${AWS::StackName}-web'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 401bffa6-76b7-4606-84ca-41c85dc73c30
@@ -426,7 +426,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: turbine-connection
+          Value: !Sub '${AWS::StackName}-connection'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 4816510b-a9fb-467b-a2b6-a85d16656b59
@@ -446,7 +446,7 @@ Resources:
   ReadWrite:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: turbine-tasks-policy
+      PolicyName: !Sub '${AWS::StackName}-tasks-policy'
       PolicyDocument:
         Statement:
           - Effect: Allow
@@ -457,7 +457,7 @@ Resources:
           - Effect: Allow
             Action:
               - 'sqs:*'
-            Resource: !Sub 
+            Resource: !Sub
               - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
               - queue: !GetAtt Tasks.QueueName
       Users:
