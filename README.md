@@ -76,6 +76,19 @@ sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
 
+> **GOTCHA**: configuring the CeleryExecutor also requires listing your region
+> as a broker transport option to be passed to Celery, until kombu is configured
+> to pick it up automatically (https://github.com/celery/kombu/issues/950).
+>
+> ```
+> [core]
+> executor = CeleryExecutor
+> ...
+> [celery_broker_transport_options]
+> region = us-east-2
+> visibility_timeout = 21600
+> ```
+
 ### 3. Clean Up
 
 In order to get a healthy initial bootstrap for your Airflow setup, it's best to
