@@ -528,19 +528,14 @@ Resources:
                 - secret: !GetAtt Secret.SecretAccessKey
             installdeps:
               command: |
-                alternatives --set python /usr/bin/python3
-                PYCURL_SSL_LIBRARY=nss pip install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip install apache-airflow[celery,postgres]==1.10.1b1 celery[sqs]
-                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
+                PYCURL_SSL_LIBRARY=nss pip3 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1rc2 celery[sqs]
         project:
           commands:
             bootstrap:
               command: |
                 cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
                 su -c '/usr/local/bin/airflow initdb' ec2-user
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip install -r /efs/airflow/requirements.txt
         supervision:
           packages:
             yum:
