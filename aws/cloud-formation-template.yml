@@ -1,11 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
-  AMI:
-    Description: >-
-      The virtual machine image (AMI) to use for the instances. See
-      https://aws.amazon.com/amazon-linux-ami/ for the latest Amazon Linux AMI for each region.
-    Type: String
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
@@ -45,10 +40,7 @@ Parameters:
   WorkerInstanceType:
     Description: EC2 instance types to use as worker.
     Type: String
-    Default: t2.micro
-    AllowedValues:
-      - t2.micro
-      - m4.large
+    Default: t3.micro
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -138,7 +130,7 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: t2.micro
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
@@ -164,7 +156,7 @@ Resources:
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       InstanceType: t2.micro
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
@@ -202,7 +194,7 @@ Resources:
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       InstanceType: !Ref WorkerInstanceType
       KeyName: !Ref KeyPair
       SecurityGroups:
@@ -622,7 +614,7 @@ Metadata:
       - Label:
           default: Instance Configuration
         Parameters:
-          - AMI
+          - !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       - Label:
           default: Networking
         Parameters:
@@ -1045,3 +1037,43 @@ Metadata:
       target:
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
       z: 13
+Mappings:
+  RegionToAMI:
+    ap-northeast-1:
+      HVMGP2: ami-00f9d04b3b3092052
+    ap-northeast-2:
+      HVMGP2: ami-0c764df09c35858b8
+    ap-northeast-3:
+      HVMGP2: ami-0f4865fb90390aeec
+    ap-south-1:
+      HVMGP2: ami-00796998f258969fd
+    ap-southeast-1:
+      HVMGP2: ami-085fd1bd447be68e8
+    ap-southeast-2:
+      HVMGP2: ami-0b8dea0e70b969adc
+    ca-central-1:
+      HVMGP2: ami-05cac140c6a1fb960
+    cn-north-1:
+      HVMGP2: ami-0bcb2d94a820e559c
+    cn-northwest-1:
+      HVMGP2: ami-0d82dd087e5eea5af
+    eu-central-1:
+      HVMGP2: ami-02ea8f348fa28c108
+    eu-west-1:
+      HVMGP2: ami-0a5e707736615003c
+    eu-west-2:
+      HVMGP2: ami-017b0e29fac27906b
+    eu-west-3:
+      HVMGP2: ami-04992646d54c69ef4
+    sa-east-1:
+      HVMGP2: ami-0160a8b6087883cb6
+    us-east-1:
+      HVMGP2: ami-013be31976ca2c322
+    us-east-2:
+      HVMGP2: ami-0350c5670171b5391
+    us-gov-west-1:
+      HVMGP2: ami-d263f9b3
+    us-west-1:
+      HVMGP2: ami-01beb64058d271bc4
+    us-west-2:
+      HVMGP2: ami-061e7ebbc234015fe
