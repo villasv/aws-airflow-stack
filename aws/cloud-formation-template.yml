@@ -69,7 +69,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-  Dummy:
+  DummySubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
       AvailabilityZone: !Sub "${AWS::Region}b"
@@ -81,7 +81,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-  Subnet:
+  StackSubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
       AvailabilityZone: !Sub "${AWS::Region}a"
@@ -130,7 +130,7 @@ Resources:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       RouteTableId: !Ref Routes
-      SubnetId: !Ref Subnet
+      SubnetId: !Ref StackSubnet
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
@@ -139,7 +139,7 @@ Resources:
     Properties:
       InstanceType: t2.micro
       ImageId: !Ref AMI
-      SubnetId: !Ref Subnet
+      SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Control
@@ -166,7 +166,7 @@ Resources:
     Properties:
       ImageId: !Ref AMI
       InstanceType: t2.micro
-      SubnetId: !Ref Subnet
+      SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
@@ -195,7 +195,7 @@ Resources:
       MinSize: !Ref MinGroupSize
       MaxSize: !Ref MaxGroupSize
       VPCZoneIdentifier:
-        - !Ref Subnet
+        - !Ref StackSubnet
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
@@ -292,7 +292,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref Files
-      SubnetId: !Ref Subnet
+      SubnetId: !Ref StackSubnet
       SecurityGroups:
         - !Ref Access
     Metadata:
@@ -303,8 +303,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
       SubnetIds:
-        - !Ref Subnet
-        - !Ref Dummy
+        - !Ref StackSubnet
+        - !Ref DummySubnet
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
