@@ -492,9 +492,10 @@ Resources:
               libxml2-devel: []
               libxslt-devel: []
               postgresql95-devel: []
-              python36: []
-              python36-devel: []
-              python36-pip: []
+              python3: []
+              python3-devel: []
+              python3-pip: []
+              python3-wheel: []
           files:
             /etc/environment:
               content: !Sub
@@ -527,9 +528,8 @@ Resources:
                 - secret: !GetAtt Secret.SecretAccessKey
             installdeps:
               command: |
-                alternatives --set python /usr/bin/python3.6
+                alternatives --set python /usr/bin/python3
                 PYCURL_SSL_LIBRARY=nss pip install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                pip install wheel
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip install apache-airflow[celery,postgres]==1.10.1b1 celery[sqs]
                 cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
         project:
