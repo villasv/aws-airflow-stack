@@ -538,8 +538,8 @@ Resources:
                   PUBLIC_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
                   LOCAL_IPV4=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
                   if [ PUBLIC = "200" ]
-                    then sed -i -e "s~INJECTHOST~$PUBLIC_IPV4~" /etc/sysconfig/airflow
-                    else sed -i -e "s~INJECTHOST~$LOCAL_IPV4~" /etc/sysconfig/airflow
+                  then sed -i -e "s~INJECTHOST~$PUBLIC_IPV4~" /etc/sysconfig/airflow
+                  else sed -i -e "s~INJECTHOST~$LOCAL_IPV4~" /etc/sysconfig/airflow
                   fi
                   SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
                   sed -i -e "s~INJECTSECRET~$SECRET~" /etc/sysconfig/airflow
@@ -548,6 +548,7 @@ Resources:
               command: |
                 cat /etc/sysconfig/airflow | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
                 su -c '/usr/local/bin/airflow initdb' ec2-user
+                systemctl start airflow
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Metadata:
