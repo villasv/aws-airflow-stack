@@ -529,7 +529,7 @@ Resources:
             installdeps:
               command: |
                 PYCURL_SSL_LIBRARY=nss pip3 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1rc2 celery[sqs]
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1rc2 celery[sqs] tenacity==5.0.2
         project:
           commands:
             bootstrap:
