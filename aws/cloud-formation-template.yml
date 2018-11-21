@@ -44,6 +44,7 @@ Parameters:
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
+    Default: airflow
   DbMasterPassword:
     Description: The password to be used in the airflow database.
     Type: String
@@ -552,10 +553,6 @@ Resources:
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
-      - Label:
-          default: Instance Configuration
-        Parameters:
-          - !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       - Label:
           default: Networking
         Parameters:
