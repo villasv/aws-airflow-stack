@@ -495,6 +495,7 @@ Resources:
               libcurl-devel: []
               libxml2-devel: []
               libxslt-devel: []
+              openssl-devel: []
               postgresql-devel: []
               python3: []
               python3-devel: []
@@ -503,7 +504,7 @@ Resources:
           commands:
             install:
               command: |
-                PYCURL_SSL_LIBRARY=nss pip3 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                PYCURL_SSL_LIBRARY=openssl pip3 install --no-cache-dir --compile --ignore-installed pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1 celery[sqs] tenacity==5.0.2
         service:
           files:
