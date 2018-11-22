@@ -37,6 +37,16 @@ Parameters:
       instance).
     Type: Number
     Default: 1
+  ShrinkCooldown:
+    Description: >-
+      The cooldown (in seconds) between deallocations of worker instances.
+    Type: Number
+    Default: 60
+  GrowthCooldown:
+    Description: >-
+      The cooldown (in seconds) between allocations of worker instances.
+    Type: Number
+    Default: 300
   WorkerInstanceType:
     Description: EC2 instance types to use as worker.
     Type: String
@@ -244,28 +254,28 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-  ScaleOut:
-    Type: 'AWS::AutoScaling::ScalingPolicy'
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      PolicyType: SimpleScaling
-      ScalingAdjustment: 1
-      Cooldown: 300
-      AutoScalingGroupName: !Ref Scaler
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: -1
-      Cooldown: 300
+      Cooldown: !Ref ShrinkCooldown
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+  ScaleOut:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: !Ref GrowthCooldown
+      AutoScalingGroupName: !Ref Scaler
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
   Files:
     Type: 'AWS::EFS::FileSystem'
     Properties:
@@ -562,13 +572,15 @@ Metadata:
           - StackSubnetBlock
           - KeyPair
       - Label:
-          default: Scaling
+          default: Worker Instances
         Parameters:
+          - WorkerInstanceType
           - MinGroupSize
           - MaxGroupSize
           - ShrinkThreshold
           - GrowthThreshold
-          - WorkerInstanceType
+          - ShrinkCooldown
+          - GrowthCooldown
       - Label:
           default: Storage
         Parameters:
