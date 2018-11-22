@@ -19,7 +19,7 @@ Parameters:
   WorkerInstanceType:
     Description: EC2 instance types to use as worker.
     Type: String
-    Default: t3.micro
+    Default: t3.small
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
