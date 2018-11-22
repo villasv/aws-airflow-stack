@@ -16,6 +16,10 @@ Parameters:
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
+  WorkerInstanceType:
+    Description: EC2 instance types to use as worker.
+    Type: String
+    Default: t3.micro
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
@@ -24,17 +28,18 @@ Parameters:
     Description: The maximum number of active worker instances.
     Type: Number
     Default: 10
-  ShrinkThreshold:
+  ShrinkTimeout:
     Description: >-
-      The threshold for the queue size from which going equal or below will
-      trigger the AutoScaling group to Scale In (killing one worker instance).
+      The timeout (in seconds, multiple of 60) after which the queue staying
+      empty will trigger the AutoScaling group to Scale In, deallocating one
+      worker instance.
     Type: Number
-    Default: 0
+    Default: 3600
   GrowthThreshold:
     Description: >-
-      The threshold for the queue size from which going equal or above will
-      trigger the AutoScaling group to Scale Out (allocating one worker
-      instance).
+      The threshold for the average queue size from which going equal or above
+      will trigger the AutoScaling group to Scale Out, allocating one worker
+      instance.
     Type: Number
     Default: 1
   ShrinkCooldown:
@@ -47,10 +52,6 @@ Parameters:
       The cooldown (in seconds) between allocations of worker instances.
     Type: Number
     Default: 300
-  WorkerInstanceType:
-    Description: EC2 instance types to use as worker.
-    Type: String
-    Default: t3.micro
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -223,15 +224,15 @@ Resources:
     Properties:
       AlarmActions:
         - !Ref ScaleIn
-      Statistic: Average
-      Period: '60'
+      Statistic: Sum
+      Period: !Ref ShrinkTimeout
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
           Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: !Ref ShrinkThreshold
+      Threshold: 0
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -577,9 +578,9 @@ Metadata:
           - WorkerInstanceType
           - MinGroupSize
           - MaxGroupSize
-          - ShrinkThreshold
-          - GrowthThreshold
+          - ShrinkTimeout
           - ShrinkCooldown
+          - GrowthThreshold
           - GrowthCooldown
       - Label:
           default: Storage
