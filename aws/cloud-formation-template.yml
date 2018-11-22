@@ -16,6 +16,10 @@ Parameters:
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
+  WorkerInstanceType:
+    Description: EC2 instance types to use as worker.
+    Type: String
+    Default: t3.small
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
@@ -24,23 +28,30 @@ Parameters:
     Description: The maximum number of active worker instances.
     Type: Number
     Default: 10
-  ShrinkThreshold:
+  ShrinkTimeout:
     Description: >-
-      The threshold for the queue size from which going equal or below will
-      trigger the AutoScaling group to Scale In (killing one worker instance).
+      The timeout (in seconds, multiple of 60) after which the queue staying
+      empty will trigger the AutoScaling group to Scale In, deallocating one
+      worker instance.
     Type: Number
-    Default: 0
+    Default: 3600
   GrowthThreshold:
     Description: >-
-      The threshold for the queue size from which going equal or above will
-      trigger the AutoScaling group to Scale Out (allocating one worker
-      instance).
+      The threshold for the average queue size from which going equal or above
+      will trigger the AutoScaling group to Scale Out, allocating one worker
+      instance.
     Type: Number
     Default: 1
-  WorkerInstanceType:
-    Description: EC2 instance types to use as worker.
-    Type: String
-    Default: t3.micro
+  ShrinkCooldown:
+    Description: >-
+      The cooldown (in seconds) between deallocations of worker instances.
+    Type: Number
+    Default: 60
+  GrowthCooldown:
+    Description: >-
+      The cooldown (in seconds) between allocations of worker instances.
+    Type: Number
+    Default: 300
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -213,15 +224,15 @@ Resources:
     Properties:
       AlarmActions:
         - !Ref ScaleIn
-      Statistic: Average
-      Period: '60'
+      Statistic: Sum
+      Period: !Ref ShrinkTimeout
       EvaluationPeriods: '1'
       Dimensions:
         - Name: QueueName
           Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
-      Threshold: !Ref ShrinkThreshold
+      Threshold: 0
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -244,28 +255,28 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-  ScaleOut:
-    Type: 'AWS::AutoScaling::ScalingPolicy'
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      PolicyType: SimpleScaling
-      ScalingAdjustment: 1
-      Cooldown: 300
-      AutoScalingGroupName: !Ref Scaler
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
   ScaleIn:
     Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: -1
-      Cooldown: 300
+      Cooldown: !Ref ShrinkCooldown
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
+  ScaleOut:
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: !Ref GrowthCooldown
+      AutoScalingGroupName: !Ref Scaler
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: f12da049-cd8c-4011-8c3f-650b4463a007
   Files:
     Type: 'AWS::EFS::FileSystem'
     Properties:
@@ -484,6 +495,7 @@ Resources:
               libcurl-devel: []
               libxml2-devel: []
               libxslt-devel: []
+              openssl-devel: []
               postgresql-devel: []
               python3: []
               python3-devel: []
@@ -492,7 +504,7 @@ Resources:
           commands:
             install:
               command: |
-                PYCURL_SSL_LIBRARY=nss pip3 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                PYCURL_SSL_LIBRARY=openssl pip3 install --no-cache-dir --compile --ignore-installed pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1 celery[sqs] tenacity==5.0.2
         service:
           files:
@@ -531,24 +543,23 @@ Resources:
               content: |
                 D /run/airflow 0755 ec2-user ec2-user
           commands:
-            injectvars:
+            bootstrap:
               command: !Sub
                 - |
                   PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4)
-                  PUBLIC_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
-                  LOCAL_IPV4=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+                  PUBLIC_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+                  LOCAL_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
                   if [ PUBLIC = "200" ]
                   then sed -i -e "s~INJECTHOST~$PUBLIC_IPV4~" /etc/sysconfig/airflow
                   else sed -i -e "s~INJECTHOST~$LOCAL_IPV4~" /etc/sysconfig/airflow
                   fi
                   SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
                   sed -i -e "s~INJECTSECRET~$SECRET~" /etc/sysconfig/airflow
+
+                  cat /etc/sysconfig/airflow | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
+                  su -c '/usr/local/bin/airflow initdb' ec2-user
+                  systemctl start airflow
                 - secret: !GetAtt Secret.SecretAccessKey
-            bootstrap:
-              command: |
-                cat /etc/sysconfig/airflow | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
-                su -c '/usr/local/bin/airflow initdb' ec2-user
-                systemctl start airflow
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Metadata:
@@ -562,13 +573,15 @@ Metadata:
           - StackSubnetBlock
           - KeyPair
       - Label:
-          default: Scaling
+          default: Worker Instances
         Parameters:
+          - WorkerInstanceType
           - MinGroupSize
           - MaxGroupSize
-          - ShrinkThreshold
+          - ShrinkTimeout
+          - ShrinkCooldown
           - GrowthThreshold
-          - WorkerInstanceType
+          - GrowthCooldown
       - Label:
           default: Storage
         Parameters:
