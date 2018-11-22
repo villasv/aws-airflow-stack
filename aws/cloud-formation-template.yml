@@ -1,11 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
-  AMI:
-    Description: >-
-      The virtual machine image (AMI) to use for the instances. See
-      https://aws.amazon.com/amazon-linux-ami/ for the latest Amazon Linux AMI for each region.
-    Type: String
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
@@ -45,13 +40,11 @@ Parameters:
   WorkerInstanceType:
     Description: EC2 instance types to use as worker.
     Type: String
-    Default: t2.micro
-    AllowedValues:
-      - t2.micro
-      - m4.large
+    Default: t3.micro
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
+    Default: airflow
   DbMasterPassword:
     Description: The password to be used in the airflow database.
     Type: String
@@ -138,7 +131,7 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: t2.micro
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
@@ -151,8 +144,6 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow scheduler' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          yum update -y
-          yum-config-manager --enable epel
           /opt/aws/bin/cfn-init \
             --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
@@ -164,7 +155,7 @@ Resources:
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       InstanceType: t2.micro
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
@@ -178,8 +169,6 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow webserver' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          yum update -y
-          yum-config-manager --enable epel
           /opt/aws/bin/cfn-init \
             --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
@@ -202,7 +191,7 @@ Resources:
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
-      ImageId: !Ref AMI
+      ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       InstanceType: !Ref WorkerInstanceType
       KeyName: !Ref KeyPair
       SecurityGroups:
@@ -212,8 +201,6 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow worker' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          yum update -y
-          yum-config-manager --enable epel
           /opt/aws/bin/cfn-init \
             --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
     Metadata:
@@ -472,18 +459,16 @@ Resources:
       'AWS::CloudFormation::Init':
         configSets:
           default:
-            - filesystem
+            - filesys
             - runtime
-            - project
-            - supervision
-            - formation
-        filesystem:
+            - service
+        filesys:
           packages:
             yum:
               nfs-utils: []
           commands:
             mount:
-              test: test ! "$(mount | grep efs)"
+              test: test ! "$(mount | grep /efs)"
               command: !Sub |
                 mkdir -p /efs
                 echo "${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2  0 0" >> /etc/fstab
@@ -499,26 +484,52 @@ Resources:
               libcurl-devel: []
               libxml2-devel: []
               libxslt-devel: []
-              postgresql95-devel: []
-              python36: []
-              python36-devel: []
-              python36-pip: []
+              postgresql-devel: []
+              python3: []
+              python3-devel: []
+              python3-pip: []
+              python3-wheel: []
+          commands:
+            install:
+              command: |
+                PYCURL_SSL_LIBRARY=nss pip3 install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install apache-airflow[celery,postgres]==1.10.1 celery[sqs] tenacity==5.0.2
+        service:
           files:
-            /etc/environment:
+            /etc/sysconfig/airflow:
               content: !Sub
                 - |
                   AIRFLOW_HOME=/efs/airflow
                   AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                  AIRFLOW__WEBSERVER__BASE_URL=http://INSERTHOST:8080
+                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:8080
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=8080
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INSERTSECRET@
+                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INJECTSECRET@
                   AIRFLOW__CELERY__CELERY_RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AWS_DEFAULT_REGION=${AWS::Region}
                 - rds: !GetAtt Database.Endpoint.Address
                   key: !Ref Secret
                   queue: !GetAtt Tasks.QueueName
+            /usr/lib/systemd/system/airflow.service:
+              content: |
+                [Unit]
+                Description=Airflow daemon
+                After=network.target postgresql.service mysql.service redis.service rabbitmq-server.service
+                Wants=postgresql.service mysql.service redis.service rabbitmq-server.service
+                [Service]
+                EnvironmentFile=/etc/sysconfig/airflow
+                User=ec2-user
+                Group=ec2-user
+                Type=simple
+                ExecStart=/usr/bin/turbine
+                Restart=always
+                RestartSec=5s
+                [Install]
+                WantedBy=multi-user.target
+            /usr/lib/tmpfiles.d/airflow.conf:
+              content: |
+                D /run/airflow 0755 ec2-user ec2-user
           commands:
             injectvars:
               command: !Sub
@@ -527,102 +538,22 @@ Resources:
                   PUBLIC_IPV4=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
                   LOCAL_IPV4=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
                   if [ PUBLIC = "200" ]
-                  then sed -i -e "s~INSERTHOST~$PUBLIC_IPV4~" /etc/environment
-                  else sed -i -e "s~INSERTHOST~$LOCAL_IPV4~" /etc/environment
+                  then sed -i -e "s~INJECTHOST~$PUBLIC_IPV4~" /etc/sysconfig/airflow
+                  else sed -i -e "s~INJECTHOST~$LOCAL_IPV4~" /etc/sysconfig/airflow
                   fi
                   SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INSERTSECRET~$SECRET~" /etc/environment
+                  sed -i -e "s~INJECTSECRET~$SECRET~" /etc/sysconfig/airflow
                 - secret: !GetAtt Secret.SecretAccessKey
-            installdeps:
-              command: |
-                alternatives --set python /usr/bin/python3.6
-                PYCURL_SSL_LIBRARY=nss pip install --no-cache-dir --compile --ignore-installed --install-option="--with-nss" pycurl
-                pip install wheel
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip install apache-airflow[celery,postgres]==1.10.1b1 celery[sqs]
-                cp /usr/local/bin/{airflow,gunicorn} /usr/bin/
-        project:
-          commands:
             bootstrap:
               command: |
-                cat /etc/environment | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
+                cat /etc/sysconfig/airflow | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
                 su -c '/usr/local/bin/airflow initdb' ec2-user
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip install -r /efs/airflow/requirements.txt
-        supervision:
-          packages:
-            yum:
-              supervisor:
-                - '2.1'
-          files:
-            /etc/supervisord.conf:
-              content: |
-                [supervisord]
-                http_port=/var/run/supervisor.sock
-                logfile=/var/log/supervisor/supervisord.log
-                childlogdir=/var/log/supervisor
-                pidfile=/var/run/supervisord.pid
-                environment=INSERTENVIRONMENT
-                [supervisorctl]
-                serverurl=unix:///var/run/supervisor.sock
-                [program:airflow]
-                command=/usr/bin/turbine
-                user=ec2-user
-                log_stderr=true
-                autorestart=true
-                startsecs=10
-                stopasgroup=true
-          commands:
-            injectvars:
-              command: |
-                ENV=$(tr '\n' ',' < /etc/environment)
-                sed -i -e "s~INSERTENVIRONMENT~$ENV~" /etc/supervisord.conf
-            fixpython:
-              command: |
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisord
-                sed -i -e "s~/python$~/python2.6~" /usr/bin/supervisorctl
-          services:
-            sysvinit:
-              supervisord:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/supervisord.conf
-        formation:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                interval=1
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Scheduler.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
-                runas=root
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: true
-                ensureRunning: true
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+                systemctl start airflow
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
-      - Label:
-          default: Instance Configuration
-        Parameters:
-          - AMI
       - Label:
           default: Networking
         Parameters:
@@ -1045,3 +976,43 @@ Metadata:
       target:
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
       z: 13
+Mappings:
+  RegionToAMI:
+    ap-northeast-1:
+      HVMGP2: ami-00f9d04b3b3092052
+    ap-northeast-2:
+      HVMGP2: ami-0c764df09c35858b8
+    ap-northeast-3:
+      HVMGP2: ami-0f4865fb90390aeec
+    ap-south-1:
+      HVMGP2: ami-00796998f258969fd
+    ap-southeast-1:
+      HVMGP2: ami-085fd1bd447be68e8
+    ap-southeast-2:
+      HVMGP2: ami-0b8dea0e70b969adc
+    ca-central-1:
+      HVMGP2: ami-05cac140c6a1fb960
+    cn-north-1:
+      HVMGP2: ami-0bcb2d94a820e559c
+    cn-northwest-1:
+      HVMGP2: ami-0d82dd087e5eea5af
+    eu-central-1:
+      HVMGP2: ami-02ea8f348fa28c108
+    eu-west-1:
+      HVMGP2: ami-0a5e707736615003c
+    eu-west-2:
+      HVMGP2: ami-017b0e29fac27906b
+    eu-west-3:
+      HVMGP2: ami-04992646d54c69ef4
+    sa-east-1:
+      HVMGP2: ami-0160a8b6087883cb6
+    us-east-1:
+      HVMGP2: ami-013be31976ca2c322
+    us-east-2:
+      HVMGP2: ami-0350c5670171b5391
+    us-gov-west-1:
+      HVMGP2: ami-d263f9b3
+    us-west-1:
+      HVMGP2: ami-01beb64058d271bc4
+    us-west-2:
+      HVMGP2: ami-061e7ebbc234015fe
