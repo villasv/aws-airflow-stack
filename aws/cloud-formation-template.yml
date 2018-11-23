@@ -231,7 +231,7 @@ Resources:
         - Name: QueueName
           Value: !GetAtt Tasks.QueueName
       Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
+      MetricName: NumberOfMessagesReceived
       Threshold: 0
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
