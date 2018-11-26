@@ -243,9 +243,10 @@ Resources:
             var AWS = require('aws-sdk');
             AWS.config.update({region: '${AWS::Region}'});
             var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
-            var c = 1, fpoll = 1.0;
+            var c = 1, fpoll = 0.08;
             exports.handler = async function(event, context) {
               var now = new Date();
+              now.setMinutes(now.getMinutes()-10);
               var then = new Date(now);
               then.setMinutes(now.getMinutes()-5);
               var ANOMV = await cw.getMetricStatistics({
@@ -262,8 +263,8 @@ Resources:
                 Dimensions: [{ Name: 'QueueName',
                                Value: '${queueName}' }],
                 StartTime: then, EndTime: now, Period: 300,
-                Statistics: [ 'Average' ],
-              }).promise(); NOER = NOER.Datapoints[0].Average;
+                Statistics: [ 'Sum' ],
+              }).promise(); NOER = NOER.Datapoints[0].Sum;
               var GISI = await cw.getMetricStatistics({
                 Namespace: 'AWS/AutoScaling',
                 MetricName: 'GroupInServiceInstances',
