@@ -188,17 +188,6 @@ Resources:
     DependsOn:
       - Repository
       - Meta
-  Scaler:
-    Type: 'AWS::AutoScaling::AutoScalingGroup'
-    Properties:
-      LaunchConfigurationName: !Ref Config
-      MinSize: !Ref MinGroupSize
-      MaxSize: !Ref MaxGroupSize
-      VPCZoneIdentifier:
-        - !Ref StackSubnet
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 90184717-25cc-4671-a70d-7becceed5c50
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
@@ -219,6 +208,68 @@ Resources:
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
     DependsOn:
       - Meta
+  Scaler:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      LaunchConfigurationName: !Ref Config
+      MinSize: !Ref MinGroupSize
+      MaxSize: !Ref MaxGroupSize
+      MetricsCollection:
+        Granularity: 1Minute
+      VPCZoneIdentifier:
+        - !Ref StackSubnet
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+  Logger:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+  Metric:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs6.10
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          var AWS = require('aws-sdk');
+          var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+          var NOER = await cw.listMetrics({
+            Namespace: 'AWS/Logs',
+            MetricName: '',
+            Dimensions: [ Name: '' ]
+          }).promise();
+          await cw.putMetricData({
+            Namespace: 'SITE/TRAFFIC',
+            MetricData: [{ MetricName: 'PAGES_VISITED',
+                          Dimensions: [ { Name: 'UNIQUE_PAGES',
+                                          Value: 'URLS' }],
+                          Unit: 'None',
+                          Value: 1.0 }]
+          }).promise();
+      Role: !Ref Logger
+  Timer:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      ScheduleExpression: 'rate(1 minute)'
+      State: 'ENABLED'
+      Targets:
+        -
+          Arn: !GetAtt Metric.Arn
+          Id: 'TargetFunction'
+  Invoke:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !Ref Metric
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt Timer.Arn
   Shrink:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
