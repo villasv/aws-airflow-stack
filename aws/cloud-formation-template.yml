@@ -211,11 +211,12 @@ Resources:
   Scaler:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
       LaunchConfigurationName: !Ref Config
       MinSize: !Ref MinGroupSize
       MaxSize: !Ref MaxGroupSize
       MetricsCollection:
-        Granularity: 1Minute
+        - Granularity: 1Minute
       VPCZoneIdentifier:
         - !Ref StackSubnet
     Metadata:
@@ -237,23 +238,55 @@ Resources:
       Runtime: nodejs6.10
       Handler: index.handler
       Code:
-        ZipFile: |
-          var AWS = require('aws-sdk');
-          var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
-          var NOER = await cw.listMetrics({
-            Namespace: 'AWS/Logs',
-            MetricName: '',
-            Dimensions: [ Name: '' ]
-          }).promise();
-          await cw.putMetricData({
-            Namespace: 'SITE/TRAFFIC',
-            MetricData: [{ MetricName: 'PAGES_VISITED',
-                          Dimensions: [ { Name: 'UNIQUE_PAGES',
-                                          Value: 'URLS' }],
-                          Unit: 'None',
-                          Value: 1.0 }]
-          }).promise();
-      Role: !Ref Logger
+        ZipFile: !Sub
+          - |
+            var AWS = require('aws-sdk');
+            AWS.config.update({region: '${AWS::Region}'});
+            var c = 1, fpoll = 1.0;
+            var now = new Date();
+            var then = new Date(now);
+            then.setMinutes(now.getMinutes()-1);
+            // collect metrics and calculate load
+            var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+            var ANOMV = await cw.getMetricStatistics({
+              Namespace: 'AWS/SQS',
+              MetricName: 'ApproximateNumberOfMessagesVisible',
+              Dimensions: [{ Name: 'QueueName',
+                             Value: '${queueName}' }],
+              StartTime: then, EndTime: now, Period: 300,
+              Statistics: [ 'Average' ],
+            }).promise(); ANOMV = ANOMV.Datapoints[0].Average;
+            var NOER = await cw.getMetricStatistics({
+              Namespace: 'AWS/SQS',
+              MetricName: 'NumberOfEmptyReceives',
+              Dimensions: [{ Name: 'QueueName',
+                             Value: '${queueName}' }],
+              StartTime: then, EndTime: now, Period: 300,
+              Statistics: [ 'Average' ],
+            }).promise(); NOER = NOER.Datapoints[0].Average;
+            var GISI = await cw.getMetricStatistics({
+              Namespace: 'AWS/AutoScaling',
+              MetricName: 'GroupInServiceInstances',
+              Dimensions: [{ Name: 'AutoScalingGroupName',
+                             Value: '${asgName}' }],
+              StartTime: then, EndTime: now, Period: 300,
+              Statistics: [ 'Average' ],
+            }).promise(); GISI = GISI.Datapoints[0].Average;
+            var l = (ANOMV > 0) ? 1.0 : 0.0;
+            if (GISI > 0) {
+              l = 1 - NOER / (GISI * c * fpoll * 300);
+            }
+            await cw.putMetricData({
+              Namespace: 'Turbine',
+              MetricData: [{ MetricName: 'WorkerLoad',
+                             Dimensions: [ { Name: 'StackName',
+                                             Value: ${AWS::StackName} }],
+                             Unit: 'None',
+                             Value: l }],
+            }).promise();
+          - asgName: !Sub '${AWS::StackName}-scaling-group'
+            queueName: !GetAtt Tasks.QueueName
+      Role: !GetAtt Logger.Arn
   Timer:
     Type: 'AWS::Events::Rule'
     Properties:
