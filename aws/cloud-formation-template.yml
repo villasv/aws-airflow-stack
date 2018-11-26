@@ -28,30 +28,20 @@ Parameters:
     Description: The maximum number of active worker instances.
     Type: Number
     Default: 10
-  ShrinkTimeout:
+  ShrinkThreshold:
     Description: >-
       The timeout (in seconds, multiple of 60) after which the queue staying
       empty will trigger the AutoScaling group to Scale In, deallocating one
       worker instance.
     Type: Number
-    Default: 3600
+    Default: 0.2
   GrowthThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or above
       will trigger the AutoScaling group to Scale Out, allocating one worker
       instance.
     Type: Number
-    Default: 1
-  ShrinkCooldown:
-    Description: >-
-      The cooldown (in seconds) between deallocations of worker instances.
-    Type: Number
-    Default: 60
-  GrowthCooldown:
-    Description: >-
-      The cooldown (in seconds) between allocations of worker instances.
-    Type: Number
-    Default: 300
+    Default: 0.8
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -319,15 +309,15 @@ Resources:
     Properties:
       AlarmActions:
         - !Ref ScaleIn
-      Statistic: Sum
-      Period: !Ref ShrinkTimeout
-      EvaluationPeriods: '1'
+      Namespace: Turbine
+      MetricName: WorkerLoad
       Dimensions:
-        - Name: QueueName
-          Value: !GetAtt Tasks.QueueName
-      Namespace: AWS/SQS
-      MetricName: NumberOfMessagesReceived
-      Threshold: 0
+        - Name: StackName
+          Value: !Ref 'AWS::StackName'
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
+      Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -337,14 +327,14 @@ Resources:
     Properties:
       AlarmActions:
         - !Ref ScaleOut
-      Statistic: Average
-      Period: '60'
-      EvaluationPeriods: '1'
+      Namespace: Turbine
+      MetricName: WorkerLoad
       Dimensions:
-        - Name: QueueName
-          Value: !GetAtt Tasks.QueueName
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
+        - Name: StackName
+          Value: !Ref 'AWS::StackName'
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
@@ -355,8 +345,8 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: -1
-      Cooldown: !Ref ShrinkCooldown
+      ScalingAdjustment: '-1'
+      Cooldown: '300'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -366,8 +356,8 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: 1
-      Cooldown: !Ref GrowthCooldown
+      ScalingAdjustment: '1'
+      Cooldown: '300'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -674,10 +664,8 @@ Metadata:
           - WorkerInstanceType
           - MinGroupSize
           - MaxGroupSize
-          - ShrinkTimeout
-          - ShrinkCooldown
+          - ShrinkThreshold
           - GrowthThreshold
-          - GrowthCooldown
       - Label:
           default: Storage
         Parameters:
