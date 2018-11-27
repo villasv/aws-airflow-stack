@@ -34,14 +34,14 @@ Parameters:
       empty will trigger the AutoScaling group to Scale In, deallocating one
       worker instance.
     Type: Number
-    Default: 0.2
+    Default: 0.5
   GrowthThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or above
       will trigger the AutoScaling group to Scale Out, allocating one worker
       instance.
     Type: Number
-    Default: 0.8
+    Default: 0.9
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -279,9 +279,13 @@ Resources:
                         Stat: 'Average',
                         Unit: 'None', }},
               ]}).promise();
-              var ANOMV = metrics.MetricDataResults[0].Values[0];
-              var NOER = metrics.MetricDataResults[1].Values[1];
-              var GISI = metrics.MetricDataResults[2].Values[1];
+              var ithIndex = i => (metrics
+                .MetricDataResults[i]
+                .Timestamps.map(t => t.toISOString()).indexOf(prev.toISOString())
+              );
+              var ANOMV = metrics.MetricDataResults[0].Values[ithIndex(0)];
+              var NOER = metrics.MetricDataResults[1].Values[ithIndex(1)];
+              var GISI = metrics.MetricDataResults[2].Values[ithIndex(2)];
               var l;
               if (GISI > 0)
                 l = 1 - NOER / (GISI * c * fpoll * 300);
