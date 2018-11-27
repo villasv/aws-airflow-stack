@@ -281,7 +281,8 @@ Resources:
               ]}).promise();
               var ithIndex = i => (metrics
                 .MetricDataResults[i]
-                .Timestamps.map(t => t.toISOString()).indexOf(prev.toISOString())
+                .Timestamps.map(t => t.toISOString())
+                .indexOf(prev.toISOString())
               );
               var ANOMV = metrics.MetricDataResults[0].Values[ithIndex(0)];
               var NOER = metrics.MetricDataResults[1].Values[ithIndex(1)];
@@ -361,7 +362,7 @@ Resources:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: '-1'
-      Cooldown: '300'
+      Cooldown: '600'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -372,7 +373,7 @@ Resources:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: '1'
-      Cooldown: '300'
+      Cooldown: '600'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
