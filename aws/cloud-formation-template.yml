@@ -20,6 +20,13 @@ Parameters:
     Description: EC2 instance types to use as worker.
     Type: String
     Default: t3.small
+  WorkerConcurrency:
+    Description: >-
+      Number of concurrent units per machine. This is NOT enforced as
+      configuration in Airflow, but used to regulate the load metric used by
+      auto scaling.
+    Type: Number
+    Default: 1
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
@@ -243,7 +250,7 @@ Resources:
             var AWS = require('aws-sdk');
             AWS.config.update({region: '${AWS::Region}'});
             var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
-            var c = 1, fpoll = 0.1;
+            var c = ${concurrency}, fpoll = 0.1;
             exports.handler = async function(event, context) {
               var last = new Date();
               last.setMinutes(Math.floor(last.getMinutes()/5)*5);
@@ -267,7 +274,7 @@ Resources:
                                   MetricName: 'NumberOfEmptyReceives',
                                   Dimensions: [{ Name: 'QueueName',
                                                 Value: '${queueName}' }]},
-                        Period: 60,
+                        Period: 300,
                         Stat: 'Sum',
                         Unit: 'Count', }},
                     { Id: 'avgGISI', MetricStat: {
@@ -302,6 +309,7 @@ Resources:
               }).promise();
             };
           - asgName: !Sub '${AWS::StackName}-scaling-group'
+            concurrency: !Ref WorkerConcurrency
             queueName: !GetAtt Tasks.QueueName
       Role: !GetAtt Logger.Arn
   Timer:
@@ -331,7 +339,7 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '300'
+      Period: '600'
       EvaluationPeriods: '1'
       Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
@@ -349,7 +357,7 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '300'
+      Period: '600'
       EvaluationPeriods: '1'
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -678,6 +686,7 @@ Metadata:
           default: Worker Instances
         Parameters:
           - WorkerInstanceType
+          - WorkerConcurrency
           - MinGroupSize
           - MaxGroupSize
           - ShrinkThreshold
