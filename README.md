@@ -76,9 +76,12 @@ sudo ln -s /efs/repo/airflow/home /efs/airflow
 sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
 
-> **GOTCHA**: configuring the CeleryExecutor also requires listing your region
-> as a broker transport option to be passed to Celery, until kombu is configured
-> to pick it up automatically (https://github.com/celery/kombu/issues/950).
+> **GOTCHA**: if you're not in `us-east-1`, using Celery requires listing your
+> region as a broker transport option, until it becomes possible to enforce it
+> directly with environment variables
+> [(AIRFLOW-3366)](https://issues.apache.org/jira/browse/AIRFLOW-3366).
+> Providing the `visibility_timeout` is also important
+> [(AIRFLOW-3365)](https://issues.apache.org/jira/browse/AIRFLOW-3365).
 >
 > ```
 > [core]
