@@ -109,6 +109,31 @@ process (webserver, scheduler and workers). If you have many workers, the
 easiest option is to ensure 0 worker machines while doing so, either by having
 an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
 
+## Cluster Settings Advice
+
+### Workers and Auto Scaling
+
+The stack includes an estimate of the cluster load average made by analyzing the
+amount of failed attempts to retrieve a task from the queue. The rationale is
+detailed [elsewhere][load-metric], but the metric objective is to measure if the
+cluster is correctly sized for the influx of tasks.
+
+**The goal of the auto scaling feature is to respond to the tasks load, which
+could mean an idle cluster becoming active or a busy cluster becoming idle, the
+start/end of a backfill, many DAGs with similar schedules hitting their due
+time, DAGs that branch to many parallel operators. Scaling in response to
+machine resources like facing CPU intensive tasks is not the goal**; the latter
+is a very advanced scenario and would be best handled by Celery's own [scaling
+mechanism][celery-as] or offloading the computation to it's own system (like
+Spark or Kubernetes) and use Airflow only for orchestration.
+
+[load-metric]:
+https://github.com/villasv/aws-airflow-stack/issues/63
+[tpo-poll]:
+http://docs.celeryproject.org/en/latest/getting-started/brokers/sqs.html#polling-interval
+[celery-as]:
+http://docs.celeryproject.org/en/latest/userguide/workers.html#autoscaling
+
 ## FAQ
 
 1. Why is there a `Dummy` subnet in the VPC?
