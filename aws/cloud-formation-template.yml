@@ -266,7 +266,7 @@ Resources:
                                   MetricName: 'ApproximateNumberOfMessagesVisible',
                                   Dimensions: [{ Name: 'QueueName',
                                                 Value: '${queueName}' }]},
-                        Period: 60,
+                        Period: 300,
                         Stat: 'Maximum',
                         Unit: 'Count' }},
                     { Id: 'sumNOER', MetricStat: {
@@ -314,7 +314,7 @@ Resources:
   Timer:
     Type: 'AWS::Events::Rule'
     Properties:
-      ScheduleExpression: 'rate(5 minutes)'
+      ScheduleExpression: 'rate(1 minute)'
       State: 'ENABLED'
       Targets:
         -
@@ -338,8 +338,8 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '600'
-      EvaluationPeriods: '1'
+      Period: '300'
+      EvaluationPeriods: '2'
       Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
@@ -356,8 +356,8 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '600'
-      EvaluationPeriods: '1'
+      Period: '300'
+      EvaluationPeriods: '2'
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
