@@ -18,12 +18,12 @@ configure in a few commands.
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
 The stack is composed mainly of two EC2 machines, one for the Airflow webserver
-and one for the Airflow scheduler running the CeleryExecutor, plus an Auto
-Scaling Group of EC2 machines for Airflow workers. Supporting resources include
-a RDS instance to host the Airflow metadata database, a SQS instance to be used
-as broker backend, an EFS instance to serve as shared directory, and auto
-scaling metrics, alarms and triggers. All other resources are the usual
-boilerplate to keep the wind blowing.
+and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
+for Airflow workers. Supporting resources include a RDS instance to host the
+Airflow metadata database, a SQS instance to be used as broker backend, an EFS
+instance to serve as shared directory, and auto scaling metrics, alarms and
+triggers. All other resources are the usual boilerplate to keep the wind
+blowing.
 
 ### Deployment and File Synchronization
 
@@ -150,6 +150,16 @@ an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
     RDS Instance is deployed. The only alternatives are to let it live in the
     default VPC and communicate with peering or to use DBSubnetGroup, which
     requires associated subnets that cover at least 2 Availability Zones.
+
+2. Why does auto scaling takes so long to kick in?
+
+    AWS doesn't provide minute-level granularity on SQS metrics, only 5 minute
+    aggregates. Also, CloudWatch stamps aggregate metrics with their initial
+    timestamp, meaning that the latest SQS metric used on the load average
+    estimation is continuously changing, being stable only on the period already
+    past - that is, 10 minutes ago. This means that the load metric is always at
+    least 5~10 minutes delayed, so to avoid oscillating allocations the alarm
+    trigger has a 10 minutes cooldown.
 
 ## Contributing
 
