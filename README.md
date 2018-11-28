@@ -37,7 +37,7 @@ resources are the usual boilerplate to keep the wind flowing.
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
 
 
-### 1. Deploy the Cloud Formation Stack
+### 1. Deploy the CloudFormation stack
 
 Create a new stack using the latest template definition at
 [`aws\cloud-formation-template.yml`][raw-template]. The following button will
@@ -68,12 +68,12 @@ instance, clone your Airflow files **inside the shared directory** (`/efs`),
 install your stuff and link your specific files.
 
 ```
-ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
-cd /efs
-git clone https://your.git/user/repo
-sudo pip install -r /efs/repo/requirements.txt
-sudo ln -s /efs/repo/airflow/home /efs/airflow
-sudo ln -s /efs/repo/airflow/dags /efs/dags
+you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
+[ec2-user@ip-yy-y-y-yyy ~]$ cd /efs
+[ec2-user@ip-yy-y-y-yyy efs]$ git clone https://your.git/user/repo
+[ec2-user@ip-yy-y-y-yyy efs]$ sudo pip install -r /efs/repo/requirements.txt
+[ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/home /efs/airflow
+[ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
 
 > **GOTCHA**: if you're not in `us-east-1`, using Celery requires listing your
@@ -92,16 +92,22 @@ sudo ln -s /efs/repo/airflow/dags /efs/dags
 > visibility_timeout = 21600
 > ```
 
-### 3. Clean Up
+### 3. Apply your configurations
 
-In order to get a healthy initial bootstrap for your Airflow setup, it's best to
-make sure we're writing on a blank slate. The stack comes with Airflow already
-running by default because it's easier to demo and to setup supervision.
+If you change `airflow.cfg`, it's necessary to restart the Airflow processes
+related to that change. If you change the scheduler heartbeat, restart the
+scheduler; if you change the webserver port, restart the webserver; and so on.
+Whatever the case, this can be done easily by `systemd` on each machine:
 
-One way to be completely safe is to stop all airflow process (webserver,
-scheduler and workers), reset the airflow database, empty the queue and resume
-all airflow processes back again. If you have many workers, the easiest option
-is to downscale beforehand.
+```
+you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
+[ec2-user@ip-yy-y-y-yyy ~]$ sudo systemctl restart airflow
+```
+
+One way to be completely safe in any case is to always restart all airflow
+process (webserver, scheduler and workers). If you have many workers, the
+easiest option is to ensure 0 worker machines while doing so, either by having
+an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
 
 ## FAQ
 
