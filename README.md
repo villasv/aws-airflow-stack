@@ -5,27 +5,60 @@ https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon
 [ci]: #get-it-working
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
-Airflow setup. Deploy in a few clicks, configure in a few commands, personalize
-in a few fields.
+Airflow setup.
 
 The project is intended to be easily deployed, making it great for testing,
 demos and showcasing Airflow solutions. It is also expected to be easily
 tinkered with, allowing it to be used in real production environments with
-little extra effort.
+little extra effort. Deploy in a few clicks, personalize in a few fields,
+configure in a few commands.
 
 ## Overview
 
 ![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
 
-The stack is composed of two main EC2 machines, one for the Airflow UI and one
-for the job scheduler. Airflow worker machines are instantiated on demand when
-the job queue average length grows past a certain threshold and terminated when
-the queue stays empty for too long.
+The stack is composed mainly of two EC2 machines, one for the Airflow webserver
+and one for the Airflow scheduler running the CeleryExecutor, plus an Auto
+Scaling Group of EC2 machines for Airflow workers. Supporting resources include
+a RDS instance to host the Airflow metadata database, a SQS instance to be used
+as broker backend, an EFS instance to serve as shared directory, and auto
+scaling metrics, alarms and triggers. All other resources are the usual
+boilerplate to keep the wind blowing.
 
-Supporting resources include a RDS instance to host the Airflow metadata
-database, a SQS instance to be used as broker backend, an EFS instance to serve
-as shared configuration and auto-scaling triggers for workers. All other
-resources are the usual boilerplate to keep the wind flowing.
+### Deployment and File Synchronization
+
+The Airflow home and the DAGs directory are automatically synchronized between
+all machines using EFS, so there's no risk of having drifting configurations as
+long as the Airflow processes are restarted to pick up the new relevant
+settings.
+
+Having a shared filesystem also make deployments very easy: all it takes is a
+pull command from your project remote repository and all machines will have the
+latest files. If you distribute your dependencies along with your DAG
+definitions, it won't even require installing libraries on each machine.
+
+### Workers and Auto Scaling
+
+The stack includes an estimate of the cluster load average made by analyzing the
+amount of failed attempts to retrieve a task from the queue. The rationale is
+detailed [elsewhere][load-metric], but the metric objective is to measure if the
+cluster is correctly sized for the influx of tasks.
+
+**The goal of the auto scaling feature is to respond to changes in the tasks
+load, which could mean an idle cluster becoming active or a busy cluster
+becoming idle, the start/end of a backfill, many DAGs with similar schedules
+hitting their due time, DAGs that branch to many parallel operators. Scaling in
+response to machine resources like facing CPU intensive tasks is not the goal**;
+the latter is a very advanced scenario and would be best handled by Celery's own
+[scaling mechanism][celery-as] or offloading the computation to it's own system
+(like Spark or Kubernetes) and use Airflow only for orchestration.
+
+[load-metric]:
+https://github.com/villasv/aws-airflow-stack/issues/63
+[tpo-poll]:
+http://docs.celeryproject.org/en/latest/getting-started/brokers/sqs.html#polling-interval
+[celery-as]:
+http://docs.celeryproject.org/en/latest/userguide/workers.html#autoscaling
 
 ## Get It Working
 
@@ -37,7 +70,7 @@ resources are the usual boilerplate to keep the wind flowing.
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
 
 
-### 1. Deploy the CloudFormation stack
+### 1. Deploy the stack
 
 Create a new stack using the latest template definition at
 [`aws\cloud-formation-template.yml`][raw-template]. The following button will
@@ -52,7 +85,7 @@ The stack resources take around 10 minutes to create, while the airflow
 installation and bootstrap another 3 to 5 minutes. After that you can
 already access the Airflow UI and setup your own Airflow DAGs.
 
-### 2. Setup your Airflow files
+### 2. Setup your files
 
 This can be done in several ways. What really matters is:
 
@@ -92,7 +125,7 @@ you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 > visibility_timeout = 21600
 > ```
 
-### 3. Apply your configurations
+### 3. Apply your configs
 
 If you change `airflow.cfg`, it's necessary to restart the Airflow processes
 related to that change. If you change the scheduler heartbeat, restart the
@@ -108,31 +141,6 @@ One way to be completely safe in any case is to always restart all airflow
 process (webserver, scheduler and workers). If you have many workers, the
 easiest option is to ensure 0 worker machines while doing so, either by having
 an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
-
-## Cluster Settings Advice
-
-### Workers and Auto Scaling
-
-The stack includes an estimate of the cluster load average made by analyzing the
-amount of failed attempts to retrieve a task from the queue. The rationale is
-detailed [elsewhere][load-metric], but the metric objective is to measure if the
-cluster is correctly sized for the influx of tasks.
-
-**The goal of the auto scaling feature is to respond to the tasks load, which
-could mean an idle cluster becoming active or a busy cluster becoming idle, the
-start/end of a backfill, many DAGs with similar schedules hitting their due
-time, DAGs that branch to many parallel operators. Scaling in response to
-machine resources like facing CPU intensive tasks is not the goal**; the latter
-is a very advanced scenario and would be best handled by Celery's own [scaling
-mechanism][celery-as] or offloading the computation to it's own system (like
-Spark or Kubernetes) and use Airflow only for orchestration.
-
-[load-metric]:
-https://github.com/villasv/aws-airflow-stack/issues/63
-[tpo-poll]:
-http://docs.celeryproject.org/en/latest/getting-started/brokers/sqs.html#polling-interval
-[celery-as]:
-http://docs.celeryproject.org/en/latest/userguide/workers.html#autoscaling
 
 ## FAQ
 
