@@ -250,7 +250,7 @@ Resources:
             var AWS = require('aws-sdk');
             AWS.config.update({region: '${AWS::Region}'});
             var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
-            var c = ${WorkerConcurrency}, fpoll = 0.1;
+            var fpoll = 0.098444;
             exports.handler = async function(event, context) {
               var last = new Date();
               last.setMinutes(Math.floor(last.getMinutes()/5)*5);
@@ -296,7 +296,7 @@ Resources:
               var GISI = metrics.MetricDataResults[2].Values[ithIndex(2)];
               var l;
               if (GISI > 0)
-                l = 1 - NOER / (GISI * c * fpoll * 300);
+                l = 1 - NOER / (GISI * fpoll * 300);
               else
                 l = (ANOMV > 0) ? 1.0 : 0.0;
               await cw.putMetricData({
