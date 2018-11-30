@@ -311,7 +311,8 @@ Resources:
                               Dimensions: [ { Name: 'StackName',
                                               Value: '${AWS::StackName}' }],
                               Timestamp: prev,
-                              Value: l, Unit: 'None' }],
+                              Value: (l > 0) ? l : 0,
+                              Unit: 'None' }],
               }).promise();
             };
           - asgName: !Sub '${AWS::StackName}-scaling-group'
