@@ -16,10 +16,23 @@ Parameters:
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
+  SchedulerInstanceType:
+    Description: EC2 instance type to use for the scheduler.
+    Type: String
+    Default: t3.micro
+  WebserverInstanceType:
+    Description: EC2 instance type to use for the webserver.
+    Type: String
+    Default: t3.micro
   WorkerInstanceType:
-    Description: EC2 instance types to use as worker.
+    Description: EC2 instance type to use for the workers.
     Type: String
     Default: t3.small
+  WorkerConcurrency:
+    Description: >-
+      Number of concurrent units per machine.
+    Type: Number
+    Default: 1
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
@@ -28,30 +41,20 @@ Parameters:
     Description: The maximum number of active worker instances.
     Type: Number
     Default: 10
-  ShrinkTimeout:
+  ShrinkThreshold:
     Description: >-
       The timeout (in seconds, multiple of 60) after which the queue staying
       empty will trigger the AutoScaling group to Scale In, deallocating one
       worker instance.
     Type: Number
-    Default: 3600
+    Default: 0.5
   GrowthThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or above
       will trigger the AutoScaling group to Scale Out, allocating one worker
       instance.
     Type: Number
-    Default: 1
-  ShrinkCooldown:
-    Description: >-
-      The cooldown (in seconds) between deallocations of worker instances.
-    Type: Number
-    Default: 60
-  GrowthCooldown:
-    Description: >-
-      The cooldown (in seconds) between allocations of worker instances.
-    Type: Number
-    Default: 300
+    Default: 0.9
   DbMasterUsername:
     Description: The username to be used in the airflow database.
     Type: String
@@ -141,7 +144,7 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t2.micro
+      InstanceType: !Ref SchedulerInstanceType
       ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
@@ -166,8 +169,8 @@ Resources:
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
+      InstanceType: !Ref WebserverInstanceType
       ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
-      InstanceType: t2.micro
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
@@ -188,17 +191,6 @@ Resources:
     DependsOn:
       - Repository
       - Meta
-  Scaler:
-    Type: 'AWS::AutoScaling::AutoScalingGroup'
-    Properties:
-      LaunchConfigurationName: !Ref Config
-      MinSize: !Ref MinGroupSize
-      MaxSize: !Ref MaxGroupSize
-      VPCZoneIdentifier:
-        - !Ref StackSubnet
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 90184717-25cc-4671-a70d-7becceed5c50
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
@@ -219,20 +211,143 @@ Resources:
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
     DependsOn:
       - Meta
+  Scaler:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
+      LaunchConfigurationName: !Ref Config
+      MinSize: !Ref MinGroupSize
+      MaxSize: !Ref MaxGroupSize
+      MetricsCollection:
+        - Granularity: 1Minute
+      VPCZoneIdentifier:
+        - !Ref StackSubnet
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 90184717-25cc-4671-a70d-7becceed5c50
+  Logger:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${AWS::StackName}-cloudwatch-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - 'cloudwatch:GetMetric*'
+                  - 'cloudwatch:PutMetricData'
+  Metric:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs8.10
+      Handler: index.handler
+      Code:
+        ZipFile: !Sub
+          - |
+            var AWS = require('aws-sdk');
+            AWS.config.update({region: '${AWS::Region}'});
+            var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+            var fpoll = 0.098444;
+            exports.handler = async function(event, context) {
+              var last = new Date();
+              last.setMinutes(Math.floor(last.getMinutes()/5)*5);
+              last.setSeconds(0); last.setMilliseconds(0);
+              var prev = new Date(last);
+              prev.setMinutes(last.getMinutes()-10);
+              var metrics = await cw.getMetricData({
+                StartTime: prev, EndTime: last,
+                ScanBy: 'TimestampDescending',
+                MetricDataQueries: [
+                    { Id: 'maxANOMV', MetricStat: {
+                        Metric: { Namespace: 'AWS/SQS',
+                                  MetricName: 'ApproximateNumberOfMessagesVisible',
+                                  Dimensions: [{ Name: 'QueueName',
+                                                Value: '${queueName}' }]},
+                        Period: 300,
+                        Stat: 'Maximum',
+                        Unit: 'Count' }},
+                    { Id: 'sumNOER', MetricStat: {
+                        Metric: { Namespace: 'AWS/SQS',
+                                  MetricName: 'NumberOfEmptyReceives',
+                                  Dimensions: [{ Name: 'QueueName',
+                                                Value: '${queueName}' }]},
+                        Period: 300,
+                        Stat: 'Sum',
+                        Unit: 'Count', }},
+                    { Id: 'avgGISI', MetricStat: {
+                        Metric: { Namespace: 'AWS/AutoScaling',
+                                  MetricName: 'GroupInServiceInstances',
+                                  Dimensions: [{ Name: 'AutoScalingGroupName',
+                                                Value: '${asgName}' }]},
+                        Period: 300,
+                        Stat: 'Average',
+                        Unit: 'None', }},
+              ]}).promise();
+              var ithIndex = i => (metrics
+                .MetricDataResults[i]
+                .Timestamps.map(t => t.toISOString())
+                .indexOf(prev.toISOString())
+              );
+              var ANOMV = metrics.MetricDataResults[0].Values[ithIndex(0)];
+              var NOER = metrics.MetricDataResults[1].Values[ithIndex(1)];
+              var GISI = metrics.MetricDataResults[2].Values[ithIndex(2)];
+              var l;
+              if (GISI > 0)
+                l = 1 - NOER / (GISI * fpoll * 300);
+              else
+                l = (ANOMV > 0) ? 1.0 : 0.0;
+              await cw.putMetricData({
+                Namespace: 'Turbine',
+                MetricData: [{ MetricName: 'WorkerLoad',
+                              Dimensions: [ { Name: 'StackName',
+                                              Value: '${AWS::StackName}' }],
+                              Timestamp: prev,
+                              Value: (l > 0) ? l : 0,
+                              Unit: 'None' }],
+              }).promise();
+            };
+          - asgName: !Sub '${AWS::StackName}-scaling-group'
+            queueName: !GetAtt Tasks.QueueName
+      Role: !GetAtt Logger.Arn
+  Timer:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      ScheduleExpression: 'rate(1 minute)'
+      State: 'ENABLED'
+      Targets:
+        -
+          Arn: !GetAtt Metric.Arn
+          Id: 'TargetFunction'
+  Invoke:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !Ref Metric
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt Timer.Arn
   Shrink:
     Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmActions:
         - !Ref ScaleIn
-      Statistic: Sum
-      Period: !Ref ShrinkTimeout
-      EvaluationPeriods: '1'
+      Namespace: Turbine
+      MetricName: WorkerLoad
       Dimensions:
-        - Name: QueueName
-          Value: !GetAtt Tasks.QueueName
-      Namespace: AWS/SQS
-      MetricName: NumberOfMessagesReceived
-      Threshold: 0
+        - Name: StackName
+          Value: !Ref 'AWS::StackName'
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
+      Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -242,14 +357,14 @@ Resources:
     Properties:
       AlarmActions:
         - !Ref ScaleOut
-      Statistic: Average
-      Period: '60'
-      EvaluationPeriods: '1'
+      Namespace: Turbine
+      MetricName: WorkerLoad
       Dimensions:
-        - Name: QueueName
-          Value: !GetAtt Tasks.QueueName
-      Namespace: AWS/SQS
-      MetricName: ApproximateNumberOfMessagesVisible
+        - Name: StackName
+          Value: !Ref 'AWS::StackName'
+      Statistic: Average
+      Period: '300'
+      EvaluationPeriods: '1'
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
@@ -260,8 +375,8 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: -1
-      Cooldown: !Ref ShrinkCooldown
+      ScalingAdjustment: '-1'
+      Cooldown: '600'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -271,8 +386,8 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: 1
-      Cooldown: !Ref GrowthCooldown
+      ScalingAdjustment: '1'
+      Cooldown: '600'
       AutoScalingGroupName: !Ref Scaler
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -446,6 +561,7 @@ Resources:
     Properties:
       PolicyName: !Sub '${AWS::StackName}-tasks-policy'
       PolicyDocument:
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Action:
@@ -513,12 +629,14 @@ Resources:
                 - |
                   AIRFLOW_HOME=/efs/airflow
                   AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
+                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:8080
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=8080
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INJECTSECRET@
+                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
                   AWS_DEFAULT_REGION=${AWS::Region}
                 - rds: !GetAtt Database.Endpoint.Address
                   key: !Ref Secret
@@ -573,15 +691,16 @@ Metadata:
           - StackSubnetBlock
           - KeyPair
       - Label:
-          default: Worker Instances
+          default: Cluster Settings
         Parameters:
+          - SchedulerInstanceType
+          - WebserverInstanceType
           - WorkerInstanceType
+          - WorkerConcurrency
           - MinGroupSize
           - MaxGroupSize
-          - ShrinkTimeout
-          - ShrinkCooldown
+          - ShrinkThreshold
           - GrowthThreshold
-          - GrowthCooldown
       - Label:
           default: Storage
         Parameters:
