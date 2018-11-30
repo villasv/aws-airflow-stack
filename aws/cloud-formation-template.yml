@@ -16,15 +16,21 @@ Parameters:
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
+  SchedulerInstanceType:
+    Description: EC2 instance type to use for the scheduler.
+    Type: String
+    Default: t3.micro
+  WebserverInstanceType:
+    Description: EC2 instance type to use for the webserver.
+    Type: String
+    Default: t3.micro
   WorkerInstanceType:
-    Description: EC2 instance types to use as worker.
+    Description: EC2 instance type to use for the workers.
     Type: String
     Default: t3.small
   WorkerConcurrency:
     Description: >-
-      Number of concurrent units per machine. This is NOT enforced as
-      configuration in Airflow, but used to regulate the load metric used by
-      auto scaling.
+      Number of concurrent units per machine.
     Type: Number
     Default: 1
   MinGroupSize:
@@ -138,7 +144,7 @@ Resources:
   Scheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
-      InstanceType: t2.micro
+      InstanceType: !Ref SchedulerInstanceType
       ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
@@ -163,8 +169,8 @@ Resources:
   Interface:
     Type: 'AWS::EC2::Instance'
     Properties:
+      InstanceType: !Ref WebserverInstanceType
       ImageId: !FindInMap [RegionToAMI, !Ref "AWS::Region", HVMGP2]
-      InstanceType: t2.micro
       SubnetId: !Ref StackSubnet
       KeyName: !Ref KeyPair
       SecurityGroupIds:
@@ -339,7 +345,7 @@ Resources:
           Value: !Ref 'AWS::StackName'
       Statistic: Average
       Period: '300'
-      EvaluationPeriods: '2'
+      EvaluationPeriods: '1'
       Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
@@ -357,7 +363,7 @@ Resources:
           Value: !Ref 'AWS::StackName'
       Statistic: Average
       Period: '300'
-      EvaluationPeriods: '2'
+      EvaluationPeriods: '1'
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
@@ -684,8 +690,10 @@ Metadata:
           - StackSubnetBlock
           - KeyPair
       - Label:
-          default: Worker Instances
+          default: Cluster Settings
         Parameters:
+          - SchedulerInstanceType
+          - WebserverInstanceType
           - WorkerInstanceType
           - WorkerConcurrency
           - MinGroupSize
