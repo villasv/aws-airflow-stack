@@ -93,18 +93,19 @@ This can be done in several ways. What really matters is:
 - The DAG files directory should be accessible at `/efs/dags`
 
 The home directory is assumed to contain the Airflow configuration file
-(`airflow.cfg`). This is flexible enough to accommodate pretty much any project
-structure and is easily set up with symbolic links.
+(`airflow.cfg`) and the requirements file (`requirements.txt`). This is flexible
+enough to accommodate pretty much any project structure and is easily set up
+with symbolic links.
 
 The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2
 instance, clone your Airflow files **inside the shared directory** (`/efs`),
-install your stuff and link your specific files.
+install your dependencies and link your directories.
 
 ```
 you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 [ec2-user@ip-yy-y-y-yyy ~]$ cd /efs
 [ec2-user@ip-yy-y-y-yyy efs]$ git clone https://your.git/user/repo
-[ec2-user@ip-yy-y-y-yyy efs]$ sudo pip install -r /efs/repo/requirements.txt
+[ec2-user@ip-yy-y-y-yyy efs]$ sudo pip3 install -r repo/home/requirements.txt
 [ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/home /efs/airflow
 [ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/dags /efs/dags
 ```
@@ -124,6 +125,10 @@ you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 > region = us-east-2
 > visibility_timeout = 21600
 > ```
+>
+> Also be sure to configure the Airflow `aws_default` Connection to use the
+> appropriate region!
+>
 
 ### 3. Apply your configs
 
@@ -155,11 +160,9 @@ an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
 
     AWS doesn't provide minute-level granularity on SQS metrics, only 5 minute
     aggregates. Also, CloudWatch stamps aggregate metrics with their initial
-    timestamp, meaning that the latest SQS metric used on the load average
-    estimation is continuously changing, being stable only on the period already
-    past - that is, 10 minutes ago. This means that the load metric is always at
-    least 5~10 minutes delayed, so to avoid oscillating allocations the alarm
-    trigger has a 10 minutes cooldown.
+    timestamp, meaning that the latest stable SQS metrics are from 10 minutes in
+    the past. This is why the load metric is always 5~10 minutes delayed. To
+    avoid oscillating allocations, the alarm action has a 10 minutes cooldown.
 
 ## Contributing
 
