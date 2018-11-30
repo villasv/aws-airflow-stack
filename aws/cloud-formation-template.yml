@@ -13,6 +13,18 @@ Parameters:
     Description: The IPv4 CIDR block to be used in the stack subnet.
     Type: String
     Default: 10.0.0.0/24
+  AllowedSshBlock:
+    Description: The IPv4 CIDR block to allow SSH access in all machines.
+    Type: String
+    Default: 0.0.0.0/0
+  AllowedWebBlock:
+    Description: The IPv4 CIDR block to allow HTTP access in the webserver.
+    Type: String
+    Default: 0.0.0.0/0
+  WebserverPort:
+    Description: The port Airflow webserver will be listening.
+    Type: String
+    Default: 8080
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -474,7 +486,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
-        - CidrIp: 0.0.0.0/0
+        - CidrIp: !Ref AllowedSshBlock
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
@@ -496,7 +508,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
-        - CidrIp: 0.0.0.0/0
+        - CidrIp: !Ref AllowedSshBlock
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
@@ -512,11 +524,11 @@ Resources:
     Properties:
       GroupDescription: Security Rules with permissions for the web UI exposed by Airflow.
       SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
+        - CidrIp: !Ref AllowedWebBlock
           IpProtocol: TCP
-          FromPort: 8080
-          ToPort: 8080
-        - CidrIp: 0.0.0.0/0
+          FromPort: !Ref WebserverPort
+          ToPort: !Ref WebserverPort
+        - CidrIp: !Ref AllowedSshBlock
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
@@ -631,8 +643,8 @@ Resources:
                   AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
-                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:8080
-                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=8080
+                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:${WebserverPort}
+                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
                   AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INJECTSECRET@
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
@@ -689,6 +701,9 @@ Metadata:
           - VpcCidrBlock
           - DummySubnetBlock
           - StackSubnetBlock
+          - AllowedSshBlock
+          - AllowedWebBlock
+          - WebserverPort
           - KeyPair
       - Label:
           default: Cluster Settings
