@@ -167,8 +167,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-scheduler'
-      UserData:
-        'Fn::Base64': !Sub |
+      UserData: !Base64
+        'Fn::Sub': |
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow scheduler' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
@@ -195,8 +195,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-interface'
-      UserData:
-        'Fn::Base64': !Sub |
+      UserData: !Base64
+        'Fn::Sub': |
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow webserver' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
@@ -219,8 +219,8 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroups:
         - !Ref Comms
-      UserData:
-        'Fn::Base64': !Sub |
+      UserData: !Base64
+        'Fn::Sub': |
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow worker' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
@@ -339,8 +339,12 @@ Resources:
               }).promise();
             };
           - asgName: !Sub '${AWS::StackName}-scaling-group'
-            queueName: !GetAtt Tasks.QueueName
-      Role: !GetAtt Logger.Arn
+            queueName: !GetAtt
+              - Tasks
+              - QueueName
+      Role: !GetAtt
+        - Logger
+        - Arn
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 94c385fa-fb13-42cc-a292-7e68c10956f3
@@ -350,7 +354,9 @@ Resources:
       ScheduleExpression: rate(1 minute)
       State: ENABLED
       Targets:
-        - Arn: !GetAtt Metric.Arn
+        - Arn: !GetAtt
+            - Metric
+            - Arn
           Id: TargetFunction
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -361,7 +367,9 @@ Resources:
       FunctionName: !Ref Metric
       Action: 'lambda:InvokeFunction'
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt Timer.Arn
+      SourceArn: !GetAtt
+        - Timer
+        - Arn
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6941c0b8-cdd6-43ca-a936-b30ac47b9bb6
@@ -604,7 +612,9 @@ Resources:
               - 'sqs:*'
             Resource: !Sub
               - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
-              - queue: !GetAtt Tasks.QueueName
+              - queue: !GetAtt
+                  - Tasks
+                  - QueueName
       Users:
         - !Ref Celery
     Metadata:
@@ -629,7 +639,10 @@ Resources:
               test: test ! "$(mount | grep /efs)"
               command: !Sub |
                 mkdir -p /efs
-                echo "${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
+                fspec="${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
+                param1="nfsvers=4.1,rsize=1048576,wsize=1048576"
+                param2="hard,timeo=600,retrans=2"
+                echo "$fspec $param1,$param2 0 0" >> /etc/fstab
                 mount /efs
                 chown -R ec2-user /efs
         runtime:
@@ -677,15 +690,18 @@ Resources:
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
                   AWS_DEFAULT_REGION=${AWS::Region}
-                - rds: !GetAtt Database.Endpoint.Address
+                - queue: !GetAtt
+                    - Tasks
+                    - QueueName
                   key: !Ref Secret
-                  queue: !GetAtt Tasks.QueueName
+                  rds: !GetAtt
+                    - Database
+                    - Endpoint.Address
             /usr/lib/systemd/system/airflow.service:
               content: |
                 [Unit]
                 Description=Airflow daemon
-                After=network.target postgresql.service mysql.service redis.service rabbitmq-server.service
-                Wants=postgresql.service mysql.service redis.service rabbitmq-server.service
+                After=network.target
                 [Service]
                 EnvironmentFile=/etc/sysconfig/airflow
                 User=ec2-user
@@ -703,20 +719,32 @@ Resources:
             bootstrap:
               command: !Sub
                 - |
-                  PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4)
-                  PUBLIC_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-                  LOCAL_IPV4=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-                  if [ PUBLIC = "200" ]
-                  then sed -i -e "s~INJECTHOST~$PUBLIC_IPV4~" /etc/sysconfig/airflow
-                  else sed -i -e "s~INJECTHOST~$LOCAL_IPV4~" /etc/sysconfig/airflow
+                  PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                    http://169.254.169.254/latest/meta-data/public-ipv4)
+                  PUBLIC_IPV4=$(curl -s \
+                    http://169.254.169.254/latest/meta-data/public-ipv4)
+                  LOCAL_IPV4=$(curl -s \
+                    http://169.254.169.254/latest/meta-data/local-ipv4)
+                  if [ $PUBLIC = "200" ];
+                  then
+                    HOST=$PUBLIC_IPV4
+                  else
+                    HOST=$LOCAL_IPV4
                   fi
-                  SECRET=$(echo "${secret}" | perl -lpe 's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INJECTSECRET~$SECRET~" /etc/sysconfig/airflow
+                  sed -i -e "s~INJECTHOST~$HOST~" \
+                    /etc/sysconfig/airflow
+                  SECRET=$(echo "${secret}" | perl -lpe \
+                    's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
+                  sed -i -e "s~INJECTSECRET~$SECRET~" \
+                    /etc/sysconfig/airflow
 
-                  cat /etc/sysconfig/airflow | sed 's/^/export /' > /tmp/env.sh && source /tmp/env.sh
+                  sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
+                  source /tmp/env.sh
                   su -c '/usr/local/bin/airflow initdb' ec2-user
                   systemctl start airflow
-                - secret: !GetAtt Secret.SecretAccessKey
+                - secret: !GetAtt
+                    - Secret
+                    - SecretAccessKey
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Mappings:
