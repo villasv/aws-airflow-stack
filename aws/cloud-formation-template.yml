@@ -729,6 +729,23 @@ Resources:
             /usr/lib/tmpfiles.d/airflow.conf:
               content: |
                 D /run/airflow 0755 ec2-user ec2-user
+            /usr/lib/systemd/system/watcher.service:
+              content: |
+                [Unit]
+                Description=Airflow configuration watcher
+                After=network.target
+                [Service]
+                Type=oneshot
+                ExecStartPre=/usr/bin/systemctl daemon-reload
+                ExecStart=/usr/bin/systemctl restart airflow
+                [Install]
+                WantedBy=multi-user.target
+            /usr/lib/systemd/system/watcher.path:
+              content: |
+                [Path]
+                PathModified=/etc/sysconfig/airflow
+                [Install]
+                WantedBy=multi-user.target
           commands:
             bootstrap:
               command: !Sub
@@ -755,7 +772,10 @@ Resources:
                   sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                   source /tmp/env.sh
                   su -c '/usr/local/bin/airflow initdb' ec2-user
-                  systemctl start airflow
+                  systemctl enable airflow.service
+                  systemctl enable watcher.path
+                  systemctl start airflow.service
+                  systemctl start watcher.path
                 - secret: !GetAtt
                     - Secret
                     - SecretAccessKey
