@@ -172,8 +172,14 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow scheduler' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          /opt/aws/bin/cfn-init \
-            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Meta
+          /opt/aws/bin/cfn-signal -e $?
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Scheduler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
@@ -200,8 +206,13 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow webserver' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          /opt/aws/bin/cfn-init \
-            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Meta
+          /opt/aws/bin/cfn-signal -e $?
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
@@ -224,8 +235,10 @@ Resources:
           #!/bin/bash -xe
           echo $'#!/bin/sh\nexec airflow worker' > /usr/bin/turbine
           chmod +x /usr/bin/turbine
-          /opt/aws/bin/cfn-init \
-            --resource Meta --stack ${AWS::StackName} --region ${AWS::Region}
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Meta
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
@@ -630,6 +643,7 @@ Resources:
             - filesys
             - runtime
             - service
+            - metahup
         filesys:
           packages:
             yum:
@@ -745,6 +759,42 @@ Resources:
                 - secret: !GetAtt
                     - Secret
                     - SecretAccessKey
+        metahup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                interval=1
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v \
+                  --region ${AWS::Region} \
+                  --stack ${AWS::StackName} \
+                  --resource Meta
+                runas=root
+            /lib/systemd/system/cfn-hup.service:
+              content: !Sub |
+                [Unit]
+                Description=cfn-hup daemon
+                [Service]
+                Type=simple
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+                [Install]
+                WantedBy=multi-user.target
+          commands:
+            setup:
+              command: |
+                systemctl enable cfn-hup.service
+                systemctl start cfn-hup.service
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Mappings:
