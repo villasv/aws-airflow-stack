@@ -1,8 +1,4 @@
-# Turbine [![sync]][ci]
-
-[sync]:
-https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon
-[ci]: #get-it-working
+# Turbine [![ci](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
@@ -41,8 +37,9 @@ definitions, it won't even require installing libraries on each machine.
 
 The stack includes an estimate of the cluster load average made by analyzing the
 amount of failed attempts to retrieve a task from the queue. The rationale is
-detailed [elsewhere][load-metric], but the metric objective is to measure if the
-cluster is correctly sized for the influx of tasks.
+detailed [elsewhere](https://github.com/villasv/aws-airflow-stack/issues/63),
+but the metric objective is to measure if the cluster is correctly sized for the
+influx of tasks.
 
 **The goal of the auto scaling feature is to respond to changes in the tasks
 load, which could mean an idle cluster becoming active or a busy cluster
@@ -50,40 +47,29 @@ becoming idle, the start/end of a backfill, many DAGs with similar schedules
 hitting their due time, DAGs that branch to many parallel operators. Scaling in
 response to machine resources like facing CPU intensive tasks is not the goal**;
 the latter is a very advanced scenario and would be best handled by Celery's own
-[scaling mechanism][celery-as] or offloading the computation to it's own system
-(like Spark or Kubernetes) and use Airflow only for orchestration.
-
-[load-metric]:
-https://github.com/villasv/aws-airflow-stack/issues/63
-[tpo-poll]:
-http://docs.celeryproject.org/en/latest/getting-started/brokers/sqs.html#polling-interval
-[celery-as]:
-http://docs.celeryproject.org/en/latest/userguide/workers.html#autoscaling
+scaling mechanism or offloading the computation to another system (like Spark or
+Kubernetes) and use Airflow only for orchestration.
 
 ## Get It Working
 
 ### 0. Prerequisites
 
-- [A key file for remote SSH access][awsdocs-keys]
-
-[awsdocs-keys]:
-https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
+- A key file for remote SSH access
+  [(Guide)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
 
 
 ### 1. Deploy the stack
 
 Create a new stack using the latest template definition at
-[`aws\cloud-formation-template.yml`][raw-template]. The following button will
-readily deploy the stack (defaults to your last used region):
+[`aws\cloud-formation-template.yml`](/aws/cloud-formation-template.yml). The
+following button will deploy the stack available in this project's `master`
+branch (defaults to your last used region):
 
-[raw-template]:
-https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml
-
-[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
+[![Launch](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
 The stack resources take around 10 minutes to create, while the airflow
-installation and bootstrap another 3 to 5 minutes. After that you can
-already access the Airflow UI and setup your own Airflow DAGs.
+installation and bootstrap another 3 to 5 minutes. After that you can already
+access the Airflow UI and setup your own Airflow DAGs.
 
 ### 2. Setup your files
 
