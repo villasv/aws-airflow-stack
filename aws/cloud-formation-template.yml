@@ -292,53 +292,85 @@ Resources:
             var AWS = require('aws-sdk');
             AWS.config.update({region: '${AWS::Region}'});
             var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
-            var fpoll = 0.098444;
+            const datePlusMinutes = (d, m) => {
+              const _d = new Date(d);
+              _d.setMinutes(d.getMinutes() + m);
+              return _d;
+            };
+            const getMetricAtTime = (ms, m, t) => {
+              const m_idx = ms.MetricDataResults
+                .map(_r => _r.Id)
+                .indexOf(m);
+              const t_idx = ms.MetricDataResults[m_idx]
+                .Timestamps
+                .map(_t => _t.toISOString())
+                .indexOf(t.toISOString());
+              return ms.MetricDataResults[m_idx]
+                .Values[t_idx];
+            };
+            const discount = (ms, m, t1, t2, ws) => {
+              let incs = 0, d = t1;
+              let v1 = getMetricAtTime(ms, m, d), v2;
+              for (let i = 0; d < t2 ; i++) {
+                d = datePlusMinutes(t1, i+1);
+                v2 = getMetricAtTime(ms, m, d);
+                if (v2 > v1) incs += ws[i];
+                v1 = v2;
+              }
+              return incs;
+            };
             exports.handler = async function(event, context) {
-              var last = new Date();
-              last.setMinutes(Math.floor(last.getMinutes()/5)*5);
-              last.setSeconds(0); last.setMilliseconds(0);
-              var prev = new Date(last);
-              prev.setMinutes(last.getMinutes()-10);
-              var metrics = await cw.getMetricData({
-                StartTime: prev, EndTime: last,
+              let curr = new Date();
+              curr.setMinutes(Math.floor(curr.getMinutes()/5)*5-5);
+              curr.setSeconds(0); curr.setMilliseconds(0);
+              const prev = datePlusMinutes(curr, -5);
+              const back = datePlusMinutes(prev, -5);
+              const metrics = await cw.getMetricData({
+                StartTime: back, EndTime: curr,
                 ScanBy: 'TimestampDescending',
                 MetricDataQueries: [
-                    { Id: 'maxANOMV', MetricStat: {
-                        Metric: { Namespace: 'AWS/SQS',
-                                  MetricName: 'ApproximateNumberOfMessagesVisible',
-                                  Dimensions: [{ Name: 'QueueName',
-                                                Value: '${queueName}' }]},
-                        Period: 300,
-                        Stat: 'Maximum',
-                        Unit: 'Count' }},
-                    { Id: 'sumNOER', MetricStat: {
-                        Metric: { Namespace: 'AWS/SQS',
-                                  MetricName: 'NumberOfEmptyReceives',
-                                  Dimensions: [{ Name: 'QueueName',
-                                                Value: '${queueName}' }]},
-                        Period: 300,
-                        Stat: 'Sum',
-                        Unit: 'Count', }},
-                    { Id: 'avgGISI', MetricStat: {
-                        Metric: { Namespace: 'AWS/AutoScaling',
-                                  MetricName: 'GroupInServiceInstances',
-                                  Dimensions: [{ Name: 'AutoScalingGroupName',
-                                                Value: '${asgName}' }]},
-                        Period: 300,
-                        Stat: 'Average',
-                        Unit: 'None', }},
+                  { Id: 'maxANOMV', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'ApproximateNumberOfMessagesVisible',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Maximum',
+                      Unit: 'Count' }},
+                  { Id: 'sumNOER', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'NumberOfEmptyReceives',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Sum',
+                      Unit: 'Count', }},
+                  { Id: 'avgGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupInServiceInstances',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 300,
+                      Stat: 'Average',
+                      Unit: 'None', }},
+                  { Id: 'uGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupDesiredCapacity',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 60,
+                      Stat: 'Average',
+                      Unit: 'None', }},
               ]}).promise();
-              var ithIndex = i => (metrics
-                .MetricDataResults[i]
-                .Timestamps.map(t => t.toISOString())
-                .indexOf(prev.toISOString())
-              );
-              var ANOMV = metrics.MetricDataResults[0].Values[ithIndex(0)];
-              var NOER = metrics.MetricDataResults[1].Values[ithIndex(1)];
-              var GISI = metrics.MetricDataResults[2].Values[ithIndex(2)];
-              var l;
-              if (GISI > 0)
-                l = 1 - NOER / (GISI * fpoll * 300);
+              const ANOMV = getMetricAtTime(metrics, 'maxANOMV', prev);
+              const NOER = getMetricAtTime(metrics, 'sumNOER', prev);
+              const GISI = getMetricAtTime(metrics, 'avgGISI', prev);
+              const ws = [0, 0, 0, 0.1, 0.3, 0.3, 0.3, 0.3, 0.2];
+              const dGISI = discount(metrics, 'uGISI', back, curr, ws);
+              const M = GISI - dGISI;
+              let l;
+              if (M > 0)
+                l = 1 - NOER / (M * 0.098444 * 300);
               else
                 l = (ANOMV > 0) ? 1.0 : 0.0;
               await cw.putMetricData({
