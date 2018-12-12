@@ -1,3 +1,5 @@
+<img src="img/turbine.png" align="right" width="25%" />
+
 # Turbine [![ci](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
