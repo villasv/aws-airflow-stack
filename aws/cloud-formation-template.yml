@@ -656,7 +656,12 @@ Resources:
                   - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
               - Effect: Allow
                 Action:
-                  - 'sqs:*'
+                  - 'sqs:ChangeMessageVisibility'
+                  - 'sqs:DeleteMessage'
+                  - 'sqs:GetQueueAttributes'
+                  - 'sqs:GetQueueUrl'
+                  - 'sqs:ReceiveMessage'
+                  - 'sqs:SendMessage'
                 Resource: !Sub
                   - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
                   - queue: !GetAtt
