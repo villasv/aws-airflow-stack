@@ -268,11 +268,13 @@ Resources:
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
+      ApplicationName: !Sub '${AWS::StackName}-deployment-application'
       ComputePlatform: Server
   CodeDeployDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
       AutoScalingGroups:
         - !Ref Scaler
       Ec2TagSet:
@@ -706,6 +708,16 @@ Resources:
                   - queue: !GetAtt
                       - Tasks
                       - QueueName
+        -
+          PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
