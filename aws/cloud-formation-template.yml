@@ -152,7 +152,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
-  Scheduler:
+  AirflowScheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref SchedulerInstanceType
@@ -180,14 +180,14 @@ Resources:
           /opt/aws/bin/cfn-signal -e $?
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
-            --resource Scheduler
+            --resource AirflowScheduler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
       - Repository
       - Meta
-  Interface:
+  AirflowWebserver:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref WebserverInstanceType
@@ -202,7 +202,7 @@ Resources:
       IamInstanceProfile: !Ref AirflowProfile
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-interface'
+          Value: !Sub '${AWS::StackName}-webserver'
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
@@ -215,6 +215,7 @@ Resources:
           /opt/aws/bin/cfn-signal -e $?
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
+            --resource AirflowWebserver
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
