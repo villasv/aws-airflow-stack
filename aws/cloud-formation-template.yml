@@ -261,6 +261,45 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
+  DeploymentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-deployments'
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ComputePlatform: Server
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      AutoScalingGroups:
+        - !Ref Scaler
+      Ec2TagSet:
+        Ec2TagSetList:
+          - Ec2TagGroup:
+            - Type: KEY_AND_VALUE
+              Key: Name
+              Value: !Sub '${AWS::StackName}-scheduler'
+            - Type: KEY_AND_VALUE
+              Key: Name
+              Value: !Sub '${AWS::StackName}-webserver'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'codedeploy.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
   Logger:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -683,6 +722,7 @@ Resources:
             - runtime
             - service
             - metahup
+            - cdagent
         filesys:
           packages:
             yum:
@@ -845,6 +885,17 @@ Resources:
               command: |
                 systemctl enable cfn-hup.service
                 systemctl start cfn-hup.service
+        cdagent:
+          packages:
+            yum:
+              ruby: []
+              wget: []
+          commands:
+            install:
+              command: !Sub |
+                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
+                chmod +x ./install
+                ./install auto
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Mappings:
