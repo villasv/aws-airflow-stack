@@ -723,6 +723,16 @@ Resources:
                   - 's3:Get*'
                   - 's3:List*'
                 Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
+        -
+          PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:Put*'
+                Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
