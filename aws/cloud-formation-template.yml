@@ -777,9 +777,6 @@ Resources:
                   apache-airflow[celery,postgres]==1.10.1 \
                   celery[sqs] \
                   tenacity==5.0.2
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip3 install -r /efs/airflow/requirements.txt
         service:
           files:
             /etc/sysconfig/airflow:
