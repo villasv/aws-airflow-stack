@@ -1,15 +1,16 @@
+ifndef stack-name
+$(error stack-name is not set)
+endif
+
 # stack logical names
-APPLICATION = $(StackName)-deployment-application
-DEPLOYMENT_GROUP = $(StackName)-deployment-group
-DEPLOYMENTS_BUCKET = $(StackName)-deployments
+APPLICATION = $(stack-name)-deployment-application
+DEPLOYMENT_GROUP = $(stack-name)-deployment-group
+DEPLOYMENTS_BUCKET = $(stack-name)-deployments
 
 # deployment variables
-REVISION := $(shell date +%Y%m%d-%H%M%S)
+REVISION := $(shell date --utc +%Y%m%dT%H%M%SZ)
 PACKAGE = airflow-package-$(REVISION).tgz
 
-ifndef StackName
-$(error StackName is not set)
-endif
 
 package:
 	cd airflow && tar czf ../$(PACKAGE) .
