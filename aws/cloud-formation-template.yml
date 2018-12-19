@@ -741,6 +741,11 @@ Resources:
             yum:
               nfs-utils: []
           commands:
+            mkdir:
+              test: test ! -d /airflow
+              command: |
+                mkdir /airflow
+                chown -R ec2-user /airflow
             mount:
               test: test ! "$(mount | grep /efs)"
               command: !Sub |
