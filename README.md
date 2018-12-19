@@ -23,17 +23,18 @@ instance to serve as shared directory, and auto scaling metrics, alarms and
 triggers. All other resources are the usual boilerplate to keep the wind
 blowing.
 
-### Deployment and File Synchronization
+### Deployment and File Sharing
 
 The deployment process through CodeDeploy is very flexible and can be tailored
 for each project structure, the only invariant being the Airflow home directory
 at `/airflow`. It ensures that every Airflow process has the same files and can
 upgraded gracefully, but most importantly makes deployments really fast and easy
-to begin.
+to begin with.
 
 There's also an EFS providing a shared directory, which can be useful for
 staging files potentially used by workers on different machines and other
-syncrhonization scenarios.
+syncrhonization scenarios. Be mindful about its usage as the throughput can
+become a bottleneck, and you won't pay for it if you don't use it.
 
 ### Workers and Auto Scaling
 
@@ -82,6 +83,10 @@ home directory to `/airflow`. After crafting your `appspec.yml`, you can use the
 For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
 packaging, upload and deployment commands. A minimal working example of an
 Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
+
+```bash
+make deploy stack-name=yourcoolstackname
+```
 
 > **GOTCHA**: if you're not in `us-east-1`, it's necessary to list your region
 > as a broker transport option, until it becomes possible to enforce it directly
