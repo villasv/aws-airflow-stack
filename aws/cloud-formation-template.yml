@@ -782,8 +782,7 @@ Resources:
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
-                  AIRFLOW_HOME=/efs/airflow
-                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
+                  AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:${WebserverPort}
