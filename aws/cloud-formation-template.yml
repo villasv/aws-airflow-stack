@@ -262,6 +262,10 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-logs'
   DeploymentsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -776,7 +780,7 @@ Resources:
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  apache-airflow[celery,postgres]==1.10.1 \
+                  apache-airflow[celery,postgres,s3]==1.10.1 \
                   celery[sqs] \
                   tenacity==5.0.2
         service:
@@ -787,6 +791,9 @@ Resources:
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
+                  AIRFLOW__CORE__REMOTE_LOG_CONN_ID=aws_base
+                  AIRFLOW__CORE__REMOTE_LOGGING=True
                   AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:${WebserverPort}
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
                   AIRFLOW__CELERY__BROKER_URL=sqs://
