@@ -737,9 +737,6 @@ Resources:
             - metahup
             - cdagent
         filesys:
-          packages:
-            yum:
-              nfs-utils: []
           commands:
             mkdir:
               test: test ! -d /airflow
