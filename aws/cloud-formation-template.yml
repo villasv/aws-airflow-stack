@@ -185,7 +185,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
-      - Repository
+      - EfsMountTarget
       - Meta
   AirflowWebserver:
     Type: 'AWS::EC2::Instance'
@@ -220,7 +220,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
-      - Repository
+      - EfsMountTarget
       - Meta
   Config:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
@@ -521,7 +521,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
-  Files:
+  EfsFileSystem:
     Type: 'AWS::EFS::FileSystem'
     Properties:
       FileSystemTags:
@@ -530,10 +530,10 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 2330aac6-8c78-44da-a211-6877405896d7
-  Repository:
+  EfsMountTarget:
     Type: 'AWS::EFS::MountTarget'
     Properties:
-      FileSystemId: !Ref Files
+      FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref StackSubnet
       SecurityGroups:
         - !Ref Access
@@ -745,7 +745,7 @@ Resources:
               test: test ! "$(mount | grep /efs)"
               command: !Sub |
                 mkdir -p /efs
-                fspec="${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
+                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
                 param1="nfsvers=4.1,rsize=1048576,wsize=1048576"
                 param2="hard,timeo=600,retrans=2"
                 echo "$fspec $param1,$param2 0 0" >> /etc/fstab
