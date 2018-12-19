@@ -25,15 +25,15 @@ blowing.
 
 ### Deployment and File Synchronization
 
-The Airflow home and the DAGs directory are automatically synchronized between
-all machines using EFS, so there's no risk of having drifting configurations as
-long as the Airflow processes are restarted to pick up the new relevant
-settings.
+The deployment process through CodeDeploy is very flexible and can be tailored
+for each project structure, the only invariant being the Airflow home directory
+at `/airflow`. It ensures that every Airflow process has the same files and can
+upgraded gracefully, but most importantly makes deployments really fast and easy
+to begin.
 
-Having a shared filesystem also make deployments very easy: all it takes is a
-pull command from your project remote repository and all machines will have the
-latest files. If you distribute your dependencies along with your DAG
-definitions, it won't even require installing libraries on each machine.
+There's also an EFS providing a shared directory, which can be useful for
+staging files potentially used by workers on different machines and other
+syncrhonization scenarios.
 
 ### Workers and Auto Scaling
 
@@ -43,12 +43,12 @@ detailed [elsewhere](https://github.com/villasv/aws-airflow-stack/issues/63),
 but the metric objective is to measure if the cluster is correctly sized for the
 influx of tasks.
 
-**The goal of the auto scaling feature is to respond to changes in the tasks
-load, which could mean an idle cluster becoming active or a busy cluster
-becoming idle, the start/end of a backfill, many DAGs with similar schedules
-hitting their due time, DAGs that branch to many parallel operators. Scaling in
-response to machine resources like facing CPU intensive tasks is not the goal**;
-the latter is a very advanced scenario and would be best handled by Celery's own
+**The goal of the auto scaling feature is to respond to changes in queue load,
+which could mean an idle cluster becoming active or a busy cluster becoming
+idle, the start/end of a backfill, many DAGs with similar schedules hitting
+their due time, DAGs that branch to many parallel operators. Scaling in response
+to machine resources like facing CPU intensive tasks is not the goal**; the
+latter is a very advanced scenario and would be best handled by Celery's own
 scaling mechanism or offloading the computation to another system (like Spark or
 Kubernetes) and use Airflow only for orchestration.
 
@@ -59,11 +59,12 @@ Kubernetes) and use Airflow only for orchestration.
 - A key file for remote SSH access
   [(Guide)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
 
+- Configured AWS CLI for deploying your own files [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
 
 ### 1. Deploy the stack
 
 Create a new stack using the latest template definition at
-[`aws\cloud-formation-template.yml`](/aws/cloud-formation-template.yml). The
+[`aws/cloud-formation-template.yml`](/aws/cloud-formation-template.yml). The
 following button will deploy the stack available in this project's `master`
 branch (defaults to your last used region):
 
@@ -71,44 +72,25 @@ branch (defaults to your last used region):
 
 The stack resources take around 10 minutes to create, while the airflow
 installation and bootstrap another 3 to 5 minutes. After that you can already
-access the Airflow UI and setup your own Airflow DAGs.
+access the Airflow UI and deploy your own Airflow DAGs.
 
-### 2. Setup your files
+### 2. Upstream your files
 
-This can be done in several ways. What really matters is:
+The only requirement is that you configure the deployment to copy your Airflow
+home directory to `/airflow`. After crafting your `appspec.yml`, you can use the AWS CLI to deploy your project.
 
-- The Airflow home directory should be accessible at `/efs/airflow`
-- The DAG files directory should be accessible at `/efs/dags`
+For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
+packaging, upload and deployment commands. A minimal working example of an
+Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
 
-The home directory is assumed to contain the Airflow configuration file
-(`airflow.cfg`) and the requirements file (`requirements.txt`). This is flexible
-enough to accommodate pretty much any project structure and is easily set up
-with symbolic links.
-
-The usual procedure goes as follows: SSH into the `turbine-scheduler` EC2
-instance, clone your Airflow files **inside the shared directory** (`/efs`),
-install your dependencies and link your directories.
-
-```
-you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
-[ec2-user@ip-yy-y-y-yyy ~]$ cd /efs
-[ec2-user@ip-yy-y-y-yyy efs]$ git clone https://your.git/user/repo
-[ec2-user@ip-yy-y-y-yyy efs]$ sudo pip3 install -r repo/home/requirements.txt
-[ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/home /efs/airflow
-[ec2-user@ip-yy-y-y-yyy efs]$ sudo ln -s /efs/repo/airflow/dags /efs/dags
-```
-
-> **GOTCHA**: if you're not in `us-east-1`, using Celery requires listing your
-> region as a broker transport option, until it becomes possible to enforce it
-> directly with environment variables
+> **GOTCHA**: if you're not in `us-east-1`, it's necessary to list your region
+> as a broker transport option, until it becomes possible to enforce it directly
+> with environment variables
 > [(AIRFLOW-3366)](https://issues.apache.org/jira/browse/AIRFLOW-3366).
 > Providing the `visibility_timeout` is also important
 > [(AIRFLOW-3365)](https://issues.apache.org/jira/browse/AIRFLOW-3365).
 >
-> ```
-> [core]
-> executor = CeleryExecutor
-> ...
+> ```ini
 > [celery_broker_transport_options]
 > region = us-east-2
 > visibility_timeout = 21600
@@ -117,23 +99,6 @@ you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
 > Also be sure to configure the Airflow `aws_default` Connection to use the
 > appropriate region!
 >
-
-### 3. Apply your configs
-
-If you change `airflow.cfg`, it's necessary to restart the Airflow processes
-related to that change. If you change the scheduler heartbeat, restart the
-scheduler; if you change the webserver port, restart the webserver; and so on.
-Whatever the case, this can be done easily by `systemd` on each machine:
-
-```
-you@machine ~/.ssh $ ssh -i "your_key.pem" ec2-user@xxx.xxx.xxx.xxx
-[ec2-user@ip-yy-y-y-yyy ~]$ sudo systemctl restart airflow
-```
-
-One way to be completely safe in any case is to always restart all airflow
-process (webserver, scheduler and workers). If you have many workers, the
-easiest option is to ensure 0 worker machines while doing so, either by having
-an idle cluster of manually setting `MinGroupSize=MaxGroupSize=0` temporarily.
 
 ## FAQ
 
