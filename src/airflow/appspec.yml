@@ -1,0 +1,12 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /airflow
+hooks:
+  ApplicationStart:
+    - location: scripts/cdapp_start.sh
+      runas: root
+  ApplicationStop:
+    - location: scripts/cdapp_stop.sh
+      runas: root

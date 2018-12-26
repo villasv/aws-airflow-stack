@@ -152,7 +152,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
-  Scheduler:
+  AirflowScheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref SchedulerInstanceType
@@ -164,6 +164,7 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Control
+      IamInstanceProfile: !Ref AirflowProfile
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-scheduler'
@@ -179,14 +180,14 @@ Resources:
           /opt/aws/bin/cfn-signal -e $?
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
-            --resource Scheduler
+            --resource AirflowScheduler
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 8c059690-0ad1-4922-b823-710c5ead3726
     DependsOn:
-      - Repository
+      - EfsMountTarget
       - Meta
-  Interface:
+  AirflowWebserver:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref WebserverInstanceType
@@ -198,9 +199,10 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
+      IamInstanceProfile: !Ref AirflowProfile
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-interface'
+          Value: !Sub '${AWS::StackName}-webserver'
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
@@ -213,13 +215,14 @@ Resources:
           /opt/aws/bin/cfn-signal -e $?
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
+            --resource AirflowWebserver
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
     DependsOn:
-      - Repository
+      - EfsMountTarget
       - Meta
-  Config:
+  AirflowWorkerConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
       ImageId: !FindInMap
@@ -230,6 +233,7 @@ Resources:
       KeyName: !Ref KeyPair
       SecurityGroups:
         - !Ref Comms
+      IamInstanceProfile: !Ref AirflowProfile
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
@@ -248,7 +252,7 @@ Resources:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
-      LaunchConfigurationName: !Ref Config
+      LaunchConfigurationName: !Ref AirflowWorkerConfig
       MinSize: !Ref MinGroupSize
       MaxSize: !Ref MaxGroupSize
       MetricsCollection:
@@ -258,6 +262,51 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-logs'
+  DeploymentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-deployments'
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub '${AWS::StackName}-deployment-application'
+      ComputePlatform: Server
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
+      AutoScalingGroups:
+        - !Ref Scaler
+      Ec2TagSet:
+        Ec2TagSetList:
+          - Ec2TagGroup:
+            - Type: KEY_AND_VALUE
+              Key: Name
+              Value: !Sub '${AWS::StackName}-scheduler'
+            - Type: KEY_AND_VALUE
+              Key: Name
+              Value: !Sub '${AWS::StackName}-webserver'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'codedeploy.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
   Logger:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -476,7 +525,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
-  Files:
+  EfsFileSystem:
     Type: 'AWS::EFS::FileSystem'
     Properties:
       FileSystemTags:
@@ -485,10 +534,10 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 2330aac6-8c78-44da-a211-6877405896d7
-  Repository:
+  EfsMountTarget:
     Type: 'AWS::EFS::MountTarget'
     Properties:
-      FileSystemId: !Ref Files
+      FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref StackSubnet
       SecurityGroups:
         - !Ref Access
@@ -627,44 +676,72 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 4816510b-a9fb-467b-a2b6-a85d16656b59
-  Secret:
-    Type: 'AWS::IAM::AccessKey'
+  AirflowRole:
+    Type: 'AWS::IAM::Role'
     Properties:
-      UserName: !Ref Celery
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 65ab6416-eeb7-4eb4-9ef2-b373b66b9825
-  Celery:
-    Type: 'AWS::IAM::User'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 106e8f70-914f-4976-82ef-bbed5867a36e
-  ReadWrite:
-    Type: 'AWS::IAM::Policy'
-    Properties:
-      PolicyName: !Sub '${AWS::StackName}-tasks-policy'
-      PolicyDocument:
+      AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          -
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'ec2.amazonaws.com'
             Action:
-              - 'sqs:ListQueues'
-            Resource:
-              - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
-          - Effect: Allow
-            Action:
-              - 'sqs:*'
-            Resource: !Sub
-              - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
-              - queue: !GetAtt
-                  - Tasks
-                  - QueueName
-      Users:
-        - !Ref Celery
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ac6b099f-6230-48a7-b672-6491406dde55
+              - 'sts:AssumeRole'
+      Policies:
+        -
+          PolicyName: !Sub '${AWS::StackName}-queue-rw-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:ListQueues'
+                Resource:
+                  - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action:
+                  - 'sqs:ChangeMessageVisibility'
+                  - 'sqs:DeleteMessage'
+                  - 'sqs:GetQueueAttributes'
+                  - 'sqs:GetQueueUrl'
+                  - 'sqs:ReceiveMessage'
+                  - 'sqs:SendMessage'
+                Resource: !Sub
+                  - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
+                  - queue: !GetAtt
+                      - Tasks
+                      - QueueName
+        -
+          PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'codedeploy:List*'
+                Resource: !Sub 'arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*'
+        -
+          PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:Put*'
+                Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
+  AirflowProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref AirflowRole
   Meta:
     Type: 'AWS::CloudFormation::WaitConditionHandle'
     Properties: {}
@@ -676,16 +753,19 @@ Resources:
             - runtime
             - service
             - metahup
+            - cdagent
         filesys:
-          packages:
-            yum:
-              nfs-utils: []
           commands:
+            mkdir:
+              test: test ! -d /airflow
+              command: |
+                mkdir /airflow
+                chown -R ec2-user /airflow
             mount:
               test: test ! "$(mount | grep /efs)"
               command: !Sub |
                 mkdir -p /efs
-                fspec="${Files}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
+                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
                 param1="nfsvers=4.1,rsize=1048576,wsize=1048576"
                 param2="hard,timeo=600,retrans=2"
                 echo "$fspec $param1,$param2 0 0" >> /etc/fstab
@@ -697,6 +777,7 @@ Resources:
               git: []
               gcc: []
               gcc-c++: []
+              jq: []
               lapack-devel: []
               libcurl-devel: []
               libxml2-devel: []
@@ -714,24 +795,22 @@ Resources:
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  apache-airflow[celery,postgres]==1.10.1 \
+                  apache-airflow[celery,postgres,s3]==1.10.1 \
                   celery[sqs] \
                   tenacity==5.0.2
-            installreqs:
-              test: test -f /efs/airflow/requirements.txt
-              command: pip3 install -r /efs/airflow/requirements.txt
         service:
           files:
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
-                  AIRFLOW_HOME=/efs/airflow
-                  AIRFLOW__CORE__DAGS_FOLDER=/efs/dags
+                  AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
+                  AIRFLOW__CORE__REMOTE_LOGGING=True
                   AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:${WebserverPort}
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://${key}:INJECTSECRET@
+                  AIRFLOW__CELERY__BROKER_URL=sqs://
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
@@ -739,7 +818,6 @@ Resources:
                 - queue: !GetAtt
                     - Tasks
                     - QueueName
-                  key: !Ref Secret
                   rds: !GetAtt
                     - Database
                     - Endpoint.Address
@@ -780,37 +858,40 @@ Resources:
                 WantedBy=multi-user.target
           commands:
             bootstrap:
-              command: !Sub
-                - |
-                  PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
-                    http://169.254.169.254/latest/meta-data/public-ipv4)
-                  PUBLIC_IPV4=$(curl -s \
-                    http://169.254.169.254/latest/meta-data/public-ipv4)
-                  LOCAL_IPV4=$(curl -s \
-                    http://169.254.169.254/latest/meta-data/local-ipv4)
-                  if [ $PUBLIC = "200" ];
-                  then
-                    HOST=$PUBLIC_IPV4
-                  else
-                    HOST=$LOCAL_IPV4
-                  fi
-                  sed -i -e "s~INJECTHOST~$HOST~" \
-                    /etc/sysconfig/airflow
-                  SECRET=$(echo "${secret}" | perl -lpe \
-                    's/([^A-Za-z0-9])/sprintf("%%%02X", ord($1))/seg')
-                  sed -i -e "s~INJECTSECRET~$SECRET~" \
-                    /etc/sysconfig/airflow
+              command: !Sub |
+                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                PUBLIC_IPV4=$(curl -s \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                LOCAL_IPV4=$(curl -s \
+                  http://169.254.169.254/latest/meta-data/local-ipv4)
+                if [ $PUBLIC = "200" ];
+                then
+                  HOST=$PUBLIC_IPV4
+                else
+                  HOST=$LOCAL_IPV4
+                fi
+                sed -i -e "s~INJECTHOST~$HOST~" \
+                  /etc/sysconfig/airflow
 
-                  sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
-                  source /tmp/env.sh
-                  su -c '/usr/local/bin/airflow initdb' ec2-user
-                  systemctl enable airflow.service
-                  systemctl enable watcher.path
+                sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
+                source /tmp/env.sh
+                su -c '/usr/local/bin/airflow initdb' ec2-user
+                systemctl enable airflow.service
+                systemctl enable watcher.path
+
+                HAS_DEPLOYMENT=$(aws deploy list-deployments \
+                  --application-name ${AWS::StackName}-deployment-application \
+                  --deployment-group ${AWS::StackName}-deployment-group | \
+                  jq '.deployments | has(0)')
+
+                if [ "$HAS_DEPLOYMENT" == "true" ];
+                then
+                  echo "Deployment pending, deferring service start"
+                else
                   systemctl start airflow.service
                   systemctl start watcher.path
-                - secret: !GetAtt
-                    - Secret
-                    - SecretAccessKey
+                fi
         metahup:
           files:
             /etc/cfn/cfn-hup.conf:
@@ -847,6 +928,17 @@ Resources:
               command: |
                 systemctl enable cfn-hup.service
                 systemctl start cfn-hup.service
+        cdagent:
+          packages:
+            yum:
+              ruby: []
+              wget: []
+          commands:
+            install:
+              command: !Sub |
+                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
+                chmod +x ./install
+                ./install auto
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Mappings:
