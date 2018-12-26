@@ -858,7 +858,7 @@ Resources:
                 WantedBy=multi-user.target
           commands:
             bootstrap:
-              command: |
+              command: !Sub |
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUBLIC_IPV4=$(curl -s \
@@ -881,8 +881,8 @@ Resources:
                 systemctl enable watcher.path
 
                 FRESH=$(aws deploy list-deployments \
-                  --application-name airtest-deployment-application \
-                  --deployment-group airtest-deployment-group | \
+                  --application-name ${AWS::StackName}-deployment-application \
+                  --deployment-group ${AWS::StackName}-deployment-group | \
                   jq '.deployments | has(0)')
 
                 if [ "$FRESH" == "true" ];
