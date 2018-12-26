@@ -3,3 +3,10 @@ os: linux
 files:
   - source: /
     destination: /airflow
+hooks:
+  ApplicationStop:
+    - location: scripts/cdapp_stop.sh
+      runas: root
+  ApplicationStart:
+    - location: scripts/cdapp_start.sh
+      runas: root

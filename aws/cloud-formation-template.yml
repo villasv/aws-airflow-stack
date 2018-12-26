@@ -222,7 +222,7 @@ Resources:
     DependsOn:
       - EfsMountTarget
       - Meta
-  Config:
+  AirflowWorkerConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Properties:
       ImageId: !FindInMap
@@ -252,7 +252,7 @@ Resources:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
-      LaunchConfigurationName: !Ref Config
+      LaunchConfigurationName: !Ref AirflowWorkerConfig
       MinSize: !Ref MinGroupSize
       MaxSize: !Ref MaxGroupSize
       MetricsCollection:
@@ -723,6 +723,10 @@ Resources:
                   - 's3:Get*'
                   - 's3:List*'
                 Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'codedeploy:List*'
+                Resource: !Sub 'arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*'
         -
           PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
           PolicyDocument:
@@ -773,6 +777,7 @@ Resources:
               git: []
               gcc: []
               gcc-c++: []
+              jq: []
               lapack-devel: []
               libcurl-devel: []
               libxml2-devel: []
@@ -874,8 +879,17 @@ Resources:
                 su -c '/usr/local/bin/airflow initdb' ec2-user
                 systemctl enable airflow.service
                 systemctl enable watcher.path
-                systemctl start airflow.service
-                systemctl start watcher.path
+
+                FRESH=$(aws deploy list-deployments \
+                  --application-name airtest-deployment-application \
+                  --deployment-group airtest-deployment-group | \
+                  jq '.deployments | has(0)')
+
+                if [ "$FRESH" == "true" ];
+                then
+                  systemctl start airflow.service
+                  systemctl start watcher.path
+                fi
         metahup:
           files:
             /etc/cfn/cfn-hup.conf:
