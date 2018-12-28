@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
+  # Networking
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
@@ -14,17 +15,27 @@ Parameters:
     Type: String
     Default: 10.0.0.0/24
   AllowedSshBlock:
-    Description: The IPv4 CIDR block to allow SSH access in all machines.
+    Description: >-
+      The IPv4 CIDR block to allow SSH access in all machines. The default of
+      0.0.0.0/0 allows SSH from everywhere, which is convenient but less secure.
     Type: String
     Default: 0.0.0.0/0
   AllowedWebBlock:
-    Description: The IPv4 CIDR block to allow HTTP access in the webserver.
+    Description: >-
+      The IPv4 CIDR block to allow HTTP access in the webserver. The default of
+      0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
+      secure.
     Type: String
     Default: 0.0.0.0/0
   WebserverPort:
-    Description: The port Airflow webserver will be listening.
+    Description: >-
+      The port Airflow webserver will be listening. Ports below 1024 can be
+      opened only with root privileges and the airflow process does not run as
+      such. If you want to use port 80, you may use a post-deployment script ran
+      as root to setup port forwarding.
     Type: String
     Default: 8080
+  # Cluster Settings
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -74,6 +85,26 @@ Parameters:
     Description: The password to be used in the airflow database.
     Type: String
     NoEcho: true
+  # Airflow Config
+  LoadExampleDags:
+    Description: >-
+      Load the example DAGs distributed with Airflow. Useful if deploying a
+      stack for demonstrating a few topologies, operators and scheduling
+      strategies.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+  LoadDefaultConns:
+    Description: >-
+      Load the default connections usually initialized by Airflow. Most consider
+      these unnecessary which is why the default is to not load them.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
@@ -877,13 +908,14 @@ Resources:
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
                 su -c '/usr/local/bin/airflow initdb' ec2-user
-                systemctl enable airflow.service
-                systemctl enable watcher.path
 
                 HAS_DEPLOYMENT=$(aws deploy list-deployments \
                   --application-name ${AWS::StackName}-deployment-application \
                   --deployment-group ${AWS::StackName}-deployment-group | \
                   jq '.deployments | has(0)')
+
+                systemctl enable airflow.service
+                systemctl enable watcher.path
 
                 if [ "$HAS_DEPLOYMENT" == "true" ];
                 then
@@ -993,10 +1025,10 @@ Metadata:
           - AllowedSshBlock
           - AllowedWebBlock
           - WebserverPort
-          - KeyPair
       - Label:
           default: Cluster Settings
         Parameters:
+          - KeyPair
           - SchedulerInstanceType
           - WebserverInstanceType
           - WorkerInstanceType
@@ -1005,20 +1037,13 @@ Metadata:
           - MaxGroupSize
           - ShrinkThreshold
           - GrowthThreshold
-      - Label:
-          default: Storage
-        Parameters:
           - DbMasterUsername
           - DbMasterPassword
-    ParameterLabels:
-      DbMasterPassword:
-        default: Postgres Password
-      DbMasterUsername:
-        default: Postgres Username
-      KeyPair:
-        default: Key for SSH access
-      WorkerInstanceType:
-        default: Worker Instance Type
+      - Label:
+          default: Airflow Config
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultConns
   'AWS::CloudFormation::Designer':
     7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b:
       size:
