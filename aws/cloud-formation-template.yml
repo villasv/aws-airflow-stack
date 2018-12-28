@@ -31,8 +31,7 @@ Parameters:
     Description: >-
       The port Airflow webserver will be listening. Ports below 1024 can be
       opened only with root privileges and the airflow process does not run as
-      such. If you want to use port 80, you may use a post-deployment script ran
-      as root to setup port forwarding.
+      such.
     Type: String
     Default: 8080
   # Cluster Settings
@@ -98,8 +97,8 @@ Parameters:
     Default: 'False'
   LoadDefaultConns:
     Description: >-
-      Load the default connections usually initialized by Airflow. Most consider
-      these unnecessary which is why the default is to not load them.
+      Load the default connections initialized by Airflow. Most consider these
+      unnecessary, which is why the default is to not load them.
     Type: String
     AllowedValues:
       - 'False'
