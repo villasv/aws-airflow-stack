@@ -784,8 +784,6 @@ Resources:
           default:
             - filesys
             - runtime
-            - configs
-            - dbsetup
             - service
             - metahup
             - cdagent
@@ -833,31 +831,6 @@ Resources:
                   apache-airflow[celery,postgres,s3]==1.10.1 \
                   celery[sqs] \
                   tenacity==5.0.2
-        configs:
-          commands:
-            inject:
-              command: |
-                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUBLIC_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                LOCAL_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/local-ipv4)
-                if [ $PUBLIC = "200" ];
-                then
-                  HOST=$PUBLIC_IPV4
-                else
-                  HOST=$LOCAL_IPV4
-                fi
-                sed -i -e "s~INJECTHOST~$HOST~" \
-                  /etc/sysconfig/airflow
-        dbsetup:
-          commands:
-            setup:
-              command: !Sub |
-                sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
-                source /tmp/env.sh
-                su -c '/usr/local/bin/airflow initdb' ec2-user
         service:
           files:
             /etc/sysconfig/airflow:
@@ -917,6 +890,27 @@ Resources:
                 [Install]
                 WantedBy=multi-user.target
           commands:
+            inject:
+              command: |
+                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                PUBLIC_IPV4=$(curl -s \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                LOCAL_IPV4=$(curl -s \
+                  http://169.254.169.254/latest/meta-data/local-ipv4)
+                if [ $PUBLIC = "200" ];
+                then
+                  HOST=$PUBLIC_IPV4
+                else
+                  HOST=$LOCAL_IPV4
+                fi
+                sed -i -e "s~INJECTHOST~$HOST~" \
+                  /etc/sysconfig/airflow
+            dbsetup:
+              command: !Sub |
+                sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
+                source /tmp/env.sh
+                su -c '/usr/local/bin/airflow initdb' ec2-user
             bootstrap:
               command: !Sub |
                 HAS_DEPLOYMENT=$(aws deploy list-deployments \
