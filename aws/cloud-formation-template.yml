@@ -204,8 +204,7 @@ Resources:
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
-          echo $'#!/bin/sh\nexec airflow scheduler' > /usr/bin/turbine
-          chmod +x /usr/bin/turbine
+          echo $'TURBINE_MACHINE=SCHEDULER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
@@ -239,8 +238,7 @@ Resources:
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
-          echo $'#!/bin/sh\nexec airflow webserver' > /usr/bin/turbine
-          chmod +x /usr/bin/turbine
+          echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
@@ -270,8 +268,7 @@ Resources:
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
-          echo $'#!/bin/sh\nexec airflow worker' > /usr/bin/turbine
-          chmod +x /usr/bin/turbine
+          echo $'TURBINE_MACHINE=WORKER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
@@ -833,6 +830,18 @@ Resources:
                   tenacity==5.0.2
         service:
           files:
+            /usr/bin/turbine:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
+                then exec airflow scheduler
+                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
+                then exec airflow webserver
+                elif [ "$TURBINE_MACHINE" == "WORKER" ]
+                then exec airflow worker
+                else echo "TURBINE_MACHINE value unknown" && exit 1
+                fi
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
