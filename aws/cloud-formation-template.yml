@@ -845,6 +845,7 @@ Resources:
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
+                  AWS_DEFAULT_REGION=${AWS::Region}
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
@@ -856,7 +857,6 @@ Resources:
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
-                  AWS_DEFAULT_REGION=${AWS::Region}
                 - queue: !GetAtt
                     - Tasks
                     - QueueName
@@ -899,8 +899,10 @@ Resources:
                 [Install]
                 WantedBy=multi-user.target
           commands:
-            inject:
-              command: |
+            setup:
+              command: !Sub |
+                cat /etc/environment >> /etc/sysconfig/airflow
+
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUBLIC_IPV4=$(curl -s \
@@ -915,13 +917,14 @@ Resources:
                 fi
                 sed -i -e "s~INJECTHOST~$HOST~" \
                   /etc/sysconfig/airflow
-            dbsetup:
-              command: !Sub |
+
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
-                su -c '/usr/local/bin/airflow initdb' ec2-user
-            bootstrap:
-              command: !Sub |
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]; then
+                  su -c '/usr/local/bin/airflow initdb' ec2-user
+                else echo "Database setup reserved for the scheduler"
+                fi
+
                 HAS_DEPLOYMENT=$(aws deploy list-deployments \
                   --application-name ${AWS::StackName}-deployment-application \
                   --deployment-group ${AWS::StackName}-deployment-group | \
