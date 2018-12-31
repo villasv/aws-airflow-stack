@@ -104,9 +104,6 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-Conditions:
-  IfLoadExampleDags: !Equals [ !Ref LoadExampleDags, 'True' ]
-  IfLoadDefaultConns: !Equals [ !Ref LoadDefaultConns, 'True' ]
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
@@ -848,6 +845,7 @@ Resources:
                   AWS_DEFAULT_REGION=${AWS::Region}
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
                   AIRFLOW__CORE__REMOTE_LOGGING=True
@@ -921,7 +919,12 @@ Resources:
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
                 if [ "$TURBINE_MACHINE" == "SCHEDULER" ]; then
-                  su -c '/usr/local/bin/airflow initdb' ec2-user
+                  echo "LoadDefaultConns = ${LoadDefaultConns}, hardcoded"
+                  if [ "${LoadDefaultConns}" == "True" ]; then
+                    su -c '/usr/local/bin/airflow initdb' ec2-user
+                  else
+                    su -c '/usr/local/bin/airflow upgradedb' ec2-user
+                  fi
                 else echo "Database setup reserved for the scheduler"
                 fi
 
