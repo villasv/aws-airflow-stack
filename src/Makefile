@@ -22,5 +22,6 @@ deploy: upload
 	aws deploy create-deployment \
 		--application-name $(APPLICATION) \
 		--deployment-group-name $(DEPLOYMENT_GROUP) \
+		--s3-location bucket=$(DEPLOYMENTS_BUCKET),bundleType=tgz,key=$(PACKAGE) \
 		--deployment-config-name CodeDeployDefault.AllAtOnce \
-		--s3-location bucket=$(DEPLOYMENTS_BUCKET),bundleType=tgz,key=$(PACKAGE)
+		--file-exists-behavior OVERWRITE
