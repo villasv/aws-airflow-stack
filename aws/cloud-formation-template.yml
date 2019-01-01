@@ -846,6 +846,7 @@ Resources:
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
+                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConns}
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
                   AIRFLOW__CORE__REMOTE_LOGGING=True
@@ -919,8 +920,7 @@ Resources:
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
                 if [ "$TURBINE_MACHINE" == "SCHEDULER" ]; then
-                  echo "LoadDefaultConns = ${LoadDefaultConns}, hardcoded"
-                  if [ "${LoadDefaultConns}" == "True" ]; then
+                  if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
                     su -c '/usr/local/bin/airflow initdb' ec2-user
                   else
                     su -c '/usr/local/bin/airflow upgradedb' ec2-user
