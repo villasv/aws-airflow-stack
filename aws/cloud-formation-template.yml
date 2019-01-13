@@ -920,15 +920,13 @@ Resources:
 
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUBLIC_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                LOCAL_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/local-ipv4)
+                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
+                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
                 if [ $PUBLIC = "200" ];
                 then
-                  HOST=$PUBLIC_IPV4
+                  HOST=$PUB_IPV4
                 else
-                  HOST=$LOCAL_IPV4
+                  HOST=$LOC_IPV4
                 fi
                 sed -i -e "s~INJECTHOST~$HOST~" \
                   /etc/sysconfig/airflow
