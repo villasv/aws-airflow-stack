@@ -275,7 +275,7 @@ Resources:
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
     DependsOn:
       - Meta
-  Scaler:
+  AutoScalingGroup:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
@@ -289,6 +289,13 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
+  AutoScalingHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      HeartbeatTimeout: 3600
+      LifecycleHookName: !Sub '${AWS::StackName}-scaling-lfhook'
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
   LogsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -308,7 +315,7 @@ Resources:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
       AutoScalingGroups:
-        - !Ref Scaler
+        - !Ref AutoScalingGroup
       Ec2TagSet:
         Ec2TagSetList:
           - Ec2TagGroup:
@@ -537,7 +544,7 @@ Resources:
       PolicyType: SimpleScaling
       ScalingAdjustment: '-1'
       Cooldown: '600'
-      AutoScalingGroupName: !Ref Scaler
+      AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
@@ -548,7 +555,7 @@ Resources:
       PolicyType: SimpleScaling
       ScalingAdjustment: '1'
       Cooldown: '600'
-      AutoScalingGroupName: !Ref Scaler
+      AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
@@ -764,6 +771,15 @@ Resources:
                   - 's3:Get*'
                   - 's3:Put*'
                 Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
+        -
+          PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:RecordLifecycleActionHeartbeat'
+                Resource: !Sub 'arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*'
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
