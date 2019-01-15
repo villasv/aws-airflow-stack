@@ -893,6 +893,8 @@ Resources:
                 ExecStart=/usr/bin/turbine
                 Restart=always
                 RestartSec=5s
+                KillMode=mixed
+                TimeoutStopSec=24h
                 [Install]
                 WantedBy=multi-user.target
             /usr/lib/tmpfiles.d/airflow.conf:
