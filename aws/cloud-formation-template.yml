@@ -293,7 +293,8 @@ Resources:
     Type: AWS::AutoScaling::LifecycleHook
     Properties:
       AutoScalingGroupName: !Ref AutoScalingGroup
-      HeartbeatTimeout: 3600
+      DefaultResult: CONTINUE
+      HeartbeatTimeout: 300
       LifecycleHookName: !Sub '${AWS::StackName}-scaling-lfhook'
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
   LogsBucket:
