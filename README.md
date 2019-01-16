@@ -138,6 +138,10 @@ See the [contribution guidelines](/CONTRIBUTING.md) for details.
 You may also want to take a look at the [Citizen Code of
 Conduct](/CODE_OF_CONDUCT.md).
 
+Did this project help you? Consider buying me a cup of coffee ;-)
+
+[![Buy me a coffee!](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/villasv)
+
 ## Licensing
 
 > MIT License
