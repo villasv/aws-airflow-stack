@@ -842,6 +842,7 @@ Resources:
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
                   apache-airflow[celery,postgres,s3]==1.10.1 \
                   celery[sqs] \
+                  billiard==3.5.0.4 \
                   tenacity==5.0.2
         service:
           files:
