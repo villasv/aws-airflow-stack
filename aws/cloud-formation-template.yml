@@ -881,10 +881,12 @@ Resources:
                   rds: !GetAtt
                     - Database
                     - Endpoint.Address
+            /usr/lib/tmpfiles.d/airflow.conf:
+              content: |
+                D /run/airflow 0755 ec2-user ec2-user
             /usr/lib/systemd/system/airflow.service:
               content: |
                 [Unit]
-                Description=Airflow daemon
                 After=network.target
                 [Service]
                 EnvironmentFile=/etc/sysconfig/airflow
@@ -898,26 +900,36 @@ Resources:
                 TimeoutStopSec=24h
                 [Install]
                 WantedBy=multi-user.target
-            /usr/lib/tmpfiles.d/airflow.conf:
-              content: |
-                D /run/airflow 0755 ec2-user ec2-user
-            /usr/lib/systemd/system/watcher.service:
-              content: |
-                [Unit]
-                Description=Airflow configuration watcher
-                After=network.target
-                [Service]
-                Type=oneshot
-                ExecStartPre=/usr/bin/systemctl daemon-reload
-                ExecStart=/usr/bin/systemctl restart airflow
-                [Install]
-                WantedBy=multi-user.target
             /usr/lib/systemd/system/watcher.path:
               content: |
                 [Path]
                 PathModified=/etc/sysconfig/airflow
                 [Install]
                 WantedBy=multi-user.target
+            /usr/lib/systemd/system/watcher.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStartPre=/usr/bin/systemctl daemon-reload
+                ExecStart=/usr/bin/systemctl restart airflow
+            /usr/bin/lchookbeat:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                echo 'Heartbeat'
+            /usr/lib/systemd/system/lchbeat.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=timers.target
+            /usr/lib/systemd/system/lchbeat.service:
+              content: |
+                [Unit]
+                After=network.target
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchookbeat
           commands:
             setup:
               command: !Sub |
@@ -954,6 +966,7 @@ Resources:
 
                 systemctl enable airflow.service
                 systemctl enable watcher.path
+                systemctl enable lchbeat.timer
 
                 if [ "$HAS_DEPLOYMENT" == "true" ];
                 then
@@ -961,6 +974,7 @@ Resources:
                 else
                   systemctl start airflow.service
                   systemctl start watcher.path
+                  systemctl start lchbeat.timer
                 fi
         metahup:
           files:
