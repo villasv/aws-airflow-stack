@@ -1,3 +1,8 @@
+<meta property="og:title" content="Turbine AWS Airflow Stack">
+<meta property="og:description" content="the bare metals behind a complete Airflow setup">
+<meta property="og:image" content="img/turbine.png">
+<meta property="og:url" content="https://victor.villas/aws-airflow-stack/">
+<meta name="twitter:card" content="summary">
 <img src="img/turbine.png" align="right" width="25%" />
 
 # Turbine [![ci](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working)
