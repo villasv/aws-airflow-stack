@@ -902,10 +902,13 @@ Resources:
                 WantedBy=multi-user.target
             /usr/lib/systemd/system/watcher.path:
               content: |
+                [Unit]
+                After=airflow.service
+                PartOf=airflow.service
                 [Path]
                 PathModified=/etc/sysconfig/airflow
                 [Install]
-                WantedBy=multi-user.target
+                WantedBy=airflow.service
             /usr/lib/systemd/system/watcher.service:
               content: |
                 [Service]
@@ -919,14 +922,15 @@ Resources:
                 echo 'Heartbeat'
             /usr/lib/systemd/system/lchbeat.timer:
               content: |
+                [Unit]
+                After=airflow.service
+                PartOf=airflow.service
                 [Timer]
                 OnCalendar=*:0/1
                 [Install]
-                WantedBy=timers.target
+                WantedBy=airflow.service
             /usr/lib/systemd/system/lchbeat.service:
               content: |
-                [Unit]
-                After=network.target
                 [Service]
                 Type=oneshot
                 ExecStart=/usr/bin/lchookbeat
@@ -964,17 +968,13 @@ Resources:
                   --deployment-group ${AWS::StackName}-deployment-group | \
                   jq '.deployments | has(0)')
 
-                systemctl enable airflow.service
-                systemctl enable watcher.path
-                systemctl enable lchbeat.timer
+                systemctl enable airflow.service watcher.path lchbeat.timer
 
-                if [ "$HAS_DEPLOYMENT" == "true" ];
+                if [ "$TURBINE_MACHINE" = "WORKER" ] && [ "$HAS_DEPLOYMENT" = "true" ];
                 then
                   echo "Deployment pending, deferring service start"
                 else
-                  systemctl start airflow.service
-                  systemctl start watcher.path
-                  systemctl start lchbeat.timer
+                  systemctl start airflow
                 fi
         metahup:
           files:
