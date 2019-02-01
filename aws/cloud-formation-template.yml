@@ -840,7 +840,7 @@ Resources:
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  apache-airflow[celery,postgres,s3]==1.10.1 \
+                  apache-airflow[celery,postgres,s3]==1.10.2 \
                   celery[sqs] \
                   billiard==3.5.0.4 \
                   tenacity==4.12.0
