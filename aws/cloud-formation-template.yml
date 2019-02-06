@@ -782,6 +782,10 @@ Resources:
                   - 'autoscaling:RecordLifecycleActionHeartbeat'
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: !Sub 'arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeScalingActivities'
+                Resource: '*'
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
