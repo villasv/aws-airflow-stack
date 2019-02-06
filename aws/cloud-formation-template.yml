@@ -919,7 +919,15 @@ Resources:
               mode: 755
               content: !Sub |
                 #!/bin/sh
-                echo 'Heartbeat'
+                SERVICE_STATUS=$(systemctl is-active airflow)
+                if [ "$SERVICE_STATUS" = "deactivating" ]
+                then
+                  aws autoscaling record-lifecycle-action-heartbeat \
+                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                    --region us-east-1
+                fi
             /usr/lib/systemd/system/lchbeat.timer:
               content: |
                 [Unit]
