@@ -923,14 +923,31 @@ Resources:
               mode: 755
               content: !Sub |
                 #!/bin/sh
+                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
                 SERVICE_STATUS=$(systemctl is-active airflow)
-                if [ "$SERVICE_STATUS" = "deactivating" ]
+
+                TERMINATE_MESSAGE="Terminating EC2 instance: $INSTANCE_ID"
+                TERMINATING=$(aws autoscaling describe-scaling-activities \
+                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                  --max-items 100 \
+                  --region '${AWS::Region}' | \
+                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
+                  '.Activities[]
+                  | select(.Description
+                  | test($TERMINATE_MESSAGE)) != []')
+
+                if [ "$TERMINATING" = "true" ]
                 then
-                  aws autoscaling record-lifecycle-action-heartbeat \
-                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                    --region us-east-1
+                  if [ "$SERVICE_STATUS" = "deactivating" ]
+                  then
+                    aws autoscaling record-lifecycle-action-heartbeat \
+                      --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                      --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                      --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                      --region '${AWS::Region}'
+                  else
+                    systemctl stop airflow & disown
+                  fi
                 fi
             /usr/lib/systemd/system/lchbeat.timer:
               content: |
