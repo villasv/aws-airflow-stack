@@ -919,13 +919,11 @@ Resources:
                 Type=oneshot
                 ExecStartPre=/usr/bin/systemctl daemon-reload
                 ExecStart=/usr/bin/systemctl restart airflow
-            /usr/bin/lchookbeat:
+            /usr/bin/lchkill:
               mode: 755
               content: !Sub |
                 #!/bin/sh
                 INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
-                SERVICE_STATUS=$(systemctl is-active airflow)
-
                 TERMINATE_MESSAGE="Terminating EC2 instance: $INSTANCE_ID"
                 TERMINATING=$(aws autoscaling describe-scaling-activities \
                   --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
@@ -938,21 +936,41 @@ Resources:
 
                 if [ "$TERMINATING" = "true" ]
                 then
-                  if [ "$SERVICE_STATUS" = "deactivating" ]
-                  then
-                    aws autoscaling record-lifecycle-action-heartbeat \
-                      --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                      --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                      --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                      --region '${AWS::Region}'
-                  else
-                    systemctl stop airflow & disown
-                  fi
+                  systemctl stop airflow
+                fi
+            /usr/lib/systemd/system/lchkill.timer:
+              content: |
+                [Unit]
+                Before=airflow.service
+                PartOf=airflow.service
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchkill.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchkill
+            /usr/bin/lchbeat:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
+                SERVICE_STATUS=$(systemctl is-active airflow)
+
+                if [ "$SERVICE_STATUS" = "deactivating" ]
+                then
+                  aws autoscaling record-lifecycle-action-heartbeat \
+                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                    --region '${AWS::Region}'
                 fi
             /usr/lib/systemd/system/lchbeat.timer:
               content: |
                 [Unit]
-                After=airflow.service
+                Before=airflow.service
                 PartOf=airflow.service
                 [Timer]
                 OnCalendar=*:0/1
@@ -962,7 +980,7 @@ Resources:
               content: |
                 [Service]
                 Type=oneshot
-                ExecStart=/usr/bin/lchookbeat
+                ExecStart=/usr/bin/lchbeat
           commands:
             setup:
               command: !Sub |
@@ -1001,7 +1019,7 @@ Resources:
 
                 if [ "$TURBINE_MACHINE" = "WORKER" ];
                 then
-                  systemctl enable lchbeat.timer
+                  systemctl enable lchkill.timer lchbeat.timer
                 fi
                 if [ "$TURBINE_MACHINE" = "WORKER" ] && [ "$HAS_DEPLOYMENT" = "true" ];
                 then
