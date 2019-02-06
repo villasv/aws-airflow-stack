@@ -9,7 +9,7 @@ DEPLOYMENTS_BUCKET = $(stack-name)-deployments
 
 # deployment variables
 REVISION := $(shell date --utc +%Y%m%dT%H%M%SZ)
-PACKAGE = airflow-package-$(REVISION).tgz
+PACKAGE = $(stack-name)_$(REVISION).tgz
 
 
 package:
