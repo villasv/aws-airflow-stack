@@ -976,8 +976,12 @@ Resources:
                   --deployment-group ${AWS::StackName}-deployment-group | \
                   jq '.deployments | has(0)')
 
-                systemctl enable airflow.service watcher.path lchbeat.timer
+                systemctl enable airflow.service watcher.path
 
+                if [ "$TURBINE_MACHINE" = "WORKER" ];
+                then
+                  systemctl enable lchbeat.timer
+                fi
                 if [ "$TURBINE_MACHINE" = "WORKER" ] && [ "$HAS_DEPLOYMENT" = "true" ];
                 then
                   echo "Deployment pending, deferring service start"
