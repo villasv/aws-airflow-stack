@@ -890,13 +890,10 @@ Resources:
                 D /run/airflow 0755 ec2-user ec2-user
             /usr/lib/systemd/system/airflow.service:
               content: |
-                [Unit]
-                After=network.target
                 [Service]
                 EnvironmentFile=/etc/sysconfig/airflow
                 User=ec2-user
                 Group=ec2-user
-                Type=simple
                 ExecStart=/usr/bin/turbine
                 Restart=always
                 RestartSec=5s
@@ -940,9 +937,6 @@ Resources:
                 fi
             /usr/lib/systemd/system/lchkill.timer:
               content: |
-                [Unit]
-                Before=airflow.service
-                PartOf=airflow.service
                 [Timer]
                 OnCalendar=*:0/1
                 [Install]
@@ -956,7 +950,6 @@ Resources:
               mode: 755
               content: !Sub |
                 #!/bin/sh
-                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
                 SERVICE_STATUS=$(systemctl is-active airflow)
 
                 if [ "$SERVICE_STATUS" = "deactivating" ]
@@ -969,9 +962,6 @@ Resources:
                 fi
             /usr/lib/systemd/system/lchbeat.timer:
               content: |
-                [Unit]
-                Before=airflow.service
-                PartOf=airflow.service
                 [Timer]
                 OnCalendar=*:0/1
                 [Install]
@@ -1050,10 +1040,7 @@ Resources:
                 runas=root
             /lib/systemd/system/cfn-hup.service:
               content: !Sub |
-                [Unit]
-                Description=cfn-hup daemon
                 [Service]
-                Type=simple
                 ExecStart=/opt/aws/bin/cfn-hup
                 Restart=always
                 [Install]
