@@ -83,32 +83,21 @@ access the Airflow UI and deploy your own Airflow DAGs.
 ### 2. Upstream your files
 
 The only requirement is that you configure the deployment to copy your Airflow
-home directory to `/airflow`. After crafting your `appspec.yml`, you can use the AWS CLI to deploy your project.
+home directory to `/airflow`. After crafting your `appspec.yml`, you can use the
+AWS CLI to deploy your project.
 
 For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
 packaging, upload and deployment commands. A minimal working example of an
 Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
 
+If you follow this blueprint, a deployment is as simple as:
+
 ```bash
 make deploy stack-name=yourcoolstackname
 ```
 
-> **GOTCHA**: if you're not in `us-east-1`, it's necessary to list your region
-> as a broker transport option, until it becomes possible to enforce it directly
-> with environment variables
-> [(AIRFLOW-3366)](https://issues.apache.org/jira/browse/AIRFLOW-3366).
-> Providing the `visibility_timeout` is also important
-> [(AIRFLOW-3365)](https://issues.apache.org/jira/browse/AIRFLOW-3365).
->
-> ```ini
-> [celery_broker_transport_options]
-> region = us-east-2
-> visibility_timeout = 21600
-> ```
->
-> Also be sure to configure the Airflow `aws_default` Connection to use the
-> appropriate region!
->
+> **GOTCHA**: if you rely on the default connections, be sure to configure the
+> `aws_default` and any other connections to use the appropriate region!
 
 ## FAQ
 
