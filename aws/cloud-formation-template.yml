@@ -879,6 +879,7 @@ Resources:
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
+                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
                 - queue: !GetAtt
                     - Tasks
                     - QueueName
