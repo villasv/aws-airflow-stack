@@ -5,7 +5,7 @@
 <meta name="twitter:card" content="summary">
 <img src="img/turbine.png" align="right" width="25%" />
 
-# Turbine [![ci](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working)
+# Turbine [![](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working) [![](https://img.shields.io/github/stars/villasv/aws-airflow-stack.svg?logo=github&style=flat-square)](https://github.com/villasv/aws-airflow-stack)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
