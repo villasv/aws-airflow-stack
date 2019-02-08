@@ -1,6 +1,11 @@
+<meta property="og:title" content="Turbine AWS Airflow Stack">
+<meta property="og:description" content="the bare metals behind a complete Airflow setup">
+<meta property="og:image" content="img/turbine.png">
+<meta property="og:url" content="https://victor.villas/aws-airflow-stack/">
+<meta name="twitter:card" content="summary">
 <img src="img/turbine.png" align="right" width="25%" />
 
-# Turbine [![ci](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working)
+# Turbine [![](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working) [![](https://img.shields.io/github/stars/villasv/aws-airflow-stack.svg?logo=github&style=flat-square)](https://github.com/villasv/aws-airflow-stack)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
@@ -78,32 +83,21 @@ access the Airflow UI and deploy your own Airflow DAGs.
 ### 2. Upstream your files
 
 The only requirement is that you configure the deployment to copy your Airflow
-home directory to `/airflow`. After crafting your `appspec.yml`, you can use the AWS CLI to deploy your project.
+home directory to `/airflow`. After crafting your `appspec.yml`, you can use the
+AWS CLI to deploy your project.
 
 For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
 packaging, upload and deployment commands. A minimal working example of an
 Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
 
+If you follow this blueprint, a deployment is as simple as:
+
 ```bash
 make deploy stack-name=yourcoolstackname
 ```
 
-> **GOTCHA**: if you're not in `us-east-1`, it's necessary to list your region
-> as a broker transport option, until it becomes possible to enforce it directly
-> with environment variables
-> [(AIRFLOW-3366)](https://issues.apache.org/jira/browse/AIRFLOW-3366).
-> Providing the `visibility_timeout` is also important
-> [(AIRFLOW-3365)](https://issues.apache.org/jira/browse/AIRFLOW-3365).
->
-> ```ini
-> [celery_broker_transport_options]
-> region = us-east-2
-> visibility_timeout = 21600
-> ```
->
-> Also be sure to configure the Airflow `aws_default` Connection to use the
-> appropriate region!
->
+> **GOTCHA**: if you rely on the default connections, be sure to configure the
+> `aws_default` and any other connections to use the appropriate region!
 
 ## FAQ
 
@@ -137,6 +131,10 @@ See the [contribution guidelines](/CONTRIBUTING.md) for details.
 
 You may also want to take a look at the [Citizen Code of
 Conduct](/CODE_OF_CONDUCT.md).
+
+Did this project help you? Consider buying me a cup of coffee ;-)
+
+[![Buy me a coffee!](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/villasv)
 
 ## Licensing
 

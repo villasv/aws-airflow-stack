@@ -275,7 +275,7 @@ Resources:
         id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
     DependsOn:
       - Meta
-  Scaler:
+  AutoScalingGroup:
     Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
@@ -289,6 +289,14 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
+  AutoScalingHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      DefaultResult: CONTINUE
+      HeartbeatTimeout: 300
+      LifecycleHookName: !Sub '${AWS::StackName}-scaling-lfhook'
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
   LogsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -308,7 +316,7 @@ Resources:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
       AutoScalingGroups:
-        - !Ref Scaler
+        - !Ref AutoScalingGroup
       Ec2TagSet:
         Ec2TagSetList:
           - Ec2TagGroup:
@@ -537,7 +545,7 @@ Resources:
       PolicyType: SimpleScaling
       ScalingAdjustment: '-1'
       Cooldown: '600'
-      AutoScalingGroupName: !Ref Scaler
+      AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
@@ -548,7 +556,7 @@ Resources:
       PolicyType: SimpleScaling
       ScalingAdjustment: '1'
       Cooldown: '600'
-      AutoScalingGroupName: !Ref Scaler
+      AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
       'AWS::CloudFormation::Designer':
         id: f12da049-cd8c-4011-8c3f-650b4463a007
@@ -764,6 +772,20 @@ Resources:
                   - 's3:Get*'
                   - 's3:Put*'
                 Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
+        -
+          PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:RecordLifecycleActionHeartbeat'
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: !Sub 'arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeScalingActivities'
+                Resource: '*'
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
@@ -822,9 +844,10 @@ Resources:
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  apache-airflow[celery,postgres,s3]==1.10.1 \
+                  apache-airflow[celery,postgres,s3]==1.10.2 \
                   celery[sqs] \
-                  tenacity==5.0.2
+                  billiard==3.5.0.4 \
+                  tenacity==4.12.0
         service:
           files:
             /usr/bin/turbine:
@@ -856,47 +879,99 @@ Resources:
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
+                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
                 - queue: !GetAtt
                     - Tasks
                     - QueueName
                   rds: !GetAtt
                     - Database
                     - Endpoint.Address
+            /usr/lib/tmpfiles.d/airflow.conf:
+              content: |
+                D /run/airflow 0755 ec2-user ec2-user
             /usr/lib/systemd/system/airflow.service:
               content: |
-                [Unit]
-                Description=Airflow daemon
-                After=network.target
                 [Service]
                 EnvironmentFile=/etc/sysconfig/airflow
                 User=ec2-user
                 Group=ec2-user
-                Type=simple
                 ExecStart=/usr/bin/turbine
                 Restart=always
                 RestartSec=5s
-                [Install]
-                WantedBy=multi-user.target
-            /usr/lib/tmpfiles.d/airflow.conf:
-              content: |
-                D /run/airflow 0755 ec2-user ec2-user
-            /usr/lib/systemd/system/watcher.service:
-              content: |
-                [Unit]
-                Description=Airflow configuration watcher
-                After=network.target
-                [Service]
-                Type=oneshot
-                ExecStartPre=/usr/bin/systemctl daemon-reload
-                ExecStart=/usr/bin/systemctl restart airflow
+                KillMode=mixed
+                TimeoutStopSec=24h
                 [Install]
                 WantedBy=multi-user.target
             /usr/lib/systemd/system/watcher.path:
               content: |
+                [Unit]
+                After=airflow.service
+                PartOf=airflow.service
                 [Path]
                 PathModified=/etc/sysconfig/airflow
                 [Install]
-                WantedBy=multi-user.target
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/watcher.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStartPre=/usr/bin/systemctl daemon-reload
+                ExecStart=/usr/bin/systemctl restart airflow
+            /usr/bin/lchkill:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
+                TERMINATE_MESSAGE="Terminating EC2 instance: $INSTANCE_ID"
+                TERMINATING=$(aws autoscaling describe-scaling-activities \
+                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                  --max-items 100 \
+                  --region '${AWS::Region}' | \
+                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
+                  '.Activities[]
+                  | select(.Description
+                  | test($TERMINATE_MESSAGE)) != []')
+
+                if [ "$TERMINATING" = "true" ]
+                then
+                  systemctl stop airflow
+                fi
+            /usr/lib/systemd/system/lchkill.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchkill.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchkill
+            /usr/bin/lchbeat:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                SERVICE_STATUS=$(systemctl is-active airflow)
+
+                if [ "$SERVICE_STATUS" = "deactivating" ]
+                then
+                  aws autoscaling record-lifecycle-action-heartbeat \
+                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                    --region '${AWS::Region}'
+                fi
+            /usr/lib/systemd/system/lchbeat.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchbeat.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchbeat
           commands:
             setup:
               command: !Sub |
@@ -904,15 +979,13 @@ Resources:
 
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUBLIC_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                LOCAL_IPV4=$(curl -s \
-                  http://169.254.169.254/latest/meta-data/local-ipv4)
+                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
+                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
                 if [ $PUBLIC = "200" ];
                 then
-                  HOST=$PUBLIC_IPV4
+                  HOST=$PUB_IPV4
                 else
-                  HOST=$LOCAL_IPV4
+                  HOST=$LOC_IPV4
                 fi
                 sed -i -e "s~INJECTHOST~$HOST~" \
                   /etc/sysconfig/airflow
@@ -933,15 +1006,17 @@ Resources:
                   --deployment-group ${AWS::StackName}-deployment-group | \
                   jq '.deployments | has(0)')
 
-                systemctl enable airflow.service
-                systemctl enable watcher.path
+                systemctl enable airflow.service watcher.path
 
-                if [ "$HAS_DEPLOYMENT" == "true" ];
+                if [ "$TURBINE_MACHINE" = "WORKER" ];
+                then
+                  systemctl enable lchkill.timer lchbeat.timer
+                fi
+                if [ "$TURBINE_MACHINE" = "WORKER" ] && [ "$HAS_DEPLOYMENT" = "true" ];
                 then
                   echo "Deployment pending, deferring service start"
                 else
-                  systemctl start airflow.service
-                  systemctl start watcher.path
+                  systemctl start airflow
                 fi
         metahup:
           files:
@@ -966,10 +1041,7 @@ Resources:
                 runas=root
             /lib/systemd/system/cfn-hup.service:
               content: !Sub |
-                [Unit]
-                Description=cfn-hup daemon
                 [Service]
-                Type=simple
                 ExecStart=/opt/aws/bin/cfn-hup
                 Restart=always
                 [Install]
