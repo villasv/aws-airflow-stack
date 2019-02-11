@@ -22,11 +22,11 @@ configure in a few commands.
 
 The stack is composed mainly of two EC2 machines, one for the Airflow webserver
 and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
-for Airflow workers. Supporting resources include a RDS instance to host the
-Airflow metadata database, a SQS instance to be used as broker backend, an EFS
-instance to serve as shared directory, and auto scaling metrics, alarms and
-triggers. All other resources are the usual boilerplate to keep the wind
-blowing.
+for Airflow workers. Supporting resources include an RDS instance to host the
+Airflow metadata database, an SQS instance to be used as broker backend, S3
+buckets for logs and deployment bundles, an EFS instance to serve as shared
+directory, and auto scaling metrics, alarms and triggers. All other resources
+are the usual boilerplate to keep the wind blowing.
 
 ### Deployment and File Sharing
 
@@ -36,10 +36,11 @@ at `/airflow`. It ensures that every Airflow process has the same files and can
 upgraded gracefully, but most importantly makes deployments really fast and easy
 to begin with.
 
-There's also an EFS providing a shared directory, which can be useful for
-staging files potentially used by workers on different machines and other
-syncrhonization scenarios. Be mindful about its usage as the throughput can
-become a bottleneck, and you won't pay for it if you don't use it.
+There's also an EFS shared directory mounted at at `/mnt/efs`, which can be
+useful for staging files potentially used by workers on different machines and
+other syncrhonization scenarios commonly found in ETL/Big Data applications. It
+facilitates migrating legacy workloads not ready for running on distributed
+workers.
 
 ### Workers and Auto Scaling
 
@@ -47,7 +48,8 @@ The stack includes an estimate of the cluster load average made by analyzing the
 amount of failed attempts to retrieve a task from the queue. The rationale is
 detailed [elsewhere](https://github.com/villasv/aws-airflow-stack/issues/63),
 but the metric objective is to measure if the cluster is correctly sized for the
-influx of tasks.
+influx of tasks. Worker instances have lifecycle hooks promoting a graceful
+shutdown, waiting for tasks completion when terminating.
 
 **The goal of the auto scaling feature is to respond to changes in queue load,
 which could mean an idle cluster becoming active or a busy cluster becoming
@@ -96,12 +98,12 @@ If you follow this blueprint, a deployment is as simple as:
 make deploy stack-name=yourcoolstackname
 ```
 
-> **GOTCHA**: if you rely on the default connections, be sure to configure the
-> `aws_default` and any other connections to use the appropriate region!
+> **GOTCHA**: if you rely on the default connections, be sure to configure
+> `aws_default` to use the appropriate region!
 
 ## FAQ
 
-1. Why is there a `Dummy` subnet in the VPC?
+1. Why is there an empty `Dummy` subnet in the VPC?
 
     There's no official support on CloudFormation for choosing in which VPC a
     RDS Instance is deployed. The only alternatives are to let it live in the
@@ -115,6 +117,14 @@ make deploy stack-name=yourcoolstackname
     timestamp, meaning that the latest stable SQS metrics are from 10 minutes in
     the past. This is why the load metric is always 5~10 minutes delayed. To
     avoid oscillating allocations, the alarm action has a 10 minutes cooldown.
+
+3. Why can't I stop running tasks by terminating all workers?
+
+    Workers have lifecycle hooks that make sure to wait for Celery to finish its
+    tasks before allowing EC2 to terminate that instance (except maybe for Spot
+    Instances going out of capacity). If you want to kill running tasks, you
+    will need to SSH into worker instances and stop the airflow service
+    forcefully.
 
 ## Contributing
 
