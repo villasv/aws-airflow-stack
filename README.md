@@ -18,7 +18,7 @@ configure in a few commands.
 
 ## Overview
 
-![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
+![Designer](/aws/cloud-formation-designer.png)
 
 The stack is composed mainly of two EC2 machines, one for the Airflow webserver
 and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
