@@ -831,8 +831,6 @@ Resources:
             - metahup
             - cdagent
         filesys:
-          packages:
-            amazon-efs-utils: []
           commands:
             mkdir:
               test: test ! -d /airflow
@@ -844,7 +842,9 @@ Resources:
               command: !Sub |
                 mkdir -p /mnt/efs
                 fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
-                echo "$fspec /mnt/efs efs defaults,_netdev 0 0" >> /etc/fstab
+                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
+                param="$param,hard,timeo=600,retrans=2,noresvport"
+                echo "$fspec /mnt/efs efs $param,_netdev 0 0" >> /etc/fstab
                 mount /mnt/efs
                 chown -R ec2-user /mnt/efs
         runtime:
