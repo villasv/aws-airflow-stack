@@ -1,24 +1,31 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
-  # Networking
   VpcCidrBlock:
     Description: The IPv4 CIDR block to be used in the VPC.
     Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.0.0/16
   DummySubnetBlock:
     Description: The IPv4 CIDR block to be used in the dummy subnet.
     Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.99.0/24
   StackSubnetBlock:
     Description: The IPv4 CIDR block to be used in the stack subnet.
     Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.0.0/24
   AllowedSshBlock:
     Description: >-
       The IPv4 CIDR block to allow SSH access in all machines. The default of
       0.0.0.0/0 allows SSH from everywhere, which is convenient but less secure.
     Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 0.0.0.0/0
   AllowedWebBlock:
     Description: >-
@@ -26,6 +33,8 @@ Parameters:
       0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
       secure.
     Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 0.0.0.0/0
   WebserverPort:
     Description: >-
@@ -34,7 +43,6 @@ Parameters:
       such.
     Type: String
     Default: 8080
-  # Cluster Settings
   KeyPair:
     Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: 'AWS::EC2::KeyPair::KeyName'
@@ -84,7 +92,6 @@ Parameters:
     Description: The password to be used in the airflow database.
     Type: String
     NoEcho: true
-  # Airflow Config
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
@@ -108,8 +115,8 @@ Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
-      EnableDnsSupport: 'true'
-      EnableDnsHostnames: 'true'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
       CidrBlock: !Ref VpcCidrBlock
       Tags:
         - Key: Name
@@ -290,28 +297,40 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
   AutoScalingHook:
-    Type: AWS::AutoScaling::LifecycleHook
+    Type: 'AWS::AutoScaling::LifecycleHook'
     Properties:
       AutoScalingGroupName: !Ref AutoScalingGroup
       DefaultResult: CONTINUE
       HeartbeatTimeout: 300
       LifecycleHookName: !Sub '${AWS::StackName}-scaling-lfhook'
-      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1803c37b-2716-4e56-8145-7c42613be71a
   LogsBucket:
-    Type: AWS::S3::Bucket
+    Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${AWS::StackName}-logs'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ae9dafc5-ee81-4e49-abb0-6597b9bea85f
   DeploymentsBucket:
-    Type: AWS::S3::Bucket
+    Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub '${AWS::StackName}-deployments'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: e9dec9e6-a3a5-44bd-a1a5-64fb7434649f
   CodeDeployApplication:
-    Type: AWS::CodeDeploy::Application
+    Type: 'AWS::CodeDeploy::Application'
     Properties:
       ApplicationName: !Sub '${AWS::StackName}-deployment-application'
       ComputePlatform: Server
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c0427338-3d0a-4d76-b9fe-80a013a6ce55
   CodeDeployDeploymentGroup:
-    Type: AWS::CodeDeploy::DeploymentGroup
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
     Properties:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
@@ -320,28 +339,35 @@ Resources:
       Ec2TagSet:
         Ec2TagSetList:
           - Ec2TagGroup:
-            - Type: KEY_AND_VALUE
-              Key: Name
-              Value: !Sub '${AWS::StackName}-scheduler'
-            - Type: KEY_AND_VALUE
-              Key: Name
-              Value: !Sub '${AWS::StackName}-webserver'
-      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+              - Type: KEY_AND_VALUE
+                Key: Name
+                Value: !Sub '${AWS::StackName}-scheduler'
+              - Type: KEY_AND_VALUE
+                Key: Name
+                Value: !Sub '${AWS::StackName}-webserver'
+      ServiceRoleArn: !GetAtt
+        - CodeDeployServiceRole
+        - Arn
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b961501c-cbb0-4acb-b614-563f6e84933a
   CodeDeployServiceRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
-          -
-            Effect: 'Allow'
+          - Effect: Allow
             Principal:
               Service:
-                - 'codedeploy.amazonaws.com'
+                - codedeploy.amazonaws.com
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1050ffca-0d8e-4d22-9029-fdd893f8610b
   Logger:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -513,8 +539,8 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '300'
-      EvaluationPeriods: '1'
+      Period: 300
+      EvaluationPeriods: 1
       Threshold: !Ref ShrinkThreshold
       ComparisonOperator: LessThanOrEqualToThreshold
     Metadata:
@@ -531,8 +557,8 @@ Resources:
         - Name: StackName
           Value: !Ref 'AWS::StackName'
       Statistic: Average
-      Period: '300'
-      EvaluationPeriods: '1'
+      Period: 300
+      EvaluationPeriods: 1
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
     Metadata:
@@ -543,7 +569,7 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: '-1'
+      ScalingAdjustment: -1
       Cooldown: '600'
       AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
@@ -554,7 +580,7 @@ Resources:
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
-      ScalingAdjustment: '1'
+      ScalingAdjustment: 1
       Cooldown: '600'
       AutoScalingGroupName: !Ref AutoScalingGroup
     Metadata:
@@ -592,7 +618,7 @@ Resources:
   Database:
     Type: 'AWS::RDS::DBInstance'
     Properties:
-      AllocatedStorage: 20
+      AllocatedStorage: '20'
       DBInstanceClass: db.t2.micro
       DBName: airflow
       Engine: postgres
@@ -717,16 +743,14 @@ Resources:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
-          -
-            Effect: 'Allow'
+          - Effect: Allow
             Principal:
               Service:
-                - 'ec2.amazonaws.com'
+                - ec2.amazonaws.com
             Action:
               - 'sts:AssumeRole'
       Policies:
-        -
-          PolicyName: !Sub '${AWS::StackName}-queue-rw-policy'
+        - PolicyName: !Sub '${AWS::StackName}-queue-rw-policy'
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -748,8 +772,7 @@ Resources:
                   - queue: !GetAtt
                       - Tasks
                       - QueueName
-        -
-          PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
+        - PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -762,8 +785,7 @@ Resources:
                 Action:
                   - 'codedeploy:List*'
                 Resource: !Sub 'arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*'
-        -
-          PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
+        - PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -772,8 +794,7 @@ Resources:
                   - 's3:Get*'
                   - 's3:Put*'
                 Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
-        -
-          PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
+        - PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -786,11 +807,17 @@ Resources:
                 Action:
                   - 'autoscaling:DescribeScalingActivities'
                 Resource: '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 5d9dff3c-9a97-4e99-ad97-ce312fb5754d
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
       Roles:
         - !Ref AirflowRole
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: dd12dfbc-65c8-4ceb-a38f-bc68ce895a95
   Meta:
     Type: 'AWS::CloudFormation::WaitConditionHandle'
     Properties: {}
@@ -811,15 +838,15 @@ Resources:
                 mkdir /airflow
                 chown -R ec2-user /airflow
             mount:
-              test: test ! "$(mount | grep /efs)"
+              test: test ! "$(mount | grep /mnt/efs)"
               command: !Sub |
-                mkdir -p /efs
-                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /efs nfs"
-                param1="nfsvers=4.1,rsize=1048576,wsize=1048576"
-                param2="hard,timeo=600,retrans=2"
-                echo "$fspec $param1,$param2 0 0" >> /etc/fstab
-                mount /efs
-                chown -R ec2-user /efs
+                mkdir -p /mnt/efs
+                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
+                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
+                param="$param,hard,timeo=600,retrans=2,noresvport"
+                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" > /etc/fstab
+                mount /mnt/efs
+                chown -R ec2-user /mnt/efs
         runtime:
           packages:
             yum:
@@ -852,7 +879,7 @@ Resources:
           files:
             /usr/bin/turbine:
               mode: 755
-              content: !Sub |
+              content: |
                 #!/bin/sh
                 if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
                 then exec airflow scheduler
@@ -981,22 +1008,18 @@ Resources:
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
                 LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
-                if [ $PUBLIC = "200" ];
-                then
-                  HOST=$PUB_IPV4
-                else
-                  HOST=$LOC_IPV4
+                if [ $PUBLIC = "200" ]
+                then HOST=$PUB_IPV4
+                else HOST=$LOC_IPV4
                 fi
-                sed -i -e "s~INJECTHOST~$HOST~" \
-                  /etc/sysconfig/airflow
+                sed -i -e "s~INJECTHOST~$HOST~" /etc/sysconfig/airflow
 
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
-                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]; then
-                  if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                    su -c '/usr/local/bin/airflow initdb' ec2-user
-                  else
-                    su -c '/usr/local/bin/airflow upgradedb' ec2-user
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
+                then if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]
+                  then su -c '/usr/local/bin/airflow initdb' ec2-user
+                  else su -c '/usr/local/bin/airflow upgradedb' ec2-user
                   fi
                 else echo "Database setup reserved for the scheduler"
                 fi
@@ -1008,15 +1031,13 @@ Resources:
 
                 systemctl enable airflow.service watcher.path
 
-                if [ "$TURBINE_MACHINE" = "WORKER" ];
-                then
-                  systemctl enable lchkill.timer lchbeat.timer
+                if [ "$TURBINE_MACHINE" = "WORKER" ]
+                then systemctl enable lchkill.timer lchbeat.timer
                 fi
-                if [ "$TURBINE_MACHINE" = "WORKER" ] && [ "$HAS_DEPLOYMENT" = "true" ];
-                then
-                  echo "Deployment pending, deferring service start"
-                else
-                  systemctl start airflow
+                if [ "$TURBINE_MACHINE" = "WORKER" ] && \
+                   [ "$HAS_DEPLOYMENT" = "true" ]
+                then echo "Deployment pending, deferring service start"
+                else systemctl start airflow
                 fi
         metahup:
           files:
@@ -1040,7 +1061,7 @@ Resources:
                   --resource Meta
                 runas=root
             /lib/systemd/system/cfn-hup.service:
-              content: !Sub |
+              content: |
                 [Service]
                 ExecStart=/opt/aws/bin/cfn-hup
                 Restart=always
@@ -1141,26 +1162,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 700
-        'y': 10
-      z: 1
-      embeds: []
-    106e8f70-914f-4976-82ef-bbed5867a36e:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -70
-        'y': 350
-      z: 1
-      embeds: []
-    65ab6416-eeb7-4eb4-9ef2-b373b66b9825:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -70
-        'y': 290
+        x: 720
+        'y': 20
       z: 1
       embeds: []
     0c03e033-c2e8-487d-a0e9-a5bf5e851fcb:
@@ -1168,28 +1171,37 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: -70
-        'y': 470
+        x: 110
+        'y': 450
       z: 1
       embeds: []
-    ac6b099f-6230-48a7-b672-6491406dde55:
+    5d9dff3c-9a97-4e99-ad97-ce312fb5754d:
       size:
         width: 60
         height: 60
       position:
-        x: -70
-        'y': 410
+        x: 260
+        'y': 450
+      z: 1
+      embeds: []
+    dd12dfbc-65c8-4ceb-a38f-bc68ce895a95:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 260
+        'y': 390
       z: 1
       embeds: []
       isassociatedwith:
-        - 106e8f70-914f-4976-82ef-bbed5867a36e
+        - 5d9dff3c-9a97-4e99-ad97-ce312fb5754d
     2330aac6-8c78-44da-a211-6877405896d7:
       size:
         width: 60
         height: 60
       position:
         x: 260
-        'y': 20
+        'y': 40
       z: 1
       embeds: []
     0330ff69-0cd8-47e5-8da2-d34d57ffb441:
@@ -1197,8 +1209,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 350
+        x: -40
+        'y': 510
       z: 1
       embeds: []
     94c385fa-fb13-42cc-a292-7e68c10956f3:
@@ -1206,8 +1218,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 410
+        x: -40
+        'y': 450
       z: 1
       embeds: []
     6266e80e-e4e8-4081-a46e-cc7c09d54222:
@@ -1215,8 +1227,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 470
+        x: -40
+        'y': 390
       z: 1
       embeds: []
     6941c0b8-cdd6-43ca-a936-b30ac47b9bb6:
@@ -1224,19 +1236,55 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 530
+        x: -140
+        'y': 420
       z: 1
       embeds: []
       isassociatedwith:
         - 94c385fa-fb13-42cc-a292-7e68c10956f3
+    1050ffca-0d8e-4d22-9029-fdd893f8610b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 800
+        'y': 390
+      z: 1
+      embeds: []
+    c0427338-3d0a-4d76-b9fe-80a013a6ce55:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 800
+        'y': 510
+      z: 1
+      embeds: []
+    e9dec9e6-a3a5-44bd-a1a5-64fb7434649f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 110
+        'y': 40
+      z: 1
+      embeds: []
+    ae9dafc5-ee81-4e49-abb0-6597b9bea85f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 40
+        'y': 40
+      z: 1
+      embeds: []
     789e4526-8c69-4899-aa8c-300a7772119e:
       size:
         width: 60
         height: 60
       position:
         x: -70
-        'y': 190
+        'y': 210
       z: 1
       embeds: []
     0c8b5845-7f4c-40ec-8505-a6e17371452f:
@@ -1245,7 +1293,7 @@ Metadata:
         height: 220
       position:
         x: 30
-        'y': 120
+        'y': 140
       z: 1
       embeds:
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
@@ -1261,8 +1309,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 450
-        'y': 170
+        x: 460
+        'y': 180
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1273,8 +1321,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 360
-        'y': 270
+        x: 160
+        'y': 280
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1286,7 +1334,7 @@ Metadata:
         height: 60
       position:
         x: 560
-        'y': 270
+        'y': 280
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1297,8 +1345,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 700
-        'y': 270
+        x: 720
+        'y': 280
       z: 1
       embeds: []
       isassociatedwith:
@@ -1310,8 +1358,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 270
+        x: 360
+        'y': 280
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1323,7 +1371,7 @@ Metadata:
         height: 60
       position:
         x: 260
-        'y': 270
+        'y': 280
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1337,11 +1385,11 @@ Metadata:
       z: 1
     30fb8416-de73-44a8-b965-42697ce7803c:
       size:
-        width: 120
-        height: 100
+        width: 80
+        height: 90
       position:
-        x: 30
-        'y': 240
+        x: 40
+        'y': 260
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -1353,8 +1401,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 40
-        'y': 270
+        x: 50
+        'y': 280
       z: 3
       parent: 30fb8416-de73-44a8-b965-42697ce7803c
       embeds: []
@@ -1366,11 +1414,11 @@ Metadata:
         - ec649b6a-0680-463a-9804-e4ba31cc291e
     ea81a163-4d1b-4137-8169-8c84e9c7331b:
       size:
-        width: 280
-        height: 100
+        width: 300
+        height: 110
       position:
-        x: 150
-        'y': 140
+        x: 140
+        'y': 150
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds:
@@ -1385,7 +1433,7 @@ Metadata:
         height: 60
       position:
         x: 260
-        'y': 170
+        'y': 180
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
@@ -1399,8 +1447,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 650
-        'y': 380
+        x: 660
+        'y': 450
       z: 0
       embeds: []
       isassociatedwith:
@@ -1412,8 +1460,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 350
+        x: 550
+        'y': 480
       z: 1
       embeds: []
       isassociatedwith:
@@ -1423,8 +1471,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 360
-        'y': 350
+        x: 440
+        'y': 480
       z: 1
       embeds: []
     99a417bc-21ad-4e5f-b525-7afe1289f3e6:
@@ -1432,8 +1480,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 490
-        'y': 410
+        x: 550
+        'y': 420
       z: 1
       embeds: []
       isassociatedwith:
@@ -1443,17 +1491,40 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 360
-        'y': 410
+        x: 440
+        'y': 420
       z: 1
       embeds: []
+    b961501c-cbb0-4acb-b614-563f6e84933a:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 800
+        'y': 450
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 90184717-25cc-4671-a70d-7becceed5c50
+        - c0427338-3d0a-4d76-b9fe-80a013a6ce55
+    1803c37b-2716-4e56-8145-7c42613be71a:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 660
+        'y': 510
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 90184717-25cc-4671-a70d-7becceed5c50
     832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
       size:
         width: 60
         height: 60
       position:
-        x: 360
-        'y': 170
+        x: 160
+        'y': 180
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
@@ -1469,8 +1540,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 160
-        'y': 170
+        x: 360
+        'y': 180
       z: 3
       parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
       embeds: []
@@ -1489,11 +1560,11 @@ Metadata:
       z: 2
     0559dceb-39c7-40fd-adf9-bb7614b20722:
       size:
-        width: 120
-        height: 100
+        width: 110
+        height: 110
       position:
-        x: 530
-        'y': 140
+        x: 540
+        'y': 150
       z: 2
       parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
       embeds: []
@@ -1504,8 +1575,8 @@ Metadata:
         width: 80
         height: 90
       position:
-        x: 440
-        'y': -10
+        x: 450
+        'y': 10
       z: 1
       embeds:
         - 361321d9-8ef0-4ec0-9f90-32079fd42268
@@ -1517,8 +1588,8 @@ Metadata:
         width: 60
         height: 60
       position:
-        x: 450
-        'y': 10
+        x: 460
+        'y': 30
       z: 2
       parent: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
       embeds: []

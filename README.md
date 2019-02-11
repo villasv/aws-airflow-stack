@@ -1,9 +1,9 @@
 <meta property="og:title" content="Turbine AWS Airflow Stack">
 <meta property="og:description" content="the bare metals behind a complete Airflow setup">
-<meta property="og:image" content="img/turbine.png">
+<meta property="og:image" content="img/logo.png">
 <meta property="og:url" content="https://victor.villas/aws-airflow-stack/">
 <meta name="twitter:card" content="summary">
-<img src="img/turbine.png" align="right" width="25%" />
+<img src="img/logo.png" align="right" width="25%" />
 
 # Turbine [![](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working) [![](https://img.shields.io/github/stars/villasv/aws-airflow-stack.svg?logo=github&style=flat-square)](https://github.com/villasv/aws-airflow-stack)
 
@@ -18,7 +18,7 @@ configure in a few commands.
 
 ## Overview
 
-![Designer](https://raw.githubusercontent.com/villasv/turbine/master/aws/cloud-formation-designer.png)
+![Designer](/aws/cloud-formation-designer.png)
 
 The stack is composed mainly of two EC2 machines, one for the Airflow webserver
 and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
