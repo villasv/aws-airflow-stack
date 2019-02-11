@@ -11,7 +11,7 @@ default_args = {
 dag = DAG(
     dag_id='my_dag',
     default_args=default_args,
-    schedule_interval='* * * * *',
+    schedule_interval='@daily',
 )
 
 for i in range(5):
