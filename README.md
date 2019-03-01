@@ -96,6 +96,37 @@ make deploy stack-name=yourcoolstackname
 > **GOTCHA**: if you rely on the default connections, be sure to configure
 > `aws_default` to use the appropriate region!
 
+## Maintenance and Operation
+
+Sometimes the cluster operators will want to perform some aditional setup, debug
+or just inspect the Airflow services and database. The stack is designed to
+miminize this need, but just in case it also offers decent internal tooling for
+those scenarios.
+
+### Running Airflow commands
+
+The environment variables used by the Airflow service are not immediately
+available for the `ec2-user` when you SSH into one of the instances. Before
+running Airflow commands, you need to use a convenience script exporting the
+right variables:
+
+```bash
+$ source /tmp/env.sh
+$ airflow list_dags
+```
+
+### Inspecting service logs
+
+The Airflow service runs under `systemd`, so logs are available through
+`journalctl`. Most often used arguments include the `--follow` to keep the logs
+coming, or the `--no-pager` to directly dump the text lines, but it offers [much
+more](https://www.freedesktop.org/software/systemd/man/journalctl.html).
+
+```bash
+$ sudo journalctl -u airflow -n 50
+```
+
+
 ## FAQ
 
 1. Why is there an empty `Dummy` subnet in the VPC?

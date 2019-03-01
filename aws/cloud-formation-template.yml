@@ -213,7 +213,7 @@ Resources:
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
             --resource Meta
-          /opt/aws/bin/cfn-signal -e $?
+          /opt/aws/bin/cfn-signal -e $? \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
             --resource AirflowScheduler
@@ -247,7 +247,7 @@ Resources:
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
             --resource Meta
-          /opt/aws/bin/cfn-signal -e $?
+          /opt/aws/bin/cfn-signal -e $? \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
             --resource AirflowWebserver
