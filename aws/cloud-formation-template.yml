@@ -1601,4 +1601,4 @@ Metadata:
 Outputs:
   AirflowEC2PublicDNSName:
     Description: Public DNS Name of the Webserver EC2 instance
-    Value: !Join ["", ["http://", !GetAtt AirflowWebserver.PublicDnsName, ":8080"]]
+    Value: !Join ["", ["http://", !GetAtt AirflowWebserver.PublicDnsName, ":", !Ref WebserverPort]]
