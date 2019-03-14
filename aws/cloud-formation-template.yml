@@ -874,7 +874,9 @@ Resources:
                   apache-airflow[celery,postgres,s3]==1.10.2 \
                   celery[sqs] \
                   billiard==3.5.0.4 \
-                  tenacity==4.12.0
+                  tenacity==4.12.0 \
+                  cryptography==2.6.1 \
+                  crypto==1.4.1
         service:
           files:
             /usr/bin/turbine:
