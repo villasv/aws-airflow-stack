@@ -871,12 +871,11 @@ Resources:
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  apache-airflow[celery,postgres,s3]==1.10.2 \
+                  apache-airflow[celery,postgres,s3,crypto]==1.10.2 \
                   celery[sqs] \
                   billiard==3.5.0.4 \
                   tenacity==4.12.0 \
-                  cryptography==2.6.1 \
-                  crypto==1.4.1
+                  cryptography==2.6.1                 
         service:
           files:
             /usr/bin/turbine:
