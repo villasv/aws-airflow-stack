@@ -875,7 +875,7 @@ Resources:
                   celery[sqs] \
                   billiard==3.5.0.4 \
                   tenacity==4.12.0 \
-                  cryptography==2.6.1                 
+                  cryptography==2.6.1
         service:
           files:
             /usr/bin/turbine:
@@ -908,6 +908,7 @@ Resources:
                   AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
                   AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
+                  AIRFLOW__CORE__FERNET_KEY=INJECT_FERNET_KEY
                 - queue: !GetAtt
                     - Tasks
                     - QueueName
@@ -1004,7 +1005,8 @@ Resources:
             setup:
               command: !Sub |
                 cat /etc/environment >> /etc/sysconfig/airflow
-
+                
+                FERNET_KEY=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print(FERNET_KEY)")
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
@@ -1014,6 +1016,7 @@ Resources:
                 else HOST=$LOC_IPV4
                 fi
                 sed -i -e "s~INJECTHOST~$HOST~" /etc/sysconfig/airflow
+                sed -i -e "s~INJECT_FERNET_KEY~$FERNET_KEY~" /etc/sysconfig/airflow
 
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
