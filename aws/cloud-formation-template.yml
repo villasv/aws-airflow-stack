@@ -875,7 +875,7 @@ Resources:
                   celery[sqs] \
                   billiard==3.5.0.4 \
                   tenacity==4.12.0 \
-                  cryptography==2.6.1
+                  cryptography
         service:
           files:
             /usr/bin/turbine:
