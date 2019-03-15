@@ -1095,9 +1095,14 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 Outputs:
-  AirflowEC2PublicDNSName:
-    Description: Public DNS Name of the Webserver EC2 instance
-    Value: !Join ["", ["http://", !GetAtt AirflowWebserver.PublicDnsName, ":8080"]]
+  AirflowWebserverUrl:
+    Description: Airflow UI endpoint
+    Value: !Join
+      - ""
+      - - "http://"
+        - !GetAtt AirflowWebserver.PublicDnsName
+        - ":"
+        - !Ref WebserverPort
 Mappings:
   RegionToAMI:
     ap-northeast-1:
