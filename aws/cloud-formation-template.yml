@@ -1094,6 +1094,10 @@ Resources:
                 ./install auto
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
+Outputs:
+  AirflowEC2PublicDNSName:
+    Description: Public DNS Name of the Webserver EC2 instance
+    Value: !Join ["", ["http://", !GetAtt AirflowWebserver.PublicDnsName, ":8080"]]
 Mappings:
   RegionToAMI:
     ap-northeast-1:
@@ -1606,8 +1610,3 @@ Metadata:
         - 4816510b-a9fb-467b-a2b6-a85d16656b59
       iscontainedinside:
         - 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
-
-Outputs:
-  AirflowEC2PublicDNSName:
-    Description: Public DNS Name of the Webserver EC2 instance
-    Value: !Join ["", ["http://", !GetAtt AirflowWebserver.PublicDnsName, ":8080"]]
