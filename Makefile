@@ -2,6 +2,9 @@ regions_cmd := aws ec2 describe-regions --query 'Regions[].RegionName | sort_by(
 regions_lst := $(shell $(regions_cmd))
 
 
+lint:
+	cfn-lint templates/*.template
+
 test:
 	taskcat -c ./ci/taskcat.yaml
 
