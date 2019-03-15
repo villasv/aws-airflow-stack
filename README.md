@@ -62,7 +62,8 @@ Kubernetes) and use Airflow only for orchestration.
 - A key file for remote SSH access
   [(Guide)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
 
-- Configured AWS CLI for deploying your own files [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
+- Configured AWS CLI for deploying your own files
+  [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
 
 ### 1. Deploy the stack
 
@@ -83,9 +84,10 @@ The only requirement is that you configure the deployment to copy your Airflow
 home directory to `/airflow`. After crafting your `appspec.yml`, you can use the
 AWS CLI to deploy your project.
 
-For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
-packaging, upload and deployment commands. A minimal working example of an
-Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
+For convenience, you can use this [`Makefile`](/examples/project/Makefile) to
+handle the packaging, upload and deployment commands. A minimal working example
+of an Airflow project to deploy can be found at
+[`examples/project/airflow`](/examples/project/airflow).
 
 If you follow this blueprint, a deployment is as simple as:
 
