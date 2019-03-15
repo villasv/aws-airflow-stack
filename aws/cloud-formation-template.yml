@@ -900,7 +900,7 @@ Resources:
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
                   AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
                   AIRFLOW__CORE__REMOTE_LOGGING=True
-                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECTHOST:${WebserverPort}
+                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECT_HOST:${WebserverPort}
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
                   AIRFLOW__CELERY__BROKER_URL=sqs://
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
@@ -1012,7 +1012,7 @@ Resources:
                 then HOST=$PUB_IPV4
                 else HOST=$LOC_IPV4
                 fi
-                sed -i -e "s~INJECTHOST~$HOST~" /etc/sysconfig/airflow
+                sed -i -e "s~INJECT_HOST~$HOST~" /etc/sysconfig/airflow
 
                 sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
                 source /tmp/env.sh
