@@ -1,0 +1,4 @@
+[
+  { "ParameterKey": "KeyPair", "ParameterValue": "taskcat" },
+  { "ParameterKey": "DbMasterPassword", "ParameterValue": "$[taskcat_genpass_8A]" }
+]
