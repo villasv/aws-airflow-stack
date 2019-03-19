@@ -309,15 +309,11 @@ Resources:
         id: 1803c37b-2716-4e56-8145-7c42613be71a
   LogsBucket:
     Type: 'AWS::S3::Bucket'
-    Properties:
-      BucketName: !Sub '${AWS::StackName}-logs'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ae9dafc5-ee81-4e49-abb0-6597b9bea85f
   DeploymentsBucket:
     Type: 'AWS::S3::Bucket'
-    Properties:
-      BucketName: !Sub '${AWS::StackName}-deployments'
     Metadata:
       'AWS::CloudFormation::Designer':
         id: e9dec9e6-a3a5-44bd-a1a5-64fb7434649f
