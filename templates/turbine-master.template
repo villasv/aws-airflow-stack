@@ -127,7 +127,10 @@ Resources:
   DummySubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: !Sub '${AWS::Region}b'
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - !GetAZs
       CidrBlock: !Ref DummySubnetBlock
       Tags:
         - Key: Name
@@ -139,7 +142,10 @@ Resources:
   StackSubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: !Sub '${AWS::Region}a'
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - !GetAZs
       CidrBlock: !Ref StackSubnetBlock
       MapPublicIpOnLaunch: true
       Tags:
