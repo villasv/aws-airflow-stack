@@ -2,19 +2,31 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
   VpcCidrBlock:
-    Description: The IPv4 CIDR block to be used in the VPC.
+    Description: The CIDR block for the VPC
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.0.0/16
-  DummySubnetBlock:
-    Description: The IPv4 CIDR block to be used in the dummy subnet.
+  PublicSubnetBlock1:
+    Description: The CIDR block for the public Subnet in the first Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-    Default: 10.0.99.0/24
-  StackSubnetBlock:
-    Description: The IPv4 CIDR block to be used in the stack subnet.
+    Default: 10.0.1.0/24
+  PublicSubnetBlock2:
+    Description: The CIDR block for the public Subnet in the second Availability Zone
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Default: 10.0.10.0/24
+  HiddenSubnetBlock1:
+    Description: The CIDR block for the hidden Subnet in the first Availability Zone
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Default: 10.0.11.0/24
+  HiddenSubnetBlock2:
+    Description: The CIDR block for the hidden Subnet in the second Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
@@ -49,15 +61,15 @@ Parameters:
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
-    Default: t3.micro
+    Default: t2.micro
   WebserverInstanceType:
     Description: EC2 instance type to use for the webserver.
     Type: String
-    Default: t3.micro
+    Default: t2.micro
   WorkerInstanceType:
     Description: EC2 instance type to use for the workers.
     Type: String
-    Default: t3.small
+    Default: t2.small
   WorkerConcurrency:
     Description: Number of concurrent units per machine.
     Type: Number
@@ -124,37 +136,61 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-  DummySubnet:
+  PublicSubnet1:
     Type: 'AWS::EC2::Subnet'
     Properties:
       AvailabilityZone:
         Fn::Select:
           - 0
           - !GetAZs
-      CidrBlock: !Ref DummySubnetBlock
+      CidrBlock: !Ref PublicSubnetBlock1
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-dummy'
+          Value: !Sub '${AWS::StackName}-public-subnet-1'
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-  StackSubnet:
+  PublicSubnet2:
     Type: 'AWS::EC2::Subnet'
     Properties:
       AvailabilityZone:
         Fn::Select:
           - 1
           - !GetAZs
-      CidrBlock: !Ref StackSubnetBlock
+      CidrBlock: !Ref PublicSubnetBlock2
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-subnet'
+          Value: !Sub '${AWS::StackName}-public-subnet-2'
       VpcId: !Ref VPC
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea81a163-4d1b-4137-8169-8c84e9c7331b
+  HiddenSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - !GetAZs
+      CidrBlock: !Ref HiddenSubnetBlock1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-hidden-subnet-1'
+      VpcId: !Ref VPC
+  HiddenSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - !GetAZs
+      CidrBlock: !Ref HiddenSubnetBlock2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-hidden-subnet-2'
+      VpcId: !Ref VPC
   Internet:
     Type: 'AWS::EC2::InternetGateway'
     Properties: {}
@@ -191,7 +227,7 @@ Resources:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
     Properties:
       RouteTableId: !Ref Routes
-      SubnetId: !Ref StackSubnet
+      SubnetId: !Ref PublicSubnet2
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
@@ -203,7 +239,7 @@ Resources:
         - RegionToAMI
         - !Ref 'AWS::Region'
         - HVMGP2
-      SubnetId: !Ref StackSubnet
+      SubnetId: !Ref PublicSubnet2
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Control
@@ -237,7 +273,7 @@ Resources:
         - RegionToAMI
         - !Ref 'AWS::Region'
         - HVMGP2
-      SubnetId: !Ref StackSubnet
+      SubnetId: !Ref PublicSubnet2
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
@@ -298,7 +334,7 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:
-        - !Ref StackSubnet
+        - !Ref PublicSubnet2
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
@@ -601,7 +637,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref StackSubnet
+      SubnetId: !Ref PublicSubnet2
       SecurityGroups:
         - !Ref Access
     Metadata:
@@ -612,8 +648,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
       SubnetIds:
-        - !Ref StackSubnet
-        - !Ref DummySubnet
+        - !Ref PublicSubnet2
+        - !Ref PublicSubnet1
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
@@ -1152,8 +1188,10 @@ Metadata:
           default: Networking
         Parameters:
           - VpcCidrBlock
-          - DummySubnetBlock
-          - StackSubnetBlock
+          - PublicSubnetBlock1
+          - PublicSubnetBlock2
+          - HiddenSubnetBlock1
+          - HiddenSubnetBlock2
           - AllowedSshBlock
           - AllowedWebBlock
           - WebserverPort
