@@ -1,6 +1,6 @@
 <img src="img/logo.png" align="right" width="25%" />
 
-# Turbine [![](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working) [![](https://img.shields.io/github/stars/villasv/aws-airflow-stack.svg?logo=github&style=flat-square)](https://github.com/villasv/aws-airflow-stack)
+# Turbine [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working) [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) ![Build Status](https://img.shields.io/scrutinizer/build/g/villasv/aws-airflow-stack.svg?style=flat-square&label=taskcat)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
