@@ -6,6 +6,7 @@ lint:
 	cfn-lint templates/*.template
 
 test:
+	rm -r taskcat_outputs ||:
 	taskcat -c ./ci/taskcat.yaml $(TASKCAT_FLAGS)
 
 sync:
