@@ -1,31 +1,31 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
-  VpcCidrBlock:
+  VPCCIDR:
     Description: The CIDR block for the VPC
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.0.0/16
-  PublicSubnetBlock1:
+  PublicSubnet1CIDR:
     Description: The CIDR block for the public Subnet in the first Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.1.0/24
-  PublicSubnetBlock2:
+  PublicSubnet2CIDR:
     Description: The CIDR block for the public Subnet in the second Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.10.0/24
-  HiddenSubnetBlock1:
+  PrivateSubnet1ACIDR:
     Description: The CIDR block for the hidden Subnet in the first Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.11.0/24
-  HiddenSubnetBlock2:
+  PrivateSubnet2ACIDR:
     Description: The CIDR block for the hidden Subnet in the second Availability Zone
     Type: String
     AllowedPattern: >-
@@ -123,114 +123,58 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
+  QSS3BucketName:
+    Description: >-
+      S3 bucket name for the Quick Start assets. This bucket name can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-), but should
+      not start or end with a hyphen. You can specify your own bucket if you
+      copy all of the assets and submodules into it, if you want to override the
+      Quick Start behavior for your specific implementation.
+    Type: String
+    Default: aws-quickstart
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: >-
+      Quick Start bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
+  QSS3KeyPrefix:
+    Description: >-
+      S3 key prefix for the Quick Start assets. Quick Start key prefix can
+      include numbers, lowercase letters, uppercase letters, hyphens (-), and
+      forward slash (/).
+    Type: String
+    Default: quickstart-citrix-virtualapps-service/
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
+
 Resources:
-  VPC:
-    Type: 'AWS::EC2::VPC'
+
+  VPCStack:
+    Type: 'AWS::CloudFormation::Stack'
     Properties:
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      CidrBlock: !Ref VpcCidrBlock
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-vpc'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-  PublicSubnet1:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - !GetAZs
-      CidrBlock: !Ref PublicSubnetBlock1
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-public-subnet-1'
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0559dceb-39c7-40fd-adf9-bb7614b20722
-  PublicSubnet2:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - !GetAZs
-      CidrBlock: !Ref PublicSubnetBlock2
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-public-subnet-2'
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-  HiddenSubnet1:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - !GetAZs
-      CidrBlock: !Ref HiddenSubnetBlock1
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-hidden-subnet-1'
-      VpcId: !Ref VPC
-  HiddenSubnet2:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - !GetAZs
-      CidrBlock: !Ref HiddenSubnetBlock2
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-hidden-subnet-2'
-      VpcId: !Ref VPC
-  Internet:
-    Type: 'AWS::EC2::InternetGateway'
-    Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 789e4526-8c69-4899-aa8c-300a7772119e
-  Routes:
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 30fb8416-de73-44a8-b965-42697ce7803c
-  Opener:
-    Type: 'AWS::EC2::Route'
-    Properties:
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref Internet
-      RouteTableId: !Ref Routes
-    DependsOn:
-      - VPCGatewayAttachment
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 1c52f5bf-8a65-4ee6-b601-810e47a51751
-  VPCGatewayAttachment:
-    Type: 'AWS::EC2::VPCGatewayAttachment'
-    Properties:
-      InternetGatewayId: !Ref Internet
-      VpcId: !Ref VPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ec649b6a-0680-463a-9804-e4ba31cc291e
-  SubnetRouteTableAssociation:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Properties:
-      RouteTableId: !Ref Routes
-      SubnetId: !Ref PublicSubnet2
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 6ee4ffa7-3fb0-4326-993a-9516025fd0b7
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}submodules
+          - quickstart-aws-vpc/templates/aws-vpc.template
+      Parameters:
+        VPCCIDR: !Ref VPCCIDR
+        PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+        PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
+        CreatePrivateSubnets: 'true'
+        PrivateSubnet1ACIDR: !Ref PrivateSubnet1ACIDR
+        PrivateSubnet2ACIDR: !Ref PrivateSubnet2ACIDR
+        NumberOfAZs: '2'
+        AvailabilityZones: !Join
+          - ','
+          - - Fn::Select:
+              - 0
+              - !GetAZs
+            - Fn::Select:
+              - 1
+              - !GetAZs
+
   AirflowScheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -239,7 +183,7 @@ Resources:
         - RegionToAMI
         - !Ref 'AWS::Region'
         - HVMGP2
-      SubnetId: !Ref PublicSubnet2
+      SubnetId: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Control
@@ -273,7 +217,7 @@ Resources:
         - RegionToAMI
         - !Ref 'AWS::Region'
         - HVMGP2
-      SubnetId: !Ref PublicSubnet2
+      SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1AID
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
@@ -334,7 +278,8 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:
-        - !Ref PublicSubnet2
+        - !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        - !GetAtt VPCStack.Outputs.PrivateSubnet2AID
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
@@ -637,7 +582,7 @@ Resources:
     Type: 'AWS::EFS::MountTarget'
     Properties:
       FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PublicSubnet2
+      SubnetId: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
       SecurityGroups:
         - !Ref Access
     Metadata:
@@ -648,8 +593,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
       SubnetIds:
-        - !Ref PublicSubnet2
-        - !Ref PublicSubnet1
+        - !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        - !GetAtt VPCStack.Outputs.PrivateSubnet2AID
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
@@ -684,11 +629,11 @@ Resources:
         Security Rules with permissions for the shared filesystem across Airflow
         instances.
       SecurityGroupIngress:
-        - CidrIp: !Ref VpcCidrBlock
+        - CidrIp: !Ref VPCCIDR
           IpProtocol: TCP
           FromPort: 2049
           ToPort: 2049
-      VpcId: !Ref VPC
+      VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-access'
@@ -702,7 +647,7 @@ Resources:
         Security Rules with permissions for node intercommunication between
         Airflow instances and remote access.
       SecurityGroupIngress:
-        - CidrIp: !Ref VpcCidrBlock
+        - CidrIp: !Ref VPCCIDR
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
@@ -710,7 +655,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
-      VpcId: !Ref VPC
+      VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-control'
@@ -724,7 +669,7 @@ Resources:
         Security Rules with permissions for node itercommunication between
         Airflow worker instances.
       SecurityGroupIngress:
-        - CidrIp: !Ref VpcCidrBlock
+        - CidrIp: !Ref VPCCIDR
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
@@ -732,7 +677,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
-      VpcId: !Ref VPC
+      VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-comms'
@@ -752,7 +697,7 @@ Resources:
           IpProtocol: TCP
           FromPort: 22
           ToPort: 22
-      VpcId: !Ref VPC
+      VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-web'
@@ -764,11 +709,11 @@ Resources:
     Properties:
       GroupDescription: Security Rules with permissions for database connections for Airflow.
       SecurityGroupIngress:
-        - CidrIp: !Ref VpcCidrBlock
+        - CidrIp: !Ref VPCCIDR
           IpProtocol: TCP
           FromPort: 5432
           ToPort: 5432
-      VpcId: !Ref VPC
+      VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-connection'
@@ -1187,11 +1132,11 @@ Metadata:
       - Label:
           default: Networking
         Parameters:
-          - VpcCidrBlock
-          - PublicSubnetBlock1
-          - PublicSubnetBlock2
-          - HiddenSubnetBlock1
-          - HiddenSubnetBlock2
+          - VPCCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1ACIDR
+          - PrivateSubnet2ACIDR
           - AllowedSshBlock
           - AllowedWebBlock
           - WebserverPort
@@ -1214,444 +1159,3 @@ Metadata:
         Parameters:
           - LoadExampleDags
           - LoadDefaultConns
-  'AWS::CloudFormation::Designer':
-    7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 720
-        'y': 20
-      z: 1
-      embeds: []
-    0c03e033-c2e8-487d-a0e9-a5bf5e851fcb:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 110
-        'y': 450
-      z: 1
-      embeds: []
-    5d9dff3c-9a97-4e99-ad97-ce312fb5754d:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 260
-        'y': 450
-      z: 1
-      embeds: []
-    dd12dfbc-65c8-4ceb-a38f-bc68ce895a95:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 260
-        'y': 390
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 5d9dff3c-9a97-4e99-ad97-ce312fb5754d
-    2330aac6-8c78-44da-a211-6877405896d7:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 260
-        'y': 40
-      z: 1
-      embeds: []
-    0330ff69-0cd8-47e5-8da2-d34d57ffb441:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -40
-        'y': 510
-      z: 1
-      embeds: []
-    94c385fa-fb13-42cc-a292-7e68c10956f3:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -40
-        'y': 450
-      z: 1
-      embeds: []
-    6266e80e-e4e8-4081-a46e-cc7c09d54222:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -40
-        'y': 390
-      z: 1
-      embeds: []
-    6941c0b8-cdd6-43ca-a936-b30ac47b9bb6:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -140
-        'y': 420
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 94c385fa-fb13-42cc-a292-7e68c10956f3
-    1050ffca-0d8e-4d22-9029-fdd893f8610b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 800
-        'y': 390
-      z: 1
-      embeds: []
-    c0427338-3d0a-4d76-b9fe-80a013a6ce55:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 800
-        'y': 510
-      z: 1
-      embeds: []
-    e9dec9e6-a3a5-44bd-a1a5-64fb7434649f:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 110
-        'y': 40
-      z: 1
-      embeds: []
-    ae9dafc5-ee81-4e49-abb0-6597b9bea85f:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 40
-        'y': 40
-      z: 1
-      embeds: []
-    789e4526-8c69-4899-aa8c-300a7772119e:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: -70
-        'y': 210
-      z: 1
-      embeds: []
-    0c8b5845-7f4c-40ec-8505-a6e17371452f:
-      size:
-        width: 630
-        height: 220
-      position:
-        x: 30
-        'y': 140
-      z: 1
-      embeds:
-        - 4816510b-a9fb-467b-a2b6-a85d16656b59
-        - 401bffa6-76b7-4606-84ca-41c85dc73c30
-        - 52db1638-dd50-4e4a-be69-d5efb987900b
-        - ea67a2be-98cb-48db-8c0c-89fe99de522b
-        - 245a8e14-0dbf-42f3-a982-e206e15083b9
-        - 30fb8416-de73-44a8-b965-42697ce7803c
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-        - 0559dceb-39c7-40fd-adf9-bb7614b20722
-    4816510b-a9fb-467b-a2b6-a85d16656b59:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 460
-        'y': 180
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    401bffa6-76b7-4606-84ca-41c85dc73c30:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 160
-        'y': 280
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    52db1638-dd50-4e4a-be69-d5efb987900b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 560
-        'y': 280
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    535f86f4-9cef-4823-b8bd-888153ca3b7e:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 720
-        'y': 280
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 52db1638-dd50-4e4a-be69-d5efb987900b
-      dependson:
-        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
-    ea67a2be-98cb-48db-8c0c-89fe99de522b:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 360
-        'y': 280
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    245a8e14-0dbf-42f3-a982-e206e15083b9:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 260
-        'y': 280
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    ec649b6a-0680-463a-9804-e4ba31cc291e:
-      source:
-        id: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      target:
-        id: 789e4526-8c69-4899-aa8c-300a7772119e
-      z: 1
-    30fb8416-de73-44a8-b965-42697ce7803c:
-      size:
-        width: 80
-        height: 90
-      position:
-        x: 40
-        'y': 260
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds:
-        - 1c52f5bf-8a65-4ee6-b601-810e47a51751
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    1c52f5bf-8a65-4ee6-b601-810e47a51751:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 50
-        'y': 280
-      z: 3
-      parent: 30fb8416-de73-44a8-b965-42697ce7803c
-      embeds: []
-      isassociatedwith:
-        - 789e4526-8c69-4899-aa8c-300a7772119e
-      iscontainedinside:
-        - 30fb8416-de73-44a8-b965-42697ce7803c
-      dependson:
-        - ec649b6a-0680-463a-9804-e4ba31cc291e
-    ea81a163-4d1b-4137-8169-8c84e9c7331b:
-      size:
-        width: 300
-        height: 110
-      position:
-        x: 140
-        'y': 150
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds:
-        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-        - 8c059690-0ad1-4922-b823-710c5ead3726
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 260
-        'y': 180
-      z: 3
-      parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      embeds: []
-      isassociatedwith:
-        - 2330aac6-8c78-44da-a211-6877405896d7
-        - 245a8e14-0dbf-42f3-a982-e206e15083b9
-      iscontainedinside:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-    90184717-25cc-4671-a70d-7becceed5c50:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 660
-        'y': 450
-      z: 0
-      embeds: []
-      isassociatedwith:
-        - 535f86f4-9cef-4823-b8bd-888153ca3b7e
-      iscontainedinside:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-    f12da049-cd8c-4011-8c3f-650b4463a007:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 550
-        'y': 480
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 90184717-25cc-4671-a70d-7becceed5c50
-    c2b1083d-7823-4926-bb80-1c17a3f52a53:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 440
-        'y': 480
-      z: 1
-      embeds: []
-    99a417bc-21ad-4e5f-b525-7afe1289f3e6:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 550
-        'y': 420
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 90184717-25cc-4671-a70d-7becceed5c50
-    97a1ff17-654e-4f74-bb6b-10c988a5e6e9:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 440
-        'y': 420
-      z: 1
-      embeds: []
-    b961501c-cbb0-4acb-b614-563f6e84933a:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 800
-        'y': 450
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 90184717-25cc-4671-a70d-7becceed5c50
-        - c0427338-3d0a-4d76-b9fe-80a013a6ce55
-    1803c37b-2716-4e56-8145-7c42613be71a:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 660
-        'y': 510
-      z: 1
-      embeds: []
-      isassociatedwith:
-        - 90184717-25cc-4671-a70d-7becceed5c50
-    832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 160
-        'y': 180
-      z: 3
-      parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      embeds: []
-      isassociatedwith:
-        - 401bffa6-76b7-4606-84ca-41c85dc73c30
-      iscontainedinside:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-      dependson:
-        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
-    8c059690-0ad1-4922-b823-710c5ead3726:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 360
-        'y': 180
-      z: 3
-      parent: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      embeds: []
-      isassociatedwith:
-        - ea67a2be-98cb-48db-8c0c-89fe99de522b
-      iscontainedinside:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-      dependson:
-        - d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
-        - 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
-    6ee4ffa7-3fb0-4326-993a-9516025fd0b7:
-      source:
-        id: 30fb8416-de73-44a8-b965-42697ce7803c
-      target:
-        id: ea81a163-4d1b-4137-8169-8c84e9c7331b
-      z: 2
-    0559dceb-39c7-40fd-adf9-bb7614b20722:
-      size:
-        width: 110
-        height: 110
-      position:
-        x: 540
-        'y': 150
-      z: 2
-      parent: 0c8b5845-7f4c-40ec-8505-a6e17371452f
-      embeds: []
-      iscontainedinside:
-        - 0c8b5845-7f4c-40ec-8505-a6e17371452f
-    9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54:
-      size:
-        width: 80
-        height: 90
-      position:
-        x: 450
-        'y': 10
-      z: 1
-      embeds:
-        - 361321d9-8ef0-4ec0-9f90-32079fd42268
-      iscontainedinside:
-        - ea81a163-4d1b-4137-8169-8c84e9c7331b
-        - 0559dceb-39c7-40fd-adf9-bb7614b20722
-    361321d9-8ef0-4ec0-9f90-32079fd42268:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 460
-        'y': 30
-      z: 2
-      parent: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
-      embeds: []
-      isassociatedwith:
-        - 4816510b-a9fb-467b-a2b6-a85d16656b59
-      iscontainedinside:
-        - 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
