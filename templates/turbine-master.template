@@ -217,7 +217,7 @@ Resources:
         - RegionToAMI
         - !Ref 'AWS::Region'
         - HVMGP2
-      SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1AID
+      SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1ID
       KeyName: !Ref KeyPair
       SecurityGroupIds:
         - !Ref Web
