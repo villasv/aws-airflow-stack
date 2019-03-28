@@ -10,7 +10,7 @@ test:
 	taskcat -c ./ci/taskcat.yaml $(TASKCAT_FLAGS)
 
 sync:
-	aws s3 cp . s3://villasv/quickstart-turbine-airflow --recursive --acl public-read --exclude '.*'
+	aws s3 sync . s3://villasv/quickstart-turbine-airflow --acl public-read --exclude '.*'
 
 
 

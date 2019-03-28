@@ -142,7 +142,7 @@ Parameters:
       include numbers, lowercase letters, uppercase letters, hyphens (-), and
       forward slash (/).
     Type: String
-    Default: quickstart-airflow-turbine/
+    Default: quickstart-turbine-airflow/
     AllowedPattern: '^[0-9a-zA-Z-/]*$'
     ConstraintDescription: >-
       Quick Start key prefix can include numbers, lowercase letters, uppercase
