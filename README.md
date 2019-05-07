@@ -33,7 +33,7 @@ to begin with.
 
 There's also an EFS shared directory mounted at at `/mnt/efs`, which can be
 useful for staging files potentially used by workers on different machines and
-other syncrhonization scenarios commonly found in ETL/Big Data applications. It
+other synchronization scenarios commonly found in ETL/Big Data applications. It
 facilitates migrating legacy workloads not ready for running on distributed
 workers.
 
@@ -58,9 +58,6 @@ Kubernetes) and use Airflow only for orchestration.
 ## Get It Working
 
 ### 0. Prerequisites
-
-- A key file for remote SSH access
-  [(Guide)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
 
 - Configured AWS CLI for deploying your own files
   [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
@@ -100,17 +97,25 @@ make deploy stack-name=yourcoolstackname
 
 ## Maintenance and Operation
 
-Sometimes the cluster operators will want to perform some aditional setup, debug
-or just inspect the Airflow services and database. The stack is designed to
-miminize this need, but just in case it also offers decent internal tooling for
-those scenarios.
+Sometimes the cluster operators will want to perform some additional setup,
+debug or just inspect the Airflow services and database. The stack is designed
+to minimize this need, but just in case it also offers decent internal tooling
+for those scenarios.
+
+### Using Systems Manager Sessions
+
+Instead of the usual SSH procedure, this stack encourages the use of AWS Systems
+Manager Sessions for increased security and auditing capabilities. You can still
+use the CLI after a bit more configuration and not having to expose your
+instances or creating bastion instances is worth the effort. You can read more
+about it in the Session Manager
+[docs](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html).
 
 ### Running Airflow commands
 
 The environment variables used by the Airflow service are not immediately
-available for the `ec2-user` when you SSH into one of the instances. Before
-running Airflow commands, you need to use a convenience script exporting the
-right variables:
+available in the shell. Before running Airflow commands, you need to use a
+convenience script exporting the right variables:
 
 ```bash
 $ source /tmp/env.sh
@@ -131,14 +136,7 @@ $ sudo journalctl -u airflow -n 50
 
 ## FAQ
 
-1. Why is there an empty `Dummy` subnet in the VPC?
-
-    There's no official support on CloudFormation for choosing in which VPC a
-    RDS Instance is deployed. The only alternatives are to let it live in the
-    default VPC and communicate with peering or to use DBSubnetGroup, which
-    requires associated subnets that cover at least 2 Availability Zones.
-
-2. Why does auto scaling takes so long to kick in?
+1. Why does auto scaling takes so long to kick in?
 
     AWS doesn't provide minute-level granularity on SQS metrics, only 5 minute
     aggregates. Also, CloudWatch stamps aggregate metrics with their initial
@@ -146,7 +144,7 @@ $ sudo journalctl -u airflow -n 50
     the past. This is why the load metric is always 5~10 minutes delayed. To
     avoid oscillating allocations, the alarm action has a 10 minutes cooldown.
 
-3. Why can't I stop running tasks by terminating all workers?
+2. Why can't I stop running tasks by terminating all workers?
 
     Workers have lifecycle hooks that make sure to wait for Celery to finish its
     tasks before allowing EC2 to terminate that instance (except maybe for Spot

@@ -31,14 +31,6 @@ Parameters:
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.11.0/24
-  AllowedSshBlock:
-    Description: >-
-      The IPv4 CIDR block to allow SSH access in all machines. The default of
-      0.0.0.0/0 allows SSH from everywhere, which is convenient but less secure.
-    Type: String
-    AllowedPattern: >-
-      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-    Default: 0.0.0.0/0
   AllowedWebBlock:
     Description: >-
       The IPv4 CIDR block to allow HTTP access in the webserver. The default of
@@ -651,10 +643,6 @@ Resources:
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
-        - CidrIp: !Ref AllowedSshBlock
-          IpProtocol: TCP
-          FromPort: 22
-          ToPort: 22
       VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
@@ -673,10 +661,6 @@ Resources:
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
-        - CidrIp: !Ref AllowedSshBlock
-          IpProtocol: TCP
-          FromPort: 22
-          ToPort: 22
       VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
@@ -693,10 +677,6 @@ Resources:
           IpProtocol: TCP
           FromPort: !Ref WebserverPort
           ToPort: !Ref WebserverPort
-        - CidrIp: !Ref AllowedSshBlock
-          IpProtocol: TCP
-          FromPort: 22
-          ToPort: 22
       VpcId: !GetAtt VPCStack.Outputs.VPCID
       Tags:
         - Key: Name
@@ -1138,7 +1118,6 @@ Metadata:
           - PublicSubnet2CIDR
           - PrivateSubnet1ACIDR
           - PrivateSubnet2ACIDR
-          - AllowedSshBlock
           - AllowedWebBlock
           - WebserverPort
       - Label:
