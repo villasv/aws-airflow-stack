@@ -69,7 +69,7 @@ Parameters:
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
-    Default: 0
+    Default: 1
   MaxGroupSize:
     Description: The maximum number of active worker instances.
     Type: Number
