@@ -13,15 +13,14 @@ configure in a few commands.
 
 ## Overview
 
-![template designer diagram](/img/template.png)
+![stack diagram](/img/stack-diagram.png)
 
-The stack is composed mainly of two EC2 machines, one for the Airflow webserver
-and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
-for Airflow workers. Supporting resources include an RDS instance to host the
-Airflow metadata database, an SQS instance to be used as broker backend, S3
-buckets for logs and deployment bundles, an EFS instance to serve as shared
-directory, and auto scaling metrics, alarms and triggers. All other resources
-are the usual boilerplate to keep the wind blowing.
+The stack is composed mainly of three services: the Airflow web server, the
+Airflow scheduler, and the Airflow worker. Supporting resources include an RDS
+to host the Airflow metadata database, an SQS to be used as broker backend, S3
+buckets for logs and deployment bundles, an EFS to serve as shared directory,
+and a custom CloudWatch metric measured by a timed AWS Lambda. All other
+resources are the usual boilerplate to keep the wind blowing.
 
 ### Deployment and File Sharing
 
