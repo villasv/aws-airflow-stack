@@ -8,9 +8,9 @@ Parameters:
     Type: String
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  PrivateSubnet1AID:
+  PublicSubnet1AID:
     Type: String
-  PrivateSubnet2AID:
+  PublicSubnet2AID:
     Type: String
 
 Resources:
@@ -25,7 +25,7 @@ Resources:
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=SCHEDULER' > /etc/environment
+          echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
@@ -40,11 +40,11 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:
-        - !Ref PrivateSubnet1AID
-        - !Ref PrivateSubnet2AID
+        - !Ref PublicSubnet1AID
+        - !Ref PublicSubnet2AID
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-scheduler
+          Value: !Sub ${AWS::StackName}-webserver
           PropagateAtLaunch: true
 
 Outputs:

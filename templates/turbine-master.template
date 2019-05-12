@@ -143,7 +143,7 @@ Parameters:
 Resources:
 
   VPCStack:
-    Type: 'AWS::CloudFormation::Stack'
+    Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
         - '/'
@@ -176,8 +176,6 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-scheduler-group.template
       Parameters:
-        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI
@@ -185,6 +183,27 @@ Resources:
           - HVMGP2
         InstanceType: !Ref SchedulerInstanceType
         KeyName: !Ref KeyPair
+        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+
+  WebserverStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-webserver-group.template
+      Parameters:
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref AWS::Region
+          - HVMGP2
+        InstanceType: !Ref WebserverInstanceType
+        KeyName: !Ref KeyPair
+        PublicSubnet1AID: !GetAtt VPCStack.Outputs.PublicSubnet1AID
+        PublicSubnet2AID: !GetAtt VPCStack.Outputs.PublicSubnet2AID
 
   WorkersStack:
     Type: AWS::CloudFormation::Stack
@@ -197,8 +216,6 @@ Resources:
       Parameters:
         VPCID: !GetAtt VPCStack.Outputs.VPCID
         LogIngressCIDR: !Ref VPCCIDR
-        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI
@@ -206,45 +223,12 @@ Resources:
           - HVMGP2
         InstanceType: !Ref WorkerInstanceType
         KeyName: !Ref KeyPair
+        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
         MinSize: !Ref MinGroupSize
         MaxSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
-
-  AirflowWebserver:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: !Ref WebserverInstanceType
-      ImageId: !FindInMap
-        - RegionToAMI
-        - !Ref 'AWS::Region'
-        - HVMGP2
-      SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1ID
-      KeyName: !Ref KeyPair
-      SecurityGroupIds:
-        - !Ref Web
-      IamInstanceProfile: !Ref AirflowProfile
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-webserver'
-      UserData: !Base64
-        'Fn::Sub': |
-          #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource Meta
-          /opt/aws/bin/cfn-signal -e $? \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource AirflowWebserver
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 832c87d0-e3dd-49c7-9a1c-bd20d1eadbbb
-    DependsOn:
-      - EfsMountTarget
-      - Meta
 
   LogsBucket:
     Type: 'AWS::S3::Bucket'
@@ -270,6 +254,8 @@ Resources:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
       AutoScalingGroups:
+        - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
+        - !GetAtt WebserverStack.Outputs.AutoScalingGroup
         - !GetAtt WorkersStack.Outputs.AutoScalingGroup
       Ec2TagSet:
         Ec2TagSetList:
@@ -924,15 +910,7 @@ Resources:
                 ./install auto
       'AWS::CloudFormation::Designer':
         id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
-Outputs:
-  AirflowWebserverUrl:
-    Description: Airflow UI endpoint
-    Value: !Join
-      - ""
-      - - "http://"
-        - !GetAtt AirflowWebserver.PublicDnsName
-        - ":"
-        - !Ref WebserverPort
+
 Mappings:
   RegionToAMI:
     ap-northeast-1:
@@ -973,6 +951,7 @@ Mappings:
       HVMGP2: ami-01beb64058d271bc4
     us-west-2:
       HVMGP2: ami-061e7ebbc234015fe
+
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
