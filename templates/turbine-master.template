@@ -202,8 +202,8 @@ Resources:
           - HVMGP2
         InstanceType: !Ref WebserverInstanceType
         KeyName: !Ref KeyPair
-        PublicSubnet1AID: !GetAtt VPCStack.Outputs.PublicSubnet1AID
-        PublicSubnet2AID: !GetAtt VPCStack.Outputs.PublicSubnet2AID
+        PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
+        PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
 
   WorkersStack:
     Type: AWS::CloudFormation::Stack

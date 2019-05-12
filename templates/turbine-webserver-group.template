@@ -8,9 +8,9 @@ Parameters:
     Type: String
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  PublicSubnet1AID:
+  PublicSubnet1ID:
     Type: String
-  PublicSubnet2AID:
+  PublicSubnet2ID:
     Type: String
 
 Resources:
@@ -40,8 +40,8 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:
-        - !Ref PublicSubnet1AID
-        - !Ref PublicSubnet2AID
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-webserver
