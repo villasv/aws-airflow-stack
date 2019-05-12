@@ -183,7 +183,7 @@ Resources:
           - RegionToAMI
           - !Ref AWS::Region
           - HVMGP2
-        InstanceType: !Ref WorkerInstanceType
+        InstanceType: !Ref SchedulerInstanceType
         KeyName: !Ref KeyPair
 
   WorkersStack:

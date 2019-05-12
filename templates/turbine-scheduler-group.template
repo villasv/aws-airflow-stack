@@ -1,23 +1,17 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  PrivateSubnet1AID:
-    Description: The ID of the hidden Subnet in the first Availability Zone.
-    Type: String
-  PrivateSubnet2AID:
-    Description: The ID of the hidden Subnet in the second Availability Zone.
-    Type: String
   IamInstanceProfile:
-    Description: The Instance Profile with the required IAM policies.
     Type: String
   ImageId:
-    Description: EC2 image id to use for the workers.
     Type: AWS::EC2::Image::Id
   InstanceType:
-    Description: EC2 instance type to use for the workers.
     Type: String
   KeyName:
-    Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
     Type: AWS::EC2::KeyPair::KeyName
+  PrivateSubnet1AID:
+    Type: String
+  PrivateSubnet2AID:
+    Type: String
 
 Resources:
 
