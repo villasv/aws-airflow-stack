@@ -12,4 +12,3 @@ tests:
   default:
     parameter_input: parameters-default.json
     template_file: turbine-master.template
-
