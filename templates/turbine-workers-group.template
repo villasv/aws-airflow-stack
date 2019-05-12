@@ -70,6 +70,10 @@ Resources:
       VPCZoneIdentifier:
         - !Ref PrivateSubnet1AID
         - !Ref PrivateSubnet2AID
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-worker
+          PropagateAtLaunch: true
 
   LifecycleHook:
     Type: AWS::AutoScaling::LifecycleHook

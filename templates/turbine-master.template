@@ -167,8 +167,27 @@ Resources:
               - 1
               - !GetAZs
 
+  SchedulerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-scheduler-group.template
+      Parameters:
+        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref AWS::Region
+          - HVMGP2
+        InstanceType: !Ref WorkerInstanceType
+        KeyName: !Ref KeyPair
+
   WorkersStack:
-    Type: 'AWS::CloudFormation::Stack'
+    Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
         - '/'
@@ -192,40 +211,6 @@ Resources:
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
 
-  AirflowScheduler:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: !Ref SchedulerInstanceType
-      ImageId: !FindInMap
-        - RegionToAMI
-        - !Ref 'AWS::Region'
-        - HVMGP2
-      SubnetId: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-      KeyName: !Ref KeyPair
-      SecurityGroupIds:
-        - !Ref Control
-      IamInstanceProfile: !Ref AirflowProfile
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-scheduler'
-      UserData: !Base64
-        'Fn::Sub': |
-          #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=SCHEDULER' > /etc/environment
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource Meta
-          /opt/aws/bin/cfn-signal -e $? \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource AirflowScheduler
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 8c059690-0ad1-4922-b823-710c5ead3726
-    DependsOn:
-      - EfsMountTarget
-      - Meta
   AirflowWebserver:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -549,24 +534,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-  Control:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for node intercommunication between
-        Airflow instances and remote access.
-      SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
-          IpProtocol: TCP
-          FromPort: 8793
-          ToPort: 8793
-      VpcId: !GetAtt VPCStack.Outputs.VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-control'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ea67a2be-98cb-48db-8c0c-89fe99de522b
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
