@@ -167,6 +167,31 @@ Resources:
               - 1
               - !GetAZs
 
+  WorkersStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-workers-group.template
+      Parameters:
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
+        LogIngressCIDR: !Ref VPCCIDR
+        PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref 'AWS::Region'
+          - HVMGP2
+        InstanceType: !Ref WorkerInstanceType
+        KeyName: !Ref KeyPair
+        MinSize: !Ref MinGroupSize
+        MaxSize: !Ref MaxGroupSize
+        GrowthThreshold: !Ref GrowthThreshold
+        ShrinkThreshold: !Ref ShrinkThreshold
+
   AirflowScheduler:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -235,57 +260,7 @@ Resources:
     DependsOn:
       - EfsMountTarget
       - Meta
-  AirflowWorkerConfig:
-    Type: 'AWS::AutoScaling::LaunchConfiguration'
-    Properties:
-      ImageId: !FindInMap
-        - RegionToAMI
-        - !Ref 'AWS::Region'
-        - HVMGP2
-      InstanceType: !Ref WorkerInstanceType
-      KeyName: !Ref KeyPair
-      SecurityGroups:
-        - !Ref Comms
-      IamInstanceProfile: !Ref AirflowProfile
-      UserData: !Base64
-        'Fn::Sub': |
-          #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=WORKER' > /etc/environment
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource Meta
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 535f86f4-9cef-4823-b8bd-888153ca3b7e
-    DependsOn:
-      - Meta
-  AutoScalingGroup:
-    Type: 'AWS::AutoScaling::AutoScalingGroup'
-    Properties:
-      AutoScalingGroupName: !Sub '${AWS::StackName}-scaling-group'
-      LaunchConfigurationName: !Ref AirflowWorkerConfig
-      MinSize: !Ref MinGroupSize
-      MaxSize: !Ref MaxGroupSize
-      MetricsCollection:
-        - Granularity: 1Minute
-      VPCZoneIdentifier:
-        - !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-        - !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 90184717-25cc-4671-a70d-7becceed5c50
-  AutoScalingHook:
-    Type: 'AWS::AutoScaling::LifecycleHook'
-    Properties:
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      DefaultResult: CONTINUE
-      HeartbeatTimeout: 300
-      LifecycleHookName: !Sub '${AWS::StackName}-scaling-lfhook'
-      LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 1803c37b-2716-4e56-8145-7c42613be71a
+
   LogsBucket:
     Type: 'AWS::S3::Bucket'
     Metadata:
@@ -310,7 +285,7 @@ Resources:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
       AutoScalingGroups:
-        - !Ref AutoScalingGroup
+        - !GetAtt WorkersStack.Outputs.AutoScalingGroup
       Ec2TagSet:
         Ec2TagSetList:
           - Ec2TagGroup:
@@ -503,64 +478,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 6941c0b8-cdd6-43ca-a936-b30ac47b9bb6
-  Shrink:
-    Type: 'AWS::CloudWatch::Alarm'
-    Properties:
-      AlarmActions:
-        - !Ref ScaleIn
-      Namespace: Turbine
-      MetricName: WorkerLoad
-      Dimensions:
-        - Name: StackName
-          Value: !Ref 'AWS::StackName'
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: !Ref ShrinkThreshold
-      ComparisonOperator: LessThanOrEqualToThreshold
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 97a1ff17-654e-4f74-bb6b-10c988a5e6e9
-  Growth:
-    Type: 'AWS::CloudWatch::Alarm'
-    Properties:
-      AlarmActions:
-        - !Ref ScaleOut
-      Namespace: Turbine
-      MetricName: WorkerLoad
-      Dimensions:
-        - Name: StackName
-          Value: !Ref 'AWS::StackName'
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: !Ref GrowthThreshold
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: c2b1083d-7823-4926-bb80-1c17a3f52a53
-  ScaleIn:
-    Type: 'AWS::AutoScaling::ScalingPolicy'
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      PolicyType: SimpleScaling
-      ScalingAdjustment: -1
-      Cooldown: '600'
-      AutoScalingGroupName: !Ref AutoScalingGroup
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 99a417bc-21ad-4e5f-b525-7afe1289f3e6
-  ScaleOut:
-    Type: 'AWS::AutoScaling::ScalingPolicy'
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      PolicyType: SimpleScaling
-      ScalingAdjustment: 1
-      Cooldown: '600'
-      AutoScalingGroupName: !Ref AutoScalingGroup
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: f12da049-cd8c-4011-8c3f-650b4463a007
   EfsFileSystem:
     Type: 'AWS::EFS::FileSystem'
     Properties:
@@ -650,24 +567,6 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: ea67a2be-98cb-48db-8c0c-89fe99de522b
-  Comms:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for node itercommunication between
-        Airflow worker instances.
-      SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
-          IpProtocol: TCP
-          FromPort: 8793
-          ToPort: 8793
-      VpcId: !GetAtt VPCStack.Outputs.VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-comms'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 52db1638-dd50-4e4a-be69-d5efb987900b
   Web:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:

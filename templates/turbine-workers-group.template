@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  VPCID:
+    Description: The ID of the VPC.
+    Type: AWS::EC2::VPC::Id
+  LogIngressCIDR:
+    Description: The CIDR block to allow ingress connections to read logs.
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  PrivateSubnet1AID:
+    Description: The ID of the hidden Subnet in the first Availability Zone.
+    Type: String
+  PrivateSubnet2AID:
+    Description: The ID of the hidden Subnet in the second Availability Zone.
+    Type: String
+  IamInstanceProfile:
+    Description: The Instance Profile with the required IAM policies.
+    Type: String
+  ImageId:
+    Description: EC2 image id to use for the workers.
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Description: EC2 instance type to use for the workers.
+    Type: String
+  KeyName:
+    Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
+    Type: AWS::EC2::KeyPair::KeyName
+  MinSize:
+    Description: The minimum number of active worker instances.
+    Type: Number
+  MaxSize:
+    Description: The maximum number of active worker instances.
+    Type: Number
+  ShrinkThreshold:
+    Description: The load metric value above which triggers a new worker allocation.
+    Type: Number
+  GrowthThreshold:
+    Description: The load metric value above which triggers an old worker deallocation.
+    Type: Number
+
+Resources:
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref IamInstanceProfile
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref SecurityGroup
+      UserData: !Base64
+        'Fn::Sub': |
+          #!/bin/bash -xe
+          echo $'TURBINE_MACHINE=WORKER' > /etc/environment
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Meta
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MaxSize: !Ref MaxSize
+      MinSize: !Ref MinSize
+      MetricsCollection:
+        - Granularity: 1Minute
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+
+  LifecycleHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      DefaultResult: CONTINUE
+      HeartbeatTimeout: 300
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for node itercommunication between
+        Airflow worker instances.
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - CidrIp: !Ref LogIngressCIDR
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
+      Tags:
+        - Key: Name
+          Value: !Sub sg-${AWS::StackName}-workers
+
+  ShrinkAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - !Ref ShrinkScalingPolicy
+      Namespace: Turbine
+      MetricName: WorkerLoad
+      Dimensions:
+        - Name: StackName
+          Value: !Ref AWS::StackName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref ShrinkThreshold
+      ComparisonOperator: LessThanOrEqualToThreshold
+
+  GrowthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - !Ref GrowthScalingPolicy
+      Namespace: Turbine
+      MetricName: WorkerLoad
+      Dimensions:
+        - Name: StackName
+          Value: !Ref AWS::StackName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref GrowthThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+
+  ShrinkScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
+      Cooldown: '600'
+      AutoScalingGroupName: !Ref AutoScalingGroup
+
+  GrowthScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+      Cooldown: '600'
+      AutoScalingGroupName: !Ref AutoScalingGroup
+
+Outputs:
+  AutoScalingGroup:
+    Description: The workers auto scaling group
+    Value: !Ref AutoScalingGroup
