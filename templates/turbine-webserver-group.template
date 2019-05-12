@@ -1,5 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+  WebIngressCIDR:
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   IamInstanceProfile:
     Type: String
   ImageId:
@@ -30,6 +36,22 @@ Resources:
             --region ${AWS::Region} \
             --stack ${AWS::StackName} \
             --resource Meta
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for node itercommunication between
+        Airflow worker instances.
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - CidrIp: !Ref WebIngressCIDR
+          IpProtocol: TCP
+          FromPort: 8080
+          ToPort: 8080
+      Tags:
+        - Key: Name
+          Value: !Sub sg-${AWS::StackName}-webserver
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup

@@ -47,6 +47,22 @@ Resources:
             --stack ${AWS::StackName} \
             --resource Meta
 
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for node itercommunication between
+        Airflow worker instances.
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - CidrIp: !Ref LogIngressCIDR
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
+      Tags:
+        - Key: Name
+          Value: !Sub sg-${AWS::StackName}-workers
+
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
@@ -70,22 +86,6 @@ Resources:
       DefaultResult: CONTINUE
       HeartbeatTimeout: 300
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
-
-  SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for node itercommunication between
-        Airflow worker instances.
-      VpcId: !Ref VPCID
-      SecurityGroupIngress:
-        - CidrIp: !Ref LogIngressCIDR
-          IpProtocol: TCP
-          FromPort: 8793
-          ToPort: 8793
-      Tags:
-        - Key: Name
-          Value: !Sub sg-${AWS::StackName}-workers
 
   ShrinkAlarm:
     Type: AWS::CloudWatch::Alarm

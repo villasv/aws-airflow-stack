@@ -185,6 +185,8 @@ Resources:
         KeyName: !Ref KeyPair
         PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
         PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+    DependsOn:
+      - Meta
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -195,6 +197,8 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-webserver-group.template
       Parameters:
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
+        WebIngressCIDR: !Ref AllowedWebBlock
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI
@@ -204,6 +208,8 @@ Resources:
         KeyName: !Ref KeyPair
         PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
         PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+    DependsOn:
+      - Meta
 
   WorkersStack:
     Type: AWS::CloudFormation::Stack
@@ -229,25 +235,21 @@ Resources:
         MaxSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
+    DependsOn:
+      - Meta
 
   LogsBucket:
     Type: 'AWS::S3::Bucket'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: ae9dafc5-ee81-4e49-abb0-6597b9bea85f
+
   DeploymentsBucket:
     Type: 'AWS::S3::Bucket'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: e9dec9e6-a3a5-44bd-a1a5-64fb7434649f
+
   CodeDeployApplication:
     Type: 'AWS::CodeDeploy::Application'
     Properties:
       ApplicationName: !Sub '${AWS::StackName}-deployment-application'
       ComputePlatform: Server
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: c0427338-3d0a-4d76-b9fe-80a013a6ce55
+
   CodeDeployDeploymentGroup:
     Type: 'AWS::CodeDeploy::DeploymentGroup'
     Properties:
@@ -269,9 +271,7 @@ Resources:
       ServiceRoleArn: !GetAtt
         - CodeDeployServiceRole
         - Arn
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: b961501c-cbb0-4acb-b614-563f6e84933a
+
   CodeDeployServiceRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -286,9 +286,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 1050ffca-0d8e-4d22-9029-fdd893f8610b
+
   Logger:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -309,9 +307,7 @@ Resources:
                 Action:
                   - 'cloudwatch:GetMetric*'
                   - 'cloudwatch:PutMetricData'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0330ff69-0cd8-47e5-8da2-d34d57ffb441
+
   Metric:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -434,9 +430,7 @@ Resources:
             - Metric
             - Arn
           Id: TargetFunction
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 6266e80e-e4e8-4081-a46e-cc7c09d54222
+
   Invoke:
     Type: 'AWS::Lambda::Permission'
     Properties:
@@ -446,18 +440,14 @@ Resources:
       SourceArn: !GetAtt
         - Timer
         - Arn
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 6941c0b8-cdd6-43ca-a936-b30ac47b9bb6
+
   EfsFileSystem:
     Type: 'AWS::EFS::FileSystem'
     Properties:
       FileSystemTags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-filesystem'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 2330aac6-8c78-44da-a211-6877405896d7
+
   EfsMountTarget:
     Type: 'AWS::EFS::MountTarget'
     Properties:
@@ -465,9 +455,7 @@ Resources:
       SubnetId: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
       SecurityGroups:
         - !Ref Access
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: d9dccabd-5d0c-4c15-a6b7-1bde5c799ab7
+
   DBs:
     Type: 'AWS::RDS::DBSubnetGroup'
     Properties:
@@ -475,9 +463,7 @@ Resources:
       SubnetIds:
         - !GetAtt VPCStack.Outputs.PrivateSubnet1AID
         - !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 9a84e8e5-ab24-45ee-80f8-83d6c1d4cc54
+
   Database:
     Type: 'AWS::RDS::DBInstance'
     Properties:
@@ -493,15 +479,11 @@ Resources:
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
         - !Ref Connection
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 361321d9-8ef0-4ec0-9f90-32079fd42268
+
   Tasks:
     Type: 'AWS::SQS::Queue'
     Properties: {}
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 0c03e033-c2e8-487d-a0e9-a5bf5e851fcb
+
   Access:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -517,25 +499,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-access'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 245a8e14-0dbf-42f3-a982-e206e15083b9
-  Web:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: Security Rules with permissions for the web UI exposed by Airflow.
-      SecurityGroupIngress:
-        - CidrIp: !Ref AllowedWebBlock
-          IpProtocol: TCP
-          FromPort: !Ref WebserverPort
-          ToPort: !Ref WebserverPort
-      VpcId: !GetAtt VPCStack.Outputs.VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-web'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 401bffa6-76b7-4606-84ca-41c85dc73c30
+
   Connection:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -549,9 +513,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-connection'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 4816510b-a9fb-467b-a2b6-a85d16656b59
+
   AirflowRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -624,17 +586,13 @@ Resources:
                 Action:
                   - 'autoscaling:DescribeScalingActivities'
                 Resource: '*'
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 5d9dff3c-9a97-4e99-ad97-ce312fb5754d
+
   AirflowProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
       Roles:
         - !Ref AirflowRole
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: dd12dfbc-65c8-4ceb-a38f-bc68ce895a95
+
   Meta:
     Type: 'AWS::CloudFormation::WaitConditionHandle'
     Properties: {}
@@ -908,8 +866,6 @@ Resources:
                 wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
                 chmod +x ./install
                 ./install auto
-      'AWS::CloudFormation::Designer':
-        id: 7ae6c5eb-85f6-4c96-adbc-9d57b120fb9b
 
 Mappings:
   RegionToAMI:
