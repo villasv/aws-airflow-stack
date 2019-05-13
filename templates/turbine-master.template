@@ -49,9 +49,6 @@ Parameters:
       such.
     Type: String
     Default: 8080
-  KeyPair:
-    Description: Amazon EC2 Key Pair to be used paired with the EC2 instances.
-    Type: 'AWS::EC2::KeyPair::KeyName'
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
@@ -186,7 +183,6 @@ Resources:
         PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
         AllowedWebBlock: !Ref AllowedWebBlock
         WebserverPort: !Ref WebserverPort
-        KeyPair: !Ref KeyPair
         SchedulerInstanceType: !Ref SchedulerInstanceType
         WebserverInstanceType: !Ref WebserverInstanceType
         WorkerInstanceType: !Ref WorkerInstanceType
@@ -203,7 +199,7 @@ Resources:
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
 Metadata:
-  'AWS::CloudFormation::Interface':
+  AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: Networking
@@ -218,7 +214,6 @@ Metadata:
       - Label:
           default: Cluster Settings
         Parameters:
-          - KeyPair
           - SchedulerInstanceType
           - WebserverInstanceType
           - WorkerInstanceType

@@ -6,8 +6,6 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
   PrivateSubnet1AID:
     Type: String
   PrivateSubnet2AID:
@@ -21,7 +19,6 @@ Resources:
       IamInstanceProfile: !Ref IamInstanceProfile
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyName
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe

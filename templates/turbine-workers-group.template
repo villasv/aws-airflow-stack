@@ -12,8 +12,6 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
   MinSize:
     Type: Number
   MaxSize:
@@ -35,7 +33,6 @@ Resources:
       IamInstanceProfile: !Ref IamInstanceProfile
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyName
       SecurityGroups:
         - !Ref SecurityGroup
       UserData: !Base64

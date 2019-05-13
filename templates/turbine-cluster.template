@@ -21,8 +21,6 @@ Parameters:
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   WebserverPort:
     Type: String
-  KeyPair:
-    Type: 'AWS::EC2::KeyPair::KeyName'
   SchedulerInstanceType:
     Type: String
     Default: t2.micro
@@ -73,7 +71,6 @@ Resources:
           - !Ref AWS::Region
           - HVMGP2
         InstanceType: !Ref SchedulerInstanceType
-        KeyName: !Ref KeyPair
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
     DependsOn:
@@ -96,7 +93,6 @@ Resources:
           - !Ref AWS::Region
           - HVMGP2
         InstanceType: !Ref WebserverInstanceType
-        KeyName: !Ref KeyPair
         PublicSubnet1ID: !Ref PublicSubnet1ID
         PublicSubnet2ID: !Ref PublicSubnet2ID
     DependsOn:
@@ -119,7 +115,6 @@ Resources:
           - !Ref AWS::Region
           - HVMGP2
         InstanceType: !Ref WorkerInstanceType
-        KeyName: !Ref KeyPair
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         MinSize: !Ref MinGroupSize
@@ -801,7 +796,7 @@ Mappings:
       HVMGP2: ami-061e7ebbc234015fe
 
 Metadata:
-  'AWS::CloudFormation::Interface':
+  AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: Networking
@@ -817,7 +812,6 @@ Metadata:
       - Label:
           default: Cluster Settings
         Parameters:
-          - KeyPair
           - SchedulerInstanceType
           - WebserverInstanceType
           - WorkerInstanceType
