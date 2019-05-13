@@ -130,19 +130,19 @@ Resources:
       - Meta
 
   LogsBucket:
-    Type: 'AWS::S3::Bucket'
+    Type: AWS::S3::Bucket
 
   DeploymentsBucket:
-    Type: 'AWS::S3::Bucket'
+    Type: AWS::S3::Bucket
 
   CodeDeployApplication:
-    Type: 'AWS::CodeDeploy::Application'
+    Type: AWS::CodeDeploy::Application
     Properties:
       ApplicationName: !Sub '${AWS::StackName}-deployment-application'
       ComputePlatform: Server
 
   CodeDeployDeploymentGroup:
-    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       ApplicationName: !Ref CodeDeployApplication
       DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
@@ -164,7 +164,7 @@ Resources:
         - Arn
 
   CodeDeployServiceRole:
-    Type: 'AWS::IAM::Role'
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -179,7 +179,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
   Logger:
-    Type: 'AWS::IAM::Role'
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -200,7 +200,7 @@ Resources:
                   - 'cloudwatch:PutMetricData'
 
   Metric:
-    Type: 'AWS::Lambda::Function'
+    Type: AWS::Lambda::Function
     Properties:
       Runtime: nodejs8.10
       Handler: index.handler
@@ -312,7 +312,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 94c385fa-fb13-42cc-a292-7e68c10956f3
   Timer:
-    Type: 'AWS::Events::Rule'
+    Type: AWS::Events::Rule
     Properties:
       ScheduleExpression: rate(1 minute)
       State: ENABLED
@@ -323,24 +323,24 @@ Resources:
           Id: TargetFunction
 
   Invoke:
-    Type: 'AWS::Lambda::Permission'
+    Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref Metric
-      Action: 'lambda:InvokeFunction'
+      Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt
         - Timer
         - Arn
 
   EfsFileSystem:
-    Type: 'AWS::EFS::FileSystem'
+    Type: AWS::EFS::FileSystem
     Properties:
       FileSystemTags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-filesystem'
+          Value: !Sub ${AWS::StackName}-filesystem
 
   EfsMountTarget:
-    Type: 'AWS::EFS::MountTarget'
+    Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref PrivateSubnet1AID
@@ -348,7 +348,7 @@ Resources:
         - !Ref Access
 
   DBs:
-    Type: 'AWS::RDS::DBSubnetGroup'
+    Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
       SubnetIds:
@@ -356,7 +356,7 @@ Resources:
         - !Ref PrivateSubnet2AID
 
   Database:
-    Type: 'AWS::RDS::DBInstance'
+    Type: AWS::RDS::DBInstance
     Properties:
       AllocatedStorage: '20'
       DBInstanceClass: db.t2.micro
@@ -366,17 +366,17 @@ Resources:
       MasterUserPassword: !Ref DbMasterPassword
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-database'
+          Value: !Sub ${AWS::StackName}-database
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
         - !Ref Connection
 
   Tasks:
-    Type: 'AWS::SQS::Queue'
+    Type: AWS::SQS::Queue
     Properties: {}
 
   Access:
-    Type: 'AWS::EC2::SecurityGroup'
+    Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
         Security Rules with permissions for the shared filesystem across Airflow
@@ -392,7 +392,7 @@ Resources:
           Value: !Sub '${AWS::StackName}-access'
 
   Connection:
-    Type: 'AWS::EC2::SecurityGroup'
+    Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security Rules with permissions for database connections for Airflow.
       SecurityGroupIngress:
@@ -403,10 +403,10 @@ Resources:
       VpcId: !Ref VPCID
       Tags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-connection'
+          Value: !Sub ${AWS::StackName}-connection
 
   AirflowRole:
-    Type: 'AWS::IAM::Role'
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -479,13 +479,13 @@ Resources:
                 Resource: '*'
 
   AirflowProfile:
-    Type: 'AWS::IAM::InstanceProfile'
+    Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
         - !Ref AirflowRole
 
   Meta:
-    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    Type: AWS::CloudFormation::WaitConditionHandle
     Properties: {}
     Metadata:
       'AWS::CloudFormation::Init':
