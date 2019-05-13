@@ -62,7 +62,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - '/'
+        - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-scheduler-group.template
@@ -83,7 +83,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - '/'
+        - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-webserver-group.template
@@ -106,7 +106,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - '/'
+        - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-workers-group.template
@@ -116,7 +116,7 @@ Resources:
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI
-          - !Ref 'AWS::Region'
+          - !Ref AWS::Region
           - HVMGP2
         InstanceType: !Ref WorkerInstanceType
         KeyName: !Ref KeyPair
@@ -138,14 +138,14 @@ Resources:
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
-      ApplicationName: !Sub '${AWS::StackName}-deployment-application'
+      ApplicationName: !Sub ${AWS::StackName}-deployment-application
       ComputePlatform: Server
 
   CodeDeployDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       ApplicationName: !Ref CodeDeployApplication
-      DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
+      DeploymentGroupName: !Sub ${AWS::StackName}-deployment-group
       AutoScalingGroups:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
@@ -155,10 +155,10 @@ Resources:
           - Ec2TagGroup:
               - Type: KEY_AND_VALUE
                 Key: Name
-                Value: !Sub '${AWS::StackName}-scheduler'
+                Value: !Sub ${AWS::StackName}-scheduler
               - Type: KEY_AND_VALUE
                 Key: Name
-                Value: !Sub '${AWS::StackName}-webserver'
+                Value: !Sub ${AWS::StackName}-webserver
       ServiceRoleArn: !GetAtt
         - CodeDeployServiceRole
         - Arn
@@ -174,7 +174,7 @@ Resources:
               Service:
                 - codedeploy.amazonaws.com
             Action:
-              - 'sts:AssumeRole'
+              - sts:AssumeRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
@@ -187,17 +187,17 @@ Resources:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
+            Action: sts:AssumeRole
       Policies:
-        - PolicyName: !Sub '${AWS::StackName}-cloudwatch-policy'
+        - PolicyName: !Sub ${AWS::StackName}-cloudwatch-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Resource: '*'
                 Action:
-                  - 'cloudwatch:GetMetric*'
-                  - 'cloudwatch:PutMetricData'
+                  - cloudwatch:GetMetric*
+                  - cloudwatch:PutMetricData
 
   Metric:
     Type: AWS::Lambda::Function
@@ -311,6 +311,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 94c385fa-fb13-42cc-a292-7e68c10956f3
+
   Timer:
     Type: AWS::Events::Rule
     Properties:
@@ -416,66 +417,66 @@ Resources:
               Service:
                 - ec2.amazonaws.com
             Action:
-              - 'sts:AssumeRole'
+              - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
-        - PolicyName: !Sub '${AWS::StackName}-queue-rw-policy'
+        - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - 'sqs:ListQueues'
+                  - sqs:ListQueues
                 Resource:
-                  - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
+                  - !Sub arn:aws:sqs:*:${AWS::AccountId}:*
               - Effect: Allow
                 Action:
-                  - 'sqs:ChangeMessageVisibility'
-                  - 'sqs:DeleteMessage'
-                  - 'sqs:GetQueueAttributes'
-                  - 'sqs:GetQueueUrl'
-                  - 'sqs:ReceiveMessage'
-                  - 'sqs:SendMessage'
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
                 Resource: !Sub
-                  - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
+                  - arn:aws:sqs:*:${AWS::AccountId}:${queue}
                   - queue: !GetAtt
                       - Tasks
                       - QueueName
-        - PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
+        - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - 's3:Get*'
-                  - 's3:List*'
-                Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
+                  - s3:Get*
+                  - s3:List*
+                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
               - Effect: Allow
                 Action:
-                  - 'codedeploy:List*'
-                Resource: !Sub 'arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*'
-        - PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
+                  - codedeploy:List*
+                Resource: !Sub arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*
+        - PolicyName: !Sub ${AWS::StackName}-logs-rw-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - 's3:Get*'
-                  - 's3:Put*'
-                Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
-        - PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
+                  - s3:Get*
+                  - s3:Put*
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
+        - PolicyName: !Sub ${AWS::StackName}-lifecycle-heartbeat
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - 'autoscaling:RecordLifecycleActionHeartbeat'
-                  - 'autoscaling:CompleteLifecycleAction'
-                Resource: !Sub 'arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*'
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                  - autoscaling:CompleteLifecycleAction
+                Resource: !Sub arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*
               - Effect: Allow
                 Action:
-                  - 'autoscaling:DescribeScalingActivities'
+                  - autoscaling:DescribeScalingActivities
                 Resource: '*'
 
   AirflowProfile:

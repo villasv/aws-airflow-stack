@@ -178,7 +178,7 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-cluster.template
       Parameters:
-        VPCID: !GetAtt VPCStack.Outputs.VPCID VPCCIDR
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
         VPCCIDR: !Ref VPCCIDR
         PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
         PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
