@@ -61,7 +61,7 @@ Resources:
           ToPort: 8793
       Tags:
         - Key: Name
-          Value: !Sub sg-${AWS::StackName}-workers
+          Value: !Sub ${AWS::StackName}-sg
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup

@@ -51,7 +51,7 @@ Resources:
           ToPort: 8080
       Tags:
         - Key: Name
-          Value: !Sub sg-${AWS::StackName}-webserver
+          Value: !Sub ${AWS::StackName}-sg
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup

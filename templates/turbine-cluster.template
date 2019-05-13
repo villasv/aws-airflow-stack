@@ -1,0 +1,834 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The Airflow cluster stack
+Parameters:
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+  VPCCIDR:
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  PublicSubnet1ID:
+    Type: String
+  PublicSubnet2ID:
+    Type: String
+  PrivateSubnet1AID:
+    Type: String
+  PrivateSubnet2AID:
+    Type: String
+  AllowedWebBlock:
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  WebserverPort:
+    Type: String
+  KeyPair:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+  SchedulerInstanceType:
+    Type: String
+    Default: t2.micro
+  WebserverInstanceType:
+    Type: String
+    Default: t2.micro
+  WorkerInstanceType:
+    Type: String
+    Default: t2.small
+  WorkerConcurrency:
+    Type: Number
+  MinGroupSize:
+    Type: Number
+  MaxGroupSize:
+    Type: Number
+  ShrinkThreshold:
+    Type: Number
+  GrowthThreshold:
+    Type: Number
+  DbMasterUsername:
+    Type: String
+  DbMasterPassword:
+    Type: String
+    NoEcho: true
+  LoadExampleDags:
+    Type: String
+  LoadDefaultConns:
+    Type: String
+  QSS3BucketName:
+    Type: String
+  QSS3KeyPrefix:
+    Type: String
+
+Resources:
+
+  SchedulerStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-scheduler-group.template
+      Parameters:
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref AWS::Region
+          - HVMGP2
+        InstanceType: !Ref SchedulerInstanceType
+        KeyName: !Ref KeyPair
+        PrivateSubnet1AID: !Ref PrivateSubnet1AID
+        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+    DependsOn:
+      - Meta
+
+  WebserverStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-webserver-group.template
+      Parameters:
+        VPCID: !Ref VPCID
+        WebIngressCIDR: !Ref AllowedWebBlock
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref AWS::Region
+          - HVMGP2
+        InstanceType: !Ref WebserverInstanceType
+        KeyName: !Ref KeyPair
+        PublicSubnet1ID: !Ref PublicSubnet1ID
+        PublicSubnet2ID: !Ref PublicSubnet2ID
+    DependsOn:
+      - Meta
+
+  WorkersStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-workers-group.template
+      Parameters:
+        VPCID: !Ref VPCID
+        LogIngressCIDR: !Ref VPCCIDR
+        IamInstanceProfile: !Ref AirflowProfile
+        ImageId: !FindInMap
+          - RegionToAMI
+          - !Ref 'AWS::Region'
+          - HVMGP2
+        InstanceType: !Ref WorkerInstanceType
+        KeyName: !Ref KeyPair
+        PrivateSubnet1AID: !Ref PrivateSubnet1AID
+        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+        MinSize: !Ref MinGroupSize
+        MaxSize: !Ref MaxGroupSize
+        GrowthThreshold: !Ref GrowthThreshold
+        ShrinkThreshold: !Ref ShrinkThreshold
+    DependsOn:
+      - Meta
+
+  LogsBucket:
+    Type: 'AWS::S3::Bucket'
+
+  DeploymentsBucket:
+    Type: 'AWS::S3::Bucket'
+
+  CodeDeployApplication:
+    Type: 'AWS::CodeDeploy::Application'
+    Properties:
+      ApplicationName: !Sub '${AWS::StackName}-deployment-application'
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub '${AWS::StackName}-deployment-group'
+      AutoScalingGroups:
+        - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
+        - !GetAtt WebserverStack.Outputs.AutoScalingGroup
+        - !GetAtt WorkersStack.Outputs.AutoScalingGroup
+      Ec2TagSet:
+        Ec2TagSetList:
+          - Ec2TagGroup:
+              - Type: KEY_AND_VALUE
+                Key: Name
+                Value: !Sub '${AWS::StackName}-scheduler'
+              - Type: KEY_AND_VALUE
+                Key: Name
+                Value: !Sub '${AWS::StackName}-webserver'
+      ServiceRoleArn: !GetAtt
+        - CodeDeployServiceRole
+        - Arn
+
+  CodeDeployServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
+
+  Logger:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${AWS::StackName}-cloudwatch-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - 'cloudwatch:GetMetric*'
+                  - 'cloudwatch:PutMetricData'
+
+  Metric:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Runtime: nodejs8.10
+      Handler: index.handler
+      Code:
+        ZipFile: !Sub
+          - |
+            var AWS = require('aws-sdk');
+            AWS.config.update({region: '${AWS::Region}'});
+            var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+            const datePlusMinutes = (d, m) => {
+              const _d = new Date(d);
+              _d.setMinutes(d.getMinutes() + m);
+              return _d;
+            };
+            const getMetricAtTime = (ms, m, t) => {
+              const m_idx = ms.MetricDataResults
+                .map(_r => _r.Id)
+                .indexOf(m);
+              const t_idx = ms.MetricDataResults[m_idx]
+                .Timestamps
+                .map(_t => _t.toISOString())
+                .indexOf(t.toISOString());
+              return ms.MetricDataResults[m_idx]
+                .Values[t_idx];
+            };
+            const discount = (ms, m, t1, t2, ws) => {
+              let incs = 0, d = t1;
+              let v1 = getMetricAtTime(ms, m, d), v2;
+              for (let i = 0; d < t2 ; i++) {
+                d = datePlusMinutes(t1, i+1);
+                v2 = getMetricAtTime(ms, m, d);
+                if (v2 > v1) incs += ws[i];
+                v1 = v2;
+              }
+              return incs;
+            };
+            exports.handler = async function(event, context) {
+              let curr = new Date();
+              curr.setMinutes(Math.floor(curr.getMinutes()/5)*5-5);
+              curr.setSeconds(0); curr.setMilliseconds(0);
+              const prev = datePlusMinutes(curr, -5);
+              const back = datePlusMinutes(prev, -5);
+              const metrics = await cw.getMetricData({
+                StartTime: back, EndTime: curr,
+                ScanBy: 'TimestampDescending',
+                MetricDataQueries: [
+                  { Id: 'maxANOMV', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'ApproximateNumberOfMessagesVisible',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Maximum',
+                      Unit: 'Count' }},
+                  { Id: 'sumNOER', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'NumberOfEmptyReceives',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Sum',
+                      Unit: 'Count', }},
+                  { Id: 'avgGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupInServiceInstances',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 300,
+                      Stat: 'Average',
+                      Unit: 'None', }},
+                  { Id: 'uGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupDesiredCapacity',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 60,
+                      Stat: 'Average',
+                      Unit: 'None', }},
+              ]}).promise();
+              const ANOMV = getMetricAtTime(metrics, 'maxANOMV', prev);
+              const NOER = getMetricAtTime(metrics, 'sumNOER', prev);
+              const GISI = getMetricAtTime(metrics, 'avgGISI', prev);
+              const ws = [0, 0, 0, 0.1, 0.3, 0.3, 0.3, 0.3, 0.2];
+              const dGISI = discount(metrics, 'uGISI', back, curr, ws);
+              const M = GISI - dGISI;
+              let l;
+              if (M > 0)
+                l = 1 - NOER / (M * 0.098444 * 300);
+              else
+                l = (ANOMV > 0) ? 1.0 : 0.0;
+              await cw.putMetricData({
+                Namespace: 'Turbine',
+                MetricData: [{ MetricName: 'WorkerLoad',
+                              Dimensions: [ { Name: 'StackName',
+                                              Value: '${AWS::StackName}' }],
+                              Timestamp: prev,
+                              Value: (l > 0) ? l : 0,
+                              Unit: 'None' }],
+              }).promise();
+            };
+          - asgName: !Sub '${AWS::StackName}-scaling-group'
+            queueName: !GetAtt
+              - Tasks
+              - QueueName
+      Role: !GetAtt
+        - Logger
+        - Arn
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 94c385fa-fb13-42cc-a292-7e68c10956f3
+  Timer:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt
+            - Metric
+            - Arn
+          Id: TargetFunction
+
+  Invoke:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !Ref Metric
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt
+        - Timer
+        - Arn
+
+  EfsFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-filesystem'
+
+  EfsMountTarget:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet1AID
+      SecurityGroups:
+        - !Ref Access
+
+  DBs:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+
+  Database:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
+      Engine: postgres
+      MasterUsername: !Ref DbMasterUsername
+      MasterUserPassword: !Ref DbMasterPassword
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-database'
+      DBSubnetGroupName: !Ref DBs
+      VPCSecurityGroups:
+        - !Ref Connection
+
+  Tasks:
+    Type: 'AWS::SQS::Queue'
+    Properties: {}
+
+  Access:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for the shared filesystem across Airflow
+        instances.
+      SecurityGroupIngress:
+        - CidrIp: !Ref VPCCIDR
+          IpProtocol: TCP
+          FromPort: 2049
+          ToPort: 2049
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-access'
+
+  Connection:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Security Rules with permissions for database connections for Airflow.
+      SecurityGroupIngress:
+        - CidrIp: !Ref VPCCIDR
+          IpProtocol: TCP
+          FromPort: 5432
+          ToPort: 5432
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-connection'
+
+  AirflowRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: !Sub '${AWS::StackName}-queue-rw-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:ListQueues'
+                Resource:
+                  - !Sub 'arn:aws:sqs:*:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action:
+                  - 'sqs:ChangeMessageVisibility'
+                  - 'sqs:DeleteMessage'
+                  - 'sqs:GetQueueAttributes'
+                  - 'sqs:GetQueueUrl'
+                  - 'sqs:ReceiveMessage'
+                  - 'sqs:SendMessage'
+                Resource: !Sub
+                  - 'arn:aws:sqs:*:${AWS::AccountId}:${queue}'
+                  - queue: !GetAtt
+                      - Tasks
+                      - QueueName
+        - PolicyName: !Sub '${AWS::StackName}-deployments-r-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                Resource: !Sub 'arn:aws:s3:::${DeploymentsBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'codedeploy:List*'
+                Resource: !Sub 'arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*'
+        - PolicyName: !Sub '${AWS::StackName}-logs-rw-policy'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:Put*'
+                Resource: !Sub 'arn:aws:s3:::${LogsBucket}/*'
+        - PolicyName: !Sub '${AWS::StackName}-lifecycle-heartbeat'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:RecordLifecycleActionHeartbeat'
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: !Sub 'arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeScalingActivities'
+                Resource: '*'
+
+  AirflowProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref AirflowRole
+
+  Meta:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    Properties: {}
+    Metadata:
+      'AWS::CloudFormation::Init':
+        configSets:
+          default:
+            - filesys
+            - runtime
+            - service
+            - metahup
+            - cdagent
+        filesys:
+          commands:
+            mkdir:
+              test: test ! -d /airflow
+              command: |
+                mkdir /airflow
+                chown -R ec2-user /airflow
+            mount:
+              test: test ! "$(mount | grep /mnt/efs)"
+              command: !Sub |
+                mkdir -p /mnt/efs
+                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
+                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
+                param="$param,hard,timeo=600,retrans=2,noresvport"
+                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" > /etc/fstab
+                mount /mnt/efs
+                chown -R ec2-user /mnt/efs
+        runtime:
+          packages:
+            yum:
+              git: []
+              gcc: []
+              gcc-c++: []
+              jq: []
+              lapack-devel: []
+              libcurl-devel: []
+              libxml2-devel: []
+              libxslt-devel: []
+              openssl-devel: []
+              postgresql-devel: []
+              python3: []
+              python3-devel: []
+              python3-pip: []
+              python3-wheel: []
+          commands:
+            install:
+              command: |
+                PYCURL_SSL_LIBRARY=openssl pip3 install \
+                  --no-cache-dir --compile --ignore-installed \
+                  pycurl
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
+                  apache-airflow[celery,postgres,s3,crypto]==1.10.3 \
+                  celery[sqs] \
+                  billiard==3.5.0.4
+            keygen:
+              test: test ! -f /mnt/efs/fernet.key
+              command: |
+                dd if=/dev/urandom bs=32 count=1 \
+                  2>/dev/null | openssl base64 > /mnt/efs/fernet.key
+        service:
+          files:
+            /usr/bin/turbine:
+              mode: 755
+              content: |
+                #!/bin/sh
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
+                then exec airflow scheduler
+                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
+                then exec airflow webserver
+                elif [ "$TURBINE_MACHINE" == "WORKER" ]
+                then exec airflow worker
+                else echo "TURBINE_MACHINE value unknown" && exit 1
+                fi
+            /etc/sysconfig/airflow:
+              content: !Sub
+                - |
+                  AWS_DEFAULT_REGION=${AWS::Region}
+                  AIRFLOW_HOME=/airflow
+                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+                  AIRFLOW__CORE__FERNET_KEY=INJECT_FERNET_KEY
+                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
+                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConns}
+                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
+                  AIRFLOW__CORE__REMOTE_LOGGING=True
+                  AIRFLOW__WEBSERVER__BASE_URL=http://INJECT_HOST:${WebserverPort}
+                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
+                  AIRFLOW__CELERY__BROKER_URL=sqs://
+                  AIRFLOW__CELERY__DEFAULT_QUEUE=${queue}
+                  AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${rds}/airflow
+                  AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
+                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
+                - queue: !GetAtt
+                    - Tasks
+                    - QueueName
+                  rds: !GetAtt
+                    - Database
+                    - Endpoint.Address
+            /usr/lib/tmpfiles.d/airflow.conf:
+              content: |
+                D /run/airflow 0755 ec2-user ec2-user
+            /usr/lib/systemd/system/airflow.service:
+              content: |
+                [Service]
+                EnvironmentFile=/etc/sysconfig/airflow
+                User=ec2-user
+                Group=ec2-user
+                ExecStart=/usr/bin/turbine
+                Restart=always
+                RestartSec=5s
+                KillMode=mixed
+                TimeoutStopSec=24h
+                [Install]
+                WantedBy=multi-user.target
+            /usr/lib/systemd/system/watcher.path:
+              content: |
+                [Unit]
+                After=airflow.service
+                PartOf=airflow.service
+                [Path]
+                PathModified=/etc/sysconfig/airflow
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/watcher.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStartPre=/usr/bin/systemctl daemon-reload
+                ExecStart=/usr/bin/systemctl restart airflow
+            /usr/bin/lchkill:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
+                TERMINATE_MESSAGE="Terminating EC2 instance: $INSTANCE_ID"
+                TERMINATING=$(aws autoscaling describe-scaling-activities \
+                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                  --max-items 100 \
+                  --region '${AWS::Region}' | \
+                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
+                  '.Activities[]
+                  | select(.Description
+                  | test($TERMINATE_MESSAGE)) != []')
+
+                if [ "$TERMINATING" = "true" ]
+                then
+                  systemctl stop airflow
+                fi
+            /usr/lib/systemd/system/lchkill.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchkill.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchkill
+            /usr/bin/lchbeat:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                SERVICE_STATUS=$(systemctl is-active airflow)
+
+                if [ "$SERVICE_STATUS" = "deactivating" ]
+                then
+                  aws autoscaling record-lifecycle-action-heartbeat \
+                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                    --region '${AWS::Region}'
+                fi
+            /usr/lib/systemd/system/lchbeat.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchbeat.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchbeat
+          commands:
+            setup:
+              command: !Sub |
+                cat /etc/environment >> /etc/sysconfig/airflow
+
+                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
+                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
+                if [ $PUBLIC = "200" ]
+                then HOST=$PUB_IPV4
+                else HOST=$LOC_IPV4
+                fi
+                sed -i -e "s~INJECT_HOST~$HOST~" /etc/sysconfig/airflow
+
+                FK=$(</mnt/efs/fernet.key)
+                sed -i -e "s~INJECT_FERNET_KEY~$FK~" /etc/sysconfig/airflow
+
+                sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
+                source /tmp/env.sh
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
+                then if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]
+                  then su -c '/usr/local/bin/airflow initdb' ec2-user
+                  else su -c '/usr/local/bin/airflow upgradedb' ec2-user
+                  fi
+                else echo "Database setup reserved for the scheduler"
+                fi
+
+                HAS_DEPLOYMENT=$(aws deploy list-deployments \
+                  --application-name ${AWS::StackName}-deployment-application \
+                  --deployment-group ${AWS::StackName}-deployment-group | \
+                  jq '.deployments | has(0)')
+
+                systemctl enable airflow.service watcher.path
+
+                if [ "$TURBINE_MACHINE" = "WORKER" ]
+                then systemctl enable lchkill.timer lchbeat.timer
+                fi
+                if [ "$TURBINE_MACHINE" = "WORKER" ] && \
+                   [ "$HAS_DEPLOYMENT" = "true" ]
+                then echo "Deployment pending, deferring service start"
+                else systemctl start airflow
+                fi
+        metahup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                interval=1
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v \
+                  --region ${AWS::Region} \
+                  --stack ${AWS::StackName} \
+                  --resource Meta
+                runas=root
+            /lib/systemd/system/cfn-hup.service:
+              content: |
+                [Service]
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+                [Install]
+                WantedBy=multi-user.target
+          commands:
+            setup:
+              command: |
+                systemctl enable cfn-hup.service
+                systemctl start cfn-hup.service
+        cdagent:
+          packages:
+            yum:
+              ruby: []
+              wget: []
+          commands:
+            install:
+              command: !Sub |
+                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
+                chmod +x ./install
+                ./install auto
+
+Mappings:
+  RegionToAMI:
+    ap-northeast-1:
+      HVMGP2: ami-00f9d04b3b3092052
+    ap-northeast-2:
+      HVMGP2: ami-0c764df09c35858b8
+    ap-northeast-3:
+      HVMGP2: ami-0f4865fb90390aeec
+    ap-south-1:
+      HVMGP2: ami-00796998f258969fd
+    ap-southeast-1:
+      HVMGP2: ami-085fd1bd447be68e8
+    ap-southeast-2:
+      HVMGP2: ami-0b8dea0e70b969adc
+    ca-central-1:
+      HVMGP2: ami-05cac140c6a1fb960
+    cn-north-1:
+      HVMGP2: ami-0bcb2d94a820e559c
+    cn-northwest-1:
+      HVMGP2: ami-0d82dd087e5eea5af
+    eu-central-1:
+      HVMGP2: ami-02ea8f348fa28c108
+    eu-west-1:
+      HVMGP2: ami-0a5e707736615003c
+    eu-west-2:
+      HVMGP2: ami-017b0e29fac27906b
+    eu-west-3:
+      HVMGP2: ami-04992646d54c69ef4
+    sa-east-1:
+      HVMGP2: ami-0160a8b6087883cb6
+    us-east-1:
+      HVMGP2: ami-013be31976ca2c322
+    us-east-2:
+      HVMGP2: ami-0350c5670171b5391
+    us-gov-west-1:
+      HVMGP2: ami-d263f9b3
+    us-west-1:
+      HVMGP2: ami-01beb64058d271bc4
+    us-west-2:
+      HVMGP2: ami-061e7ebbc234015fe
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Networking
+        Parameters:
+          - VPCID
+          - VPCCIDR
+          - PublicSubnet1ID
+          - PublicSubnet2ID
+          - PrivateSubnet1AID
+          - PrivateSubnet2AID
+          - AllowedWebBlock
+          - WebserverPort
+      - Label:
+          default: Cluster Settings
+        Parameters:
+          - KeyPair
+          - SchedulerInstanceType
+          - WebserverInstanceType
+          - WorkerInstanceType
+          - WorkerConcurrency
+          - MinGroupSize
+          - MaxGroupSize
+          - ShrinkThreshold
+          - GrowthThreshold
+          - DbMasterUsername
+          - DbMasterPassword
+      - Label:
+          default: Airflow Config
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultConns
