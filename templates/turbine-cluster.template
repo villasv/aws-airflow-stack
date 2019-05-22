@@ -86,7 +86,8 @@ Resources:
           - turbine-webserver-group.template
       Parameters:
         VPCID: !Ref VPCID
-        WebIngressCIDR: !Ref AllowedWebBlock
+        IngressCIDR: !Ref AllowedWebBlock
+        IngressPort: !Ref WebserverPort
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI

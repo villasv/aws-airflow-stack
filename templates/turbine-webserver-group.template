@@ -2,10 +2,12 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   VPCID:
     Type: AWS::EC2::VPC::Id
-  WebIngressCIDR:
+  IngressCIDR:
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  IngressPort:
+    Type: String
   IamInstanceProfile:
     Type: String
   ImageId:
@@ -19,21 +21,6 @@ Parameters:
 
 Resources:
 
-  LaunchConfiguration:
-    Type: AWS::AutoScaling::LaunchConfiguration
-    Properties:
-      IamInstanceProfile: !Ref IamInstanceProfile
-      ImageId: !Ref ImageId
-      InstanceType: !Ref InstanceType
-      UserData: !Base64
-        'Fn::Sub': |
-          #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
-            --resource Meta
-
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -42,13 +29,30 @@ Resources:
         Airflow worker instances.
       VpcId: !Ref VPCID
       SecurityGroupIngress:
-        - CidrIp: !Ref WebIngressCIDR
+        - CidrIp: !Ref IngressCIDR
           IpProtocol: TCP
-          FromPort: 8080
-          ToPort: 8080
+          FromPort: !Ref IngressPort
+          ToPort: !Ref IngressPort
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-sg
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref IamInstanceProfile
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref SecurityGroup
+      UserData: !Base64
+        'Fn::Sub': |
+          #!/bin/bash -xe
+          echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --stack ${AWS::StackName} \
+            --resource Meta
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
