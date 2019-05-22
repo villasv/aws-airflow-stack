@@ -65,6 +65,7 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-scheduler.template
       Parameters:
+        ParentStack: !Ref AWS::StackName
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
           - RegionToAMI
@@ -85,6 +86,7 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-webserver.template
       Parameters:
+        ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID
         IngressCIDR: !Ref AllowedWebBlock
         IngressPort: !Ref WebserverPort
@@ -99,7 +101,7 @@ Resources:
     DependsOn:
       - Meta
 
-  WorkersStack:
+  WorkerSetStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
@@ -108,6 +110,7 @@ Resources:
           - !Sub ${QSS3KeyPrefix}templates
           - turbine-workerset.template
       Parameters:
+        ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID
         LogIngressCIDR: !Ref VPCCIDR
         IamInstanceProfile: !Ref AirflowProfile
@@ -145,7 +148,7 @@ Resources:
       AutoScalingGroups:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
-        - !GetAtt WorkersStack.Outputs.AutoScalingGroup
+        - !GetAtt WorkerSetStack.Outputs.AutoScalingGroup
       Ec2TagSet:
         Ec2TagSetList:
           - Ec2TagGroup:

@@ -1,5 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  ParentStack:
+    Type: String
   VPCID:
     Type: AWS::EC2::VPC::Id
   IngressCIDR:
@@ -51,7 +53,7 @@ Resources:
           echo $'TURBINE_MACHINE=WEBSERVER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
+            --stack ${ParentStack} \
             --resource Meta
 
   AutoScalingGroup:

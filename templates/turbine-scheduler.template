@@ -1,5 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  ParentStack:
+    Type: String
   IamInstanceProfile:
     Type: String
   ImageId:
@@ -25,7 +27,7 @@ Resources:
           echo $'TURBINE_MACHINE=SCHEDULER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
-            --stack ${AWS::StackName} \
+            --stack ${ParentStack} \
             --resource Meta
 
   AutoScalingGroup:
