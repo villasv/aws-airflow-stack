@@ -63,7 +63,7 @@ Resources:
         - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
-          - turbine-scheduler-group.template
+          - turbine-scheduler.template
       Parameters:
         IamInstanceProfile: !Ref AirflowProfile
         ImageId: !FindInMap
@@ -83,7 +83,7 @@ Resources:
         - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
-          - turbine-webserver-group.template
+          - turbine-webserver.template
       Parameters:
         VPCID: !Ref VPCID
         IngressCIDR: !Ref AllowedWebBlock
@@ -106,7 +106,7 @@ Resources:
         - /
         - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
           - !Sub ${QSS3KeyPrefix}templates
-          - turbine-workers-group.template
+          - turbine-workerset.template
       Parameters:
         VPCID: !Ref VPCID
         LogIngressCIDR: !Ref VPCCIDR
