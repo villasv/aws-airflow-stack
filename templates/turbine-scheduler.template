@@ -4,6 +4,8 @@ Parameters:
     Type: String
   IamInstanceProfile:
     Type: String
+  IamRole:
+    Type: String
   ImageId:
     Type: AWS::EC2::Image::Id
   InstanceType:
@@ -27,6 +29,7 @@ Resources:
           echo $'TURBINE_MACHINE=SCHEDULER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
+            --role ${IamRole} \
             --stack ${ParentStack} \
             --resource Meta
 

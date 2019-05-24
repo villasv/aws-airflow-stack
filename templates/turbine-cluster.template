@@ -67,6 +67,7 @@ Resources:
       Parameters:
         ParentStack: !Ref AWS::StackName
         IamInstanceProfile: !Ref AirflowProfile
+        IamRole: !Ref AirflowRole
         ImageId: !FindInMap
           - RegionToAMI
           - !Ref AWS::Region
@@ -91,6 +92,7 @@ Resources:
         IngressCIDR: !Ref AllowedWebBlock
         IngressPort: !Ref WebserverPort
         IamInstanceProfile: !Ref AirflowProfile
+        IamRole: !Ref AirflowRole
         ImageId: !FindInMap
           - RegionToAMI
           - !Ref AWS::Region
@@ -114,6 +116,7 @@ Resources:
         VPCID: !Ref VPCID
         LogIngressCIDR: !Ref VPCCIDR
         IamInstanceProfile: !Ref AirflowProfile
+        IamRole: !Ref AirflowRole
         ImageId: !FindInMap
           - RegionToAMI
           - !Ref AWS::Region
@@ -411,6 +414,14 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
+        - PolicyName: !Sub ${AWS::StackName}-cfn-describe
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
         - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
           PolicyDocument:
             Version: 2012-10-17

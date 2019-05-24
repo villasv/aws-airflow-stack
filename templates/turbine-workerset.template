@@ -10,6 +10,8 @@ Parameters:
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   IamInstanceProfile:
     Type: String
+  IamRole:
+    Type: String
   ImageId:
     Type: AWS::EC2::Image::Id
   InstanceType:
@@ -43,6 +45,7 @@ Resources:
           echo $'TURBINE_MACHINE=WORKER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
+            --role ${IamRole} \
             --stack ${ParentStack} \
             --resource Meta
 
