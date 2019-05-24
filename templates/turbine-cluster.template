@@ -149,15 +149,6 @@ Resources:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
         - !GetAtt WorkerSetStack.Outputs.AutoScalingGroup
-      Ec2TagSet:
-        Ec2TagSetList:
-          - Ec2TagGroup:
-              - Type: KEY_AND_VALUE
-                Key: Name
-                Value: !Sub ${AWS::StackName}-scheduler
-              - Type: KEY_AND_VALUE
-                Key: Name
-                Value: !Sub ${AWS::StackName}-webserver
       ServiceRoleArn: !GetAtt
         - CodeDeployServiceRole
         - Arn
@@ -488,7 +479,7 @@ Resources:
     Type: AWS::CloudFormation::WaitConditionHandle
     Properties: {}
     Metadata:
-      'AWS::CloudFormation::Init':
+      AWS::CloudFormation::Init:
         configSets:
           default:
             - filesys
