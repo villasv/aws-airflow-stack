@@ -9,7 +9,7 @@ PACKAGE = $(stack-name)_$(REVISION).tgz
 # stack resources
 APPLICATION = $(stack-name)-deployment-application
 DEPLOYMENT_GROUP = $(stack-name)-deployment-group
-DEPLOYMENTS_BUCKET = $(shell aws cloudformation describe-stack-resources --stack-name airtest --logical-resource-id DeploymentsBucket --query 'StackResources[0].PhysicalResourceId' --output text)
+DEPLOYMENTS_BUCKET = $(shell aws cloudformation describe-stack-resources --stack-name $(stack-name) --logical-resource-id DeploymentsBucket --query 'StackResources[0].PhysicalResourceId' --output text)
 
 
 package:
