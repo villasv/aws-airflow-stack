@@ -53,17 +53,13 @@ If a community member engages in unacceptable behavior, the community organizers
 
 ## 6. Reporting Guidelines
 
-If you are subject to or witness unacceptable behavior, or have any other concerns, please notify a community organizer as soon as possible. villasv@outlook.com.
-
-
+If you are subject to or witness unacceptable behavior, or have any other concerns, please notify a community organizer as soon as possible.
 
 Additionally, community organizers are available to help community members engage with local law enforcement or to otherwise help those experiencing unacceptable behavior feel safe. In the context of in-person events, organizers will also provide escorts as desired by the person experiencing distress.
 
 ## 7. Addressing Grievances
 
 If you feel you have been falsely or unfairly accused of violating this Code of Conduct, you should notify Villasv with a concise description of your grievance. Your grievance will be handled in accordance with our existing governing policies.
-
-
 
 ## 8. Scope
 
@@ -73,7 +69,7 @@ This code of conduct and its related procedures also applies to unacceptable beh
 
 ## 9. Contact info
 
-villasv@outlook.com
+- Victor Villas: mail@victor.villas
 
 ## 10. License and attribution
 
