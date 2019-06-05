@@ -722,10 +722,8 @@ Resources:
                 [main]
                 stack=${AWS::StackId}
                 region=${AWS::Region}
+                role=${AirflowRole}
                 interval=1
-              mode: '000400'
-              owner: root
-              group: root
             /etc/cfn/hooks.d/cfn-auto-reloader.conf:
               content: !Sub |
                 [cfn-auto-reloader-hook]
@@ -733,6 +731,7 @@ Resources:
                 path=Resources.Meta.Metadata.AWS::CloudFormation::Init
                 action=/opt/aws/bin/cfn-init -v \
                   --region ${AWS::Region} \
+                  --role ${AirflowRole} \
                   --stack ${AWS::StackName} \
                   --resource Meta
                 runas=root
