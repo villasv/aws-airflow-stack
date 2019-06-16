@@ -69,9 +69,9 @@ Resources:
         IamInstanceProfile: !Ref AirflowProfile
         IamRole: !Ref AirflowRole
         ImageId: !FindInMap
-          - RegionToAMI
+          - AWSAMIRegionMap
           - !Ref AWS::Region
-          - HVMGP2
+          - AMZNLINUX2
         InstanceType: !Ref SchedulerInstanceType
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
@@ -94,9 +94,9 @@ Resources:
         IamInstanceProfile: !Ref AirflowProfile
         IamRole: !Ref AirflowRole
         ImageId: !FindInMap
-          - RegionToAMI
+          - AWSAMIRegionMap
           - !Ref AWS::Region
-          - HVMGP2
+          - AMZNLINUX2
         InstanceType: !Ref WebserverInstanceType
         PublicSubnet1ID: !Ref PublicSubnet1ID
         PublicSubnet2ID: !Ref PublicSubnet2ID
@@ -118,9 +118,9 @@ Resources:
         IamInstanceProfile: !Ref AirflowProfile
         IamRole: !Ref AirflowRole
         ImageId: !FindInMap
-          - RegionToAMI
+          - AWSAMIRegionMap
           - !Ref AWS::Region
-          - HVMGP2
+          - AMZNLINUX2
         InstanceType: !Ref WorkerInstanceType
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
@@ -760,45 +760,37 @@ Resources:
                 ./install auto
 
 Mappings:
-  RegionToAMI:
+  AWSAMIRegionMap:
     ap-northeast-1:
-      HVMGP2: ami-00f9d04b3b3092052
+      AMZNLINUX2: ami-00d101850e971728d
     ap-northeast-2:
-      HVMGP2: ami-0c764df09c35858b8
-    ap-northeast-3:
-      HVMGP2: ami-0f4865fb90390aeec
+      AMZNLINUX2: ami-08ab3f7e72215fe91
     ap-south-1:
-      HVMGP2: ami-00796998f258969fd
+      AMZNLINUX2: ami-00e782930f1c3dbc7
     ap-southeast-1:
-      HVMGP2: ami-085fd1bd447be68e8
+      AMZNLINUX2: ami-0b5a47f8865280111
     ap-southeast-2:
-      HVMGP2: ami-0b8dea0e70b969adc
+      AMZNLINUX2: ami-0fb7513bcdc525c3b
     ca-central-1:
-      HVMGP2: ami-05cac140c6a1fb960
-    cn-north-1:
-      HVMGP2: ami-0bcb2d94a820e559c
-    cn-northwest-1:
-      HVMGP2: ami-0d82dd087e5eea5af
+      AMZNLINUX2: ami-08a9b721ecc5b0a53
     eu-central-1:
-      HVMGP2: ami-02ea8f348fa28c108
+      AMZNLINUX2: ami-0ebe657bc328d4e82
     eu-west-1:
-      HVMGP2: ami-0a5e707736615003c
+      AMZNLINUX2: ami-030dbca661d402413
     eu-west-2:
-      HVMGP2: ami-017b0e29fac27906b
+      AMZNLINUX2: ami-0009a33f033d8b7b6
     eu-west-3:
-      HVMGP2: ami-04992646d54c69ef4
+      AMZNLINUX2: ami-0ebb3a801d5fb8b9b
     sa-east-1:
-      HVMGP2: ami-0160a8b6087883cb6
+      AMZNLINUX2: ami-058141e091292ecf0
     us-east-1:
-      HVMGP2: ami-013be31976ca2c322
+      AMZNLINUX2: ami-0c6b1d09930fac512
     us-east-2:
-      HVMGP2: ami-0350c5670171b5391
-    us-gov-west-1:
-      HVMGP2: ami-d263f9b3
+      AMZNLINUX2: ami-0ebbf2179e615c338
     us-west-1:
-      HVMGP2: ami-01beb64058d271bc4
+      AMZNLINUX2: ami-015954d5e5548d13b
     us-west-2:
-      HVMGP2: ami-061e7ebbc234015fe
+      AMZNLINUX2: ami-0cb72367e98845d43
 
 Metadata:
   AWS::CloudFormation::Interface:
