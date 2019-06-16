@@ -759,6 +759,14 @@ Resources:
                 chmod +x ./install
                 ./install auto
 
+Outputs:
+  DeploymentsBucket:
+    Value: !Ref DeploymentsBucket
+  CodeDeployApplication:
+    Value: !Ref CodeDeployApplication
+  CodeDeployDeploymentGroup:
+    Value: !Ref CodeDeployDeploymentGroup
+
 Mappings:
   AWSAMIRegionMap:
     ap-northeast-1:

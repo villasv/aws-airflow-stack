@@ -198,6 +198,14 @@ Resources:
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
+Outputs:
+  DeploymentsBucket:
+    Value: !GetAtt AirflowStack.Outputs.DeploymentsBucket
+  CodeDeployApplication:
+    Value: !GetAtt AirflowStack.Outputs.CodeDeployApplication
+  CodeDeployDeploymentGroup:
+    Value: !GetAtt AirflowStack.Outputs.CodeDeployDeploymentGroup
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
