@@ -45,12 +45,12 @@ but the metric objective is to measure if the cluster is correctly sized for the
 influx of tasks. Worker instances have lifecycle hooks promoting a graceful
 shutdown, waiting for tasks completion when terminating.
 
-**The goal of the auto scaling feature is to respond to changes in queue load,
+The goal of the auto scaling feature is to respond to changes in queue load,
 which could mean an idle cluster becoming active or a busy cluster becoming
 idle, the start/end of a backfill, many DAGs with similar schedules hitting
-their due time, DAGs that branch to many parallel operators. Scaling in response
-to machine resources like facing CPU intensive tasks is not the goal**; the
-latter is a very advanced scenario and would be best handled by Celery's own
+their due time, DAGs that branch to many parallel operators. **Scaling in
+response to machine resources like facing CPU intensive tasks is not the goal**;
+the latter is a very advanced scenario and would be best handled by Celery's own
 scaling mechanism or offloading the computation to another system (like Spark or
 Kubernetes) and use Airflow only for orchestration.
 
@@ -70,7 +70,7 @@ branch (defaults to your last used region):
 
 [![Launch](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
 
-The stack resources take around 10 minutes to create, while the airflow
+The stack resources take around 15 minutes to create, while the airflow
 installation and bootstrap another 3 to 5 minutes. After that you can already
 access the Airflow UI and deploy your own Airflow DAGs.
 
