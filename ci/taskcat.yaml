@@ -10,5 +10,5 @@ global:
     - us-west-1
 tests:
   default:
-    parameter_input: parameters-default.json
+    parameter_input: parameters.json
     template_file: turbine-master.template
