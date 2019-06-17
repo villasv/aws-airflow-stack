@@ -2,7 +2,7 @@ language: python
 python:
   - "3.6"
 install:
-  - pip install cfn-lint taskcat
+  - pip install cfn-lint taskcat awscli
 
 git:
     submodules: false
