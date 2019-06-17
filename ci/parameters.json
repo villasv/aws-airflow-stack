@@ -1,4 +1,5 @@
 [
   { "ParameterKey": "DbMasterPassword", "ParameterValue": "$[taskcat_genpass_8A]" },
-  { "ParameterKey": "QSS3KeyPrefix", "ParameterValue": "quickstart-turbine-airflow-test/" }
+  { "ParameterKey": "QSS3BucketName", "ParameterValue": "$[taskcat_autobucket]" },
+  { "ParameterKey": "QSS3KeyPrefix", "ParameterValue": "quickstart-turbine-airflow/" }
 ]
