@@ -1,4 +1,7 @@
+ifndef BRANCH
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+endif
+
 BUCKET := s3://turbine-quickstart/quickstart-turbine-airflow-$(BRANCH)
 
 lint:
