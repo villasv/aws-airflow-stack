@@ -52,15 +52,15 @@ Parameters:
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
-    Default: t2.micro
+    Default: t3.micro
   WebserverInstanceType:
     Description: EC2 instance type to use for the webserver.
     Type: String
-    Default: t2.micro
+    Default: t3.micro
   WorkerInstanceType:
     Description: EC2 instance type to use for the workers.
     Type: String
-    Default: t2.small
+    Default: t3.micro
   WorkerConcurrency:
     Description: Number of concurrent units per machine.
     Type: Number
