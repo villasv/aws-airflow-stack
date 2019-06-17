@@ -1,6 +1,8 @@
 language: python
 python:
   - "3.6"
+install:
+  - pip install cfn-lint taskcat
 
 git:
     submodules: false
@@ -8,9 +10,14 @@ before_install:
     - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
     - git submodule update --init --recursive
 
-install:
-  - pip install cfn-lint taskcat
 script:
   - make lint
   - make test
-  - make sync
+
+deploy:
+  provider: script
+  script: BRANCH=$TRAVIS_BRANCH make sync
+  on:
+    branch:
+      - master
+      - develop
