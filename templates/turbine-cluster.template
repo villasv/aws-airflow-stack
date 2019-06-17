@@ -333,11 +333,19 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-filesystem
 
-  EfsMountTarget:
+  EfsMountTarget1A:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref PrivateSubnet1AID
+      SecurityGroups:
+        - !Ref Access
+
+  EfsMountTarget2A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet2AID
       SecurityGroups:
         - !Ref Access
 
