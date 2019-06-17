@@ -1,0 +1,9 @@
+language: python
+python:
+  - "3.6"
+install:
+  - pip install cfn-lint taskcat
+script:
+  - make lint
+  - make test
+  - make sync
