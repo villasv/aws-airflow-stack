@@ -1,6 +1,6 @@
 <img src="img/logo.png" align="right" width="25%" />
 
-# Turbine [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working) [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/scrutinizer/build/g/villasv/aws-airflow-stack.svg?style=flat-square&logo=scrutinizer-ci&label=taskcat)](https://scrutinizer-ci.com/g/villasv/aws-airflow-stack/build-status/master)
+# Turbine [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working) [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/travis/villasv/aws-airflow-stack/master.svg?style=flat-square&logo=gitlab&logoColor=white&label=taskcat)](https://scrutinizer-ci.com/g/villasv/aws-airflow-stack/build-status/master)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
@@ -64,11 +64,11 @@ Kubernetes) and use Airflow only for orchestration.
 ### 1. Deploy the stack
 
 Create a new stack using the latest template definition at
-[`aws/cloud-formation-template.yml`](/aws/cloud-formation-template.yml). The
+[`templates/turbine-master.template`](/templates/turbine-master.template). The
 following button will deploy the stack available in this project's `master`
 branch (defaults to your last used region):
 
-[![Launch](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
+[![Launch](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/images/cloudformation-launch-stack-button.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://turbine-quickstart.s3.amazonaws.com/quickstart-turbine-airflow/templates/turbine-master.template)
 
 The stack resources take around 15 minutes to create, while the airflow
 installation and bootstrap another 3 to 5 minutes. After that you can already
