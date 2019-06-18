@@ -17,7 +17,7 @@ script:
 
 deploy:
   provider: script
-  script: BRANCH=$TRAVIS_BRANCH make sync
+  script: make sync BRANCH=$TRAVIS_BRANCH
   on:
     branch:
       - master
