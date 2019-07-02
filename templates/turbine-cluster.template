@@ -501,6 +501,7 @@ Resources:
           default:
             - filesys
             - runtime
+            - secrets
             - sysconf
             - migrate
             - service
@@ -551,6 +552,16 @@ Resources:
                   apache-airflow[celery,postgres,s3,crypto]==1.10.3 \
                   celery[sqs] \
                   billiard==3.5.0.4
+        secrets:
+          commands:
+            fernet: |
+                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
+                  echo "Secret generation reserved for the scheduler"
+                  exit 0
+                fi
+                FERNET_KEY=$(aws ssm get-parameter \
+                  --name ${AWS::StackName}-fernet-key \
+                  --query 'Parameter.Value')
         sysconf:
           files:
             /etc/sysconfig/airflow:
