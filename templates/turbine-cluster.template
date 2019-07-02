@@ -600,14 +600,14 @@ Resources:
           commands:
             migration:
               command: |
-                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]; then
-                  if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                    su -c '/usr/local/bin/airflow initdb' ec2-user
-                  else
-                    su -c '/usr/local/bin/airflow upgradedb' ec2-user
-                  fi
-                else
+                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Database setup reserved for the scheduler"
+                  exit 0
+                fi
+                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
+                  su -c '/usr/local/bin/airflow initdb' ec2-user
+                else
+                  su -c '/usr/local/bin/airflow upgradedb' ec2-user
                 fi
         service:
           files:
