@@ -61,10 +61,6 @@ Parameters:
     Description: EC2 instance type to use for the workers.
     Type: String
     Default: t3.micro
-  WorkerConcurrency:
-    Description: Number of concurrent units per machine.
-    Type: Number
-    Default: 1
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
@@ -105,7 +101,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  LoadDefaultConns:
+  LoadDefaultConn:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
@@ -186,7 +182,6 @@ Resources:
         SchedulerInstanceType: !Ref SchedulerInstanceType
         WebserverInstanceType: !Ref WebserverInstanceType
         WorkerInstanceType: !Ref WorkerInstanceType
-        WorkerConcurrency: !Ref WorkerConcurrency
         MinGroupSize: !Ref MinGroupSize
         MaxGroupSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
@@ -194,7 +189,7 @@ Resources:
         DbMasterUsername: !Ref DbMasterUsername
         DbMasterPassword: !Ref DbMasterPassword
         LoadExampleDags: !Ref LoadExampleDags
-        LoadDefaultConns: !Ref LoadDefaultConns
+        LoadDefaultConn: !Ref LoadDefaultConn
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -225,7 +220,6 @@ Metadata:
           - SchedulerInstanceType
           - WebserverInstanceType
           - WorkerInstanceType
-          - WorkerConcurrency
           - MinGroupSize
           - MaxGroupSize
           - ShrinkThreshold
@@ -236,4 +230,4 @@ Metadata:
           default: Airflow Config
         Parameters:
           - LoadExampleDags
-          - LoadDefaultConns
+          - LoadDefaultConn

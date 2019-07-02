@@ -45,7 +45,7 @@ Parameters:
     NoEcho: true
   LoadExampleDags:
     Type: String
-  LoadDefaultConns:
+  LoadDefaultConn:
     Type: String
   QSS3BucketName:
     Type: String
@@ -561,7 +561,7 @@ Resources:
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
                   AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
                   AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
-                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConns}
+                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConn}
                   AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
                   AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
                   AIRFLOW__CORE__REMOTE_LOGGING=True
@@ -845,4 +845,4 @@ Metadata:
           default: Airflow Config
         Parameters:
           - LoadExampleDags
-          - LoadDefaultConns
+          - LoadDefaultConn
