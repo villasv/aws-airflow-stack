@@ -30,8 +30,6 @@ Parameters:
   WorkerInstanceType:
     Type: String
     Default: t2.small
-  WorkerConcurrency:
-    Type: Number
   MinGroupSize:
     Type: Number
   MaxGroupSize:
@@ -564,22 +562,25 @@ Resources:
                   AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
                   AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
                   TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConns}
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql://${DbMasterUsername}:${DbMasterPassword}@${RDS}/airflow
+                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
                   AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
                   AIRFLOW__CORE__REMOTE_LOGGING=True
                   AIRFLOW__WEBSERVER__BASE_URL=http://${!HOSTNAME}:${WebserverPort}
                   AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
                   AIRFLOW__CELERY__BROKER_URL=sqs://
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
-                  AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${DbMasterUsername}:${DbMasterPassword}@${RDS}/airflow
-                  AIRFLOW__CELERY__WORKER_CONCURRENCY=${WorkerConcurrency}
+                  AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
                   AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
-                - QueueName: !GetAtt
-                    - Tasks
-                    - QueueName
-                  RDS: !GetAtt
-                    - Database
-                    - Endpoint.Address
+                - QueueName: !GetAtt Tasks.QueueName
+                  DbUri: !Join
+                  - ''
+                  - - postgresql://
+                    - !Ref DbMasterUsername
+                    - ':'
+                    - !Ref DbMasterPassword
+                    - '@'
+                    - !GetAtt Database.Endpoint.Address
+                    - /airflow
           commands:
             envsubst:
               command: |
@@ -685,8 +686,7 @@ Resources:
                   | select(.Description
                   | test($TERMINATE_MESSAGE)) != []')
 
-                if [ "$TERMINATING" = "true" ]
-                then
+                if [ "$TERMINATING" = "true" ]; then
                   systemctl stop airflow
                 fi
             /usr/lib/systemd/system/lchkill.timer:
@@ -706,8 +706,7 @@ Resources:
                 #!/bin/sh
                 SERVICE_STATUS=$(systemctl is-active airflow)
 
-                if [ "$SERVICE_STATUS" = "deactivating" ]
-                then
+                if [ "$SERVICE_STATUS" = "deactivating" ]; then
                   aws autoscaling record-lifecycle-action-heartbeat \
                     --instance-id $(ec2-metadata -i | awk '{print $2}') \
                     --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
@@ -836,7 +835,6 @@ Metadata:
           - SchedulerInstanceType
           - WebserverInstanceType
           - WorkerInstanceType
-          - WorkerConcurrency
           - MinGroupSize
           - MaxGroupSize
           - ShrinkThreshold
