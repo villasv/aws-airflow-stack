@@ -42,7 +42,7 @@ Resources:
       UserData: !Base64
         'Fn::Sub': |
           #!/bin/bash -xe
-          echo $'TURBINE_MACHINE=WORKER' > /etc/environment
+          echo 'TURBINE_MACHINE=WORKER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \

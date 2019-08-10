@@ -428,6 +428,16 @@ Resources:
                 Action:
                   - cloudformation:DescribeStackResource
                 Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
+        - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:PutParameter
+                Resource:
+                  - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
         - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -553,14 +563,41 @@ Resources:
                   apache-airflow[celery,postgres,s3,crypto]==1.10.4
         secrets:
           commands:
-            fernet: |
+            generate:
+              command: !Sub |
+                source /etc/environment
                 if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Secret generation reserved for the scheduler"
                   exit 0
                 fi
                 FERNET_KEY=$(aws ssm get-parameter \
                   --name ${AWS::StackName}-fernet-key \
+                  --region '${AWS::Region}' \
                   --query 'Parameter.Value')
+                if [ "$FERNET_KEY" = "" ]; then
+                  FERNET_KEY=$(python3 -c "if True:#
+                    from cryptography.fernet import Fernet
+                    key = Fernet.generate_key().decode()
+                    print(key)")
+                  aws ssm put-parameter \
+                    --name ${AWS::StackName}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --value $FERNET_KEY \
+                    --type SecureString
+                fi
+            retrieve:
+              command: !Sub |
+                while [ "$FERNET_KEY" = "" ]; do
+                  echo "Waiting for Fernet key to be available..."
+                  sleep 1
+                  FERNET_KEY=$(aws ssm get-parameter \
+                    --name ${AWS::StackName}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --with-decryption \
+                    --query 'Parameter.Value' \
+                    --output text)
+                done
+                echo "FERNET_KEY=$FERNET_KEY" >> /etc/environment
         sysconf:
           files:
             /etc/sysconfig/airflow:
@@ -594,6 +631,7 @@ Resources:
           commands:
             envsubst:
               command: |
+                source /etc/environment
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
