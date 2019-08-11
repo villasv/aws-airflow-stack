@@ -641,13 +641,14 @@ Resources:
                 else HOSTNAME=$LOC_IPV4
                 fi
 
-                envsubst </etc/sysconfig/airflow | sponge /etc/sysconfig/airflow
-
-                sed 's/^/export /' -- </etc/sysconfig/airflow >/tmp/env.sh
+                export FERNET_KEY HOSTNAME
+                echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
         migrate:
           commands:
             migration:
               command: |
+                source /etc/environment
+                source /etc/sysconfig/airflow
                 if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Database setup reserved for the scheduler"
                   exit 0
