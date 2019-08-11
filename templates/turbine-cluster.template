@@ -533,8 +533,7 @@ Resources:
                 param="nfsvers=4.1,rsize=1048576,wsize=1048576"
                 param="$param,hard,timeo=600,retrans=2,noresvport"
                 echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
-                mount /mnt/efs
-                chown -R ec2-user /mnt/efs
+                mount /mnt/efs && chown -R ec2-user /mnt/efs
         runtime:
           packages:
             yum:
@@ -565,7 +564,8 @@ Resources:
           commands:
             generate:
               command: !Sub |
-                source /etc/environment
+                export $(cat /etc/environment | xargs)
+
                 if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Secret generation reserved for the scheduler"
                   exit 0
@@ -631,7 +631,8 @@ Resources:
           commands:
             envsubst:
               command: |
-                source /etc/environment
+                export $(cat /etc/environment | xargs)
+
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
@@ -641,14 +642,14 @@ Resources:
                 else HOSTNAME=$LOC_IPV4
                 fi
 
-                export FERNET_KEY HOSTNAME
                 echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
         migrate:
           commands:
             migration:
               command: |
-                source /etc/environment
-                source /etc/sysconfig/airflow
+                export $(cat /etc/environment | xargs)
+                export $(cat /etc/sysconfig/airflow | xargs)
+
                 if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Database setup reserved for the scheduler"
                   exit 0
