@@ -649,7 +649,6 @@ Resources:
               command: |
                 export $(cat /etc/environment | xargs)
                 export $(cat /etc/sysconfig/airflow | xargs)
-
                 if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
                   echo "Database setup reserved for the scheduler"
                   exit 0
@@ -709,7 +708,8 @@ Resources:
               command: !Sub |
                 HAS_DEPLOYMENT=$(aws deploy list-deployments \
                   --application-name ${AWS::StackName}-deployment-application \
-                  --deployment-group ${AWS::StackName}-deployment-group | \
+                  --deployment-group ${AWS::StackName}-deployment-group \
+                  --region ${AWS::Region} | \
                   jq '.deployments | has(0)')
 
                 systemctl enable airflow.service watcher.path
