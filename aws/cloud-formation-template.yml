@@ -293,6 +293,10 @@ Resources:
         - Granularity: 1Minute
       VPCZoneIdentifier:
         - !Ref StackSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-worker'
+          PropagateAtLaunch: true
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 90184717-25cc-4671-a70d-7becceed5c50
