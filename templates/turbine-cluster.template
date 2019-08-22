@@ -603,6 +603,7 @@ Resources:
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
+                  TURBINE_MACHINE=${!TURBINE_MACHINE}
                   AWS_DEFAULT_REGION=${AWS::Region}
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
