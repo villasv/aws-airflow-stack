@@ -27,7 +27,8 @@ AWS_REGION := eu-central-1
 PROJECT_NAME := eksairflow01-staging
 
 lint:
-	cfn-lint templates/*.template
+	cfn-lint templates/cluster/*.template
+	cfn-lint templates/services/*.template
 
 test:
 	taskcat -c ./ci/taskcat.yaml
