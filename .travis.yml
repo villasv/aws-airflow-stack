@@ -7,6 +7,11 @@ install:
 git:
     submodules: false
 before_install:
+    # DELETE ME
+    - my_ip=`curl ipinfo.io | jq .ip`;eval my_ip=${my_ip[i]}
+    - my_ip="$my_ip/32"
+    - export BASE_IP=$my_ip
+
     - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
     - git submodule update --init --recursive
     - git checkout .gitmodules
