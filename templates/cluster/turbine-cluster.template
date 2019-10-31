@@ -169,6 +169,10 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
+
+  # ---------------------- Metric for Scaling Mechanism-----------------------
+
+  # Allowing 'Metric Lambda' to access the cloudwatch metric 'Turbine'
   Logger:
     Type: AWS::IAM::Role
     Properties:
