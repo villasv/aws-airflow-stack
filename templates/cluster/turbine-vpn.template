@@ -1,7 +1,0 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description:
-Resources:
-  DummyServer:
-    Type: "AWS::EC2::Instance"
-    Properties:
-      ImageId: ""

@@ -129,11 +129,573 @@ Resources:
     DependsOn:
       - Meta
 
+  # ---------------------- Airflow EC2 cluster instance configuration-----------------------------
+
+  Meta:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Properties: {}
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - filesys
+            - runtime
+            - secrets
+            - sysconf
+            - migrate
+            - service
+            - lchooks
+            - metahup
+            - cdagent
+        filesys:
+          commands:
+            mkdir:
+              test: test ! -d /airflow
+              command: |
+                mkdir /airflow
+                chown -R ec2-user /airflow
+            mount:
+              test: test ! -d /mnt/efs
+              command: !Sub |
+                mkdir /mnt/efs
+                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
+                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
+                param="$param,hard,timeo=600,retrans=2,noresvport"
+                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
+                mount /mnt/efs && chown -R ec2-user /mnt/efs
+        runtime:
+          packages:
+            yum:
+              git: []
+              gcc: []
+              gcc-c++: []
+              jq: []
+              lapack-devel: []
+              libcurl-devel: []
+              libxml2-devel: []
+              libxslt-devel: []
+              openssl-devel: []
+              postgresql-devel: []
+              python3: []
+              python3-devel: []
+              python3-pip: []
+              python3-wheel: []
+          commands:
+            install:
+              command: |
+                PYCURL_SSL_LIBRARY=openssl pip3 install \
+                  --no-cache-dir --compile --ignore-installed \
+                  pycurl
+                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
+                  celery[sqs] \
+                  apache-airflow[celery,postgres,s3,crypto]==1.10.4
+        secrets:
+          commands:
+            generate:
+              command: !Sub |
+                export $(cat /etc/environment | xargs)
+
+                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
+                  echo "Secret generation reserved for the scheduler"
+                  exit 0
+                fi
+                FERNET_KEY=$(aws ssm get-parameter \
+                  --name ${AWS::StackName}-fernet-key \
+                  --region '${AWS::Region}' \
+                  --query 'Parameter.Value')
+                if [ "$FERNET_KEY" = "" ]; then
+                  FERNET_KEY=$(python3 -c "if True:#
+                    from cryptography.fernet import Fernet
+                    key = Fernet.generate_key().decode()
+                    print(key)")
+                  aws ssm put-parameter \
+                    --name ${AWS::StackName}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --value $FERNET_KEY \
+                    --type SecureString
+                fi
+            retrieve:
+              command: !Sub |
+                while [ "$FERNET_KEY" = "" ]; do
+                  echo "Waiting for Fernet key to be available..."
+                  sleep 1
+                  FERNET_KEY=$(aws ssm get-parameter \
+                    --name ${AWS::StackName}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --with-decryption \
+                    --query 'Parameter.Value' \
+                    --output text)
+                done
+                echo "FERNET_KEY=$FERNET_KEY" >> /etc/environment
+        sysconf:
+          files:
+            /etc/sysconfig/airflow:
+              content: !Sub
+                - |
+                  TURBINE_MACHINE=${!TURBINE_MACHINE}
+                  AWS_DEFAULT_REGION=${AWS::Region}
+                  AIRFLOW_HOME=/airflow
+                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+                  AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
+                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
+                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConn}
+                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
+                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
+                  AIRFLOW__CORE__REMOTE_LOGGING=True
+                  AIRFLOW__WEBSERVER__BASE_URL=http://${!HOSTNAME}:${WebserverPort}
+                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
+                  AIRFLOW__CELERY__BROKER_URL=sqs://
+                  AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
+                  AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
+                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
+                - QueueName: !GetAtt Tasks.QueueName
+                  DbUri: !Join
+                    - ''
+                    - - postgresql://
+                      - !Ref DbMasterUsername
+                      - ':'
+                      - !Ref DbMasterPassword
+                      - '@'
+                      - !GetAtt Database.Endpoint.Address
+                      - /airflow
+          commands:
+            envsubst:
+              command: |
+                export $(cat /etc/environment | xargs)
+
+                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
+                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
+                if [ $PUBLIC = "200" ]
+                then HOSTNAME=$PUB_IPV4
+                else HOSTNAME=$LOC_IPV4
+                fi
+
+                echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
+        migrate:
+          commands:
+            migration:
+              command: |
+                export $(cat /etc/environment | xargs)
+                export $(cat /etc/sysconfig/airflow | xargs)
+                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
+                  echo "Database setup reserved for the scheduler"
+                  exit 0
+                fi
+                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
+                  su -c '/usr/local/bin/airflow initdb' ec2-user
+                else
+                  su -c '/usr/local/bin/airflow upgradedb' ec2-user
+                fi
+        service:
+          files:
+            /usr/bin/turbine:
+              mode: 755
+              content: |
+                #!/bin/sh
+                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
+                then exec airflow scheduler
+                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
+                then exec airflow webserver
+                elif [ "$TURBINE_MACHINE" == "WORKER" ]
+                then exec airflow worker
+                else echo "TURBINE_MACHINE value unknown" && exit 1
+                fi
+            /usr/lib/tmpfiles.d/airflow.conf:
+              content: |
+                D /run/airflow 0755 ec2-user ec2-user
+            /usr/lib/systemd/system/airflow.service:
+              content: |
+                [Service]
+                EnvironmentFile=/etc/sysconfig/airflow
+                User=ec2-user
+                Group=ec2-user
+                ExecStart=/usr/bin/turbine
+                Restart=always
+                RestartSec=5s
+                KillMode=mixed
+                TimeoutStopSec=24h
+                [Install]
+                WantedBy=multi-user.target
+            /usr/lib/systemd/system/watcher.path:
+              content: |
+                [Unit]
+                After=airflow.service
+                PartOf=airflow.service
+                [Path]
+                PathModified=/etc/sysconfig/airflow
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/watcher.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStartPre=/usr/bin/systemctl daemon-reload
+                ExecStart=/usr/bin/systemctl restart airflow
+          # TODO: How does the HAS_DEPLOYMENT mechanism work here?
+          commands:
+            setup:
+              command: !Sub |
+                HAS_DEPLOYMENT=$(aws deploy list-deployments \
+                  --application-name ${AWS::StackName}-deployment-application \
+                  --deployment-group ${AWS::StackName}-deployment-group \
+                  --region ${AWS::Region} | \
+                  jq '.deployments | has(0)')
+
+                systemctl enable airflow.service watcher.path
+
+                if [ "$HAS_DEPLOYMENT" = "false" ]; then
+                  systemctl start airflow
+                else
+                  echo "Deployment pending, deferring service start"
+                fi
+        # TODO: What does lchooks stands for? How is it related to timer, beat?
+        # Lifecycle hooks promoting graceful shutdown, delaying termination for task completion
+        lchooks:
+          files:
+            /usr/bin/lchkill:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
+                TERMINATE_MESSAGE="Terminating EC2 instance <$INSTANCE_ID>"
+                TERMINATING=$(aws autoscaling describe-scaling-activities \
+                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                  --max-items 100 \
+                  --region '${AWS::Region}' | \
+                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
+                  '.Activities[]
+                  | select(.Description
+                  | test($TERMINATE_MESSAGE)) != []')
+
+                if [ "$TERMINATING" = "true" ]; then
+                  systemctl stop airflow
+                fi
+            /usr/lib/systemd/system/lchkill.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchkill.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchkill
+            # WORKER ONLY <- lchbeat, lchbeat.timer
+            /usr/bin/lchbeat:
+              mode: 755
+              content: !Sub |
+                #!/bin/sh
+                SERVICE_STATUS=$(systemctl is-active airflow)
+
+                if [ "$SERVICE_STATUS" = "deactivating" ]; then
+                  aws autoscaling record-lifecycle-action-heartbeat \
+                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
+                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
+                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
+                    --region '${AWS::Region}'
+                fi
+            /usr/lib/systemd/system/lchbeat.timer:
+              content: |
+                [Timer]
+                OnCalendar=*:0/1
+                [Install]
+                WantedBy=airflow.service
+            /usr/lib/systemd/system/lchbeat.service:
+              content: |
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/lchbeat
+          commands:
+            setup:
+              command: |
+                if [ "$TURBINE_MACHINE" = "WORKER" ]; then
+                  systemctl enable lchkill.timer lchbeat.timer
+                fi
+        metahup:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                role=${AirflowRole}
+                interval=1
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v \
+                  --region ${AWS::Region} \
+                  --role ${AirflowRole} \
+                  --stack ${AWS::StackName} \
+                  --resource Meta
+                runas=root
+            /lib/systemd/system/cfn-hup.service:
+              content: |
+                [Service]
+                ExecStart=/opt/aws/bin/cfn-hup
+                Restart=always
+                [Install]
+                WantedBy=multi-user.target
+          commands:
+            setup:
+              command: |
+                systemctl enable cfn-hup.service
+                systemctl start cfn-hup.service
+        cdagent:
+          packages:
+            yum:
+              ruby: []
+              wget: []
+          commands:
+            install:
+              command: !Sub |
+                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
+                chmod +x ./install
+                ./install auto
+
+  # IAM Profile and role for all EC2 cluster instances
+  AirflowProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref AirflowRole
+
+  AirflowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-cfn-describe
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
+        - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:PutParameter
+                Resource:
+                  - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
+        - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ListQueues
+                Resource:
+                  - !Sub arn:aws:sqs:*:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                Resource: !Sub
+                  - arn:aws:sqs:*:${AWS::AccountId}:${queue}
+                  - queue: !GetAtt
+                      - Tasks
+                      - QueueName
+        - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:List*
+                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
+              - Effect: Allow
+                Action:
+                  - codedeploy:List*
+                Resource: !Sub arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*
+        - PolicyName: !Sub ${AWS::StackName}-logs-rw-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:Put*
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
+        - PolicyName: !Sub ${AWS::StackName}-lifecycle-heartbeat
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                  - autoscaling:CompleteLifecycleAction
+                Resource: !Sub arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*
+              - Effect: Allow
+                Action:
+                  - autoscaling:DescribeScalingActivities
+                Resource: '*'
+
+  # --------------------- Buckets containing Logs and Deployment packages---------------------
+
   LogsBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
 
   DeploymentsBucket:
     Type: AWS::S3::Bucket
+
+  # Custom cloudformation hooks that signal to target: Delete, Update, Create
+  CleanUpDeployments:
+    DependsOn: cleanupDeployBucket
+    Type: Custom::cleanupdeploy
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - "cleanupDeployBucket"
+          - "Arn"
+      BucketName: !Ref DeploymentsBucket
+
+  # Removes all objects from LogsBucket and DeploymentsBucket upon cfn Delete
+  # TODO: Use SQS for two events triggering the same lambda function
+  cleanupDeployBucket:
+    DependsOn: DeploymentsBucket
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import json
+          import logging
+          # module cfnresponse does not exist for python3.7, use requests instead
+          # import cfnresponse
+          # Will yield a warning, but is currently the only solution for python3.7
+          # since inline code cannot import third party packages
+          from botocore.vendored import requests
+          from botocore.exceptions import ClientError
+
+          logger = logging.getLogger(__name__)
+
+          def setup(level='DEBUG', boto_level=None, **kwargs):
+              logging.root.setLevel(level)
+
+              if not boto_level:
+                  boto_level = level
+
+              logging.getLogger('boto').setLevel(boto_level)
+              logging.getLogger('boto3').setLevel(boto_level)
+              logging.getLogger('botocore').setLevel(boto_level)
+              logging.getLogger('urllib3').setLevel(boto_level)
+
+          try:
+              setup('DEBUG', formatter_cls=None, boto_level='ERROR')
+          except Exception as e:
+              logger.error(e, exc_info=True)
+
+          def clean_up_bucket(target_bucket):
+              logger.info(f"Clean content of bucket {target_bucket}.")
+              s3_resource = boto3.resource('s3')
+              try:
+                  bucket_response = s3_resource.Bucket(target_bucket).load()
+              except ClientError as e:
+                  logger.info(f"s3:://{target_bucket} not found. {e}")
+                  return
+              else:
+                  bucket_obj = s3_resource.Bucket(target_bucket)
+                  bucket_obj.objects.all().delete()
+
+          def handler(event, context):
+              # helper(event, context)
+
+              response_data = {}
+              # NOTE: The status value sent by the custom resource provider must be either SUCCESS or FAILED!!
+              try:
+                  bucket = event['ResourceProperties']['BucketName']
+                  if event['RequestType'] == 'Delete':
+                      clean_up_bucket(bucket)
+                  if event['RequestType'] == 'Update':
+                      logger.info(f"custom::cleanupbucket update. Target bucket: {bucket}")
+                  if event['RequestType'] == 'Create':
+                      logger.info(f"custom::cleanupbucket create. Target bucket: {bucket}")
+                  send_response_cfn(event, context, "SUCCESS")
+              except Exception as e:
+                  logger.info(str(e))
+                  send_response_cfn(event, context, "FAILED")
+
+          def send_response_cfn(event, context, response_status):
+              response_body = {'Status': response_status,
+                               'Reason': 'Log stream name: ' + context.log_stream_name,
+                               'PhysicalResourceId': context.log_stream_name,
+                               'StackId': event['StackId'],
+                               'RequestId': event['RequestId'],
+                               'LogicalResourceId': event['LogicalResourceId'],
+                               'Data': json.loads("{}")}
+              # Sends the response signal to the respective custom resource request
+              requests.put(event['ResponseURL'], data=json.dumps(response_body))
+      Description: cleanup Bucket on Delete Lambda function.
+      Handler: index.handler
+      Role: !GetAtt CleanupS3ExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 100
+
+  CleanupS3ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+
+  CleanupS3ExecutionPolicy:
+    DependsOn:
+      - CleanupS3ExecutionRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DeleteS3BucketLogsRolePolicy
+      Roles:
+        - Ref: CleanupS3ExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:*
+            Resource:
+              - arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+              - s3:*
+            Resource:
+              - "*"
+
+  # TODO: Move to separate template if possible
+  # --------------------- CodeDeploy resources-----------------------------------------------
 
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
@@ -168,7 +730,6 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
-
 
   # ---------------------- Metric for Scaling Mechanism-----------------------
 
@@ -328,6 +889,8 @@ Resources:
         - Timer
         - Arn
 
+  # ---------------------------- Shared Storage Volumes (EFS)------------------------------
+
   EfsFileSystem:
     Type: AWS::EFS::FileSystem
     Properties:
@@ -350,6 +913,9 @@ Resources:
       SubnetId: !Ref PrivateSubnet2AID
       SecurityGroups:
         - !Ref Access
+
+  # TODO: Move to Services as Database or External template
+  # ---------------------------- Airflow Postgres----------------------------------------
 
   DBs:
     Type: AWS::RDS::DBSubnetGroup
@@ -375,9 +941,14 @@ Resources:
       VPCSecurityGroups:
         - !Ref Connection
 
+  # TODO: Move to Database/External Services template
+  # ---------------------------- SQS Queuing---------------------------------------------
   Tasks:
     Type: AWS::SQS::Queue
     Properties: {}
+
+  # TODO: Move to SG template
+  # ---------------------------- Security Groups-----------------------------------------
 
   Access:
     Type: AWS::EC2::SecurityGroup
@@ -408,426 +979,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-connection
-
-  AirflowRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
-      Policies:
-        - PolicyName: !Sub ${AWS::StackName}-cfn-describe
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudformation:DescribeStackResource
-                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
-        - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                  - ssm:PutParameter
-                Resource:
-                  - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
-        - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - sqs:ListQueues
-                Resource:
-                  - !Sub arn:aws:sqs:*:${AWS::AccountId}:*
-              - Effect: Allow
-                Action:
-                  - sqs:ChangeMessageVisibility
-                  - sqs:DeleteMessage
-                  - sqs:GetQueueAttributes
-                  - sqs:GetQueueUrl
-                  - sqs:ReceiveMessage
-                  - sqs:SendMessage
-                Resource: !Sub
-                  - arn:aws:sqs:*:${AWS::AccountId}:${queue}
-                  - queue: !GetAtt
-                      - Tasks
-                      - QueueName
-        - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:List*
-                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-              - Effect: Allow
-                Action:
-                  - codedeploy:List*
-                Resource: !Sub arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*
-        - PolicyName: !Sub ${AWS::StackName}-logs-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:Put*
-                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
-        - PolicyName: !Sub ${AWS::StackName}-lifecycle-heartbeat
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - autoscaling:RecordLifecycleActionHeartbeat
-                  - autoscaling:CompleteLifecycleAction
-                Resource: !Sub arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*
-              - Effect: Allow
-                Action:
-                  - autoscaling:DescribeScalingActivities
-                Resource: '*'
-
-  AirflowProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref AirflowRole
-
-  Meta:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          default:
-            - filesys
-            - runtime
-            - secrets
-            - sysconf
-            - migrate
-            - service
-            - lchooks
-            - metahup
-            - cdagent
-        filesys:
-          commands:
-            mkdir:
-              test: test ! -d /airflow
-              command: |
-                mkdir /airflow
-                chown -R ec2-user /airflow
-            mount:
-              test: test ! -d /mnt/efs
-              command: !Sub |
-                mkdir /mnt/efs
-                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
-                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
-                param="$param,hard,timeo=600,retrans=2,noresvport"
-                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
-                mount /mnt/efs && chown -R ec2-user /mnt/efs
-        runtime:
-          packages:
-            yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              jq: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              openssl-devel: []
-              postgresql-devel: []
-              python3: []
-              python3-devel: []
-              python3-pip: []
-              python3-wheel: []
-          commands:
-            install:
-              command: |
-                PYCURL_SSL_LIBRARY=openssl pip3 install \
-                  --no-cache-dir --compile --ignore-installed \
-                  pycurl
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  celery[sqs] \
-                  apache-airflow[celery,postgres,s3,crypto]==1.10.4
-        secrets:
-          commands:
-            generate:
-              command: !Sub |
-                export $(cat /etc/environment | xargs)
-
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Secret generation reserved for the scheduler"
-                  exit 0
-                fi
-                FERNET_KEY=$(aws ssm get-parameter \
-                  --name ${AWS::StackName}-fernet-key \
-                  --region '${AWS::Region}' \
-                  --query 'Parameter.Value')
-                if [ "$FERNET_KEY" = "" ]; then
-                  FERNET_KEY=$(python3 -c "if True:#
-                    from cryptography.fernet import Fernet
-                    key = Fernet.generate_key().decode()
-                    print(key)")
-                  aws ssm put-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --value $FERNET_KEY \
-                    --type SecureString
-                fi
-            retrieve:
-              command: !Sub |
-                while [ "$FERNET_KEY" = "" ]; do
-                  echo "Waiting for Fernet key to be available..."
-                  sleep 1
-                  FERNET_KEY=$(aws ssm get-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --with-decryption \
-                    --query 'Parameter.Value' \
-                    --output text)
-                done
-                echo "FERNET_KEY=$FERNET_KEY" >> /etc/environment
-        sysconf:
-          files:
-            /etc/sysconfig/airflow:
-              content: !Sub
-                - |
-                  TURBINE_MACHINE=${!TURBINE_MACHINE}
-                  AWS_DEFAULT_REGION=${AWS::Region}
-                  AIRFLOW_HOME=/airflow
-                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-                  AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
-                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
-                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConn}
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
-                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
-                  AIRFLOW__CORE__REMOTE_LOGGING=True
-                  AIRFLOW__WEBSERVER__BASE_URL=http://${!HOSTNAME}:${WebserverPort}
-                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
-                  AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
-                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
-                - QueueName: !GetAtt Tasks.QueueName
-                  DbUri: !Join
-                  - ''
-                  - - postgresql://
-                    - !Ref DbMasterUsername
-                    - ':'
-                    - !Ref DbMasterPassword
-                    - '@'
-                    - !GetAtt Database.Endpoint.Address
-                    - /airflow
-          commands:
-            envsubst:
-              command: |
-                export $(cat /etc/environment | xargs)
-
-                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
-                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
-                if [ $PUBLIC = "200" ]
-                then HOSTNAME=$PUB_IPV4
-                else HOSTNAME=$LOC_IPV4
-                fi
-
-                echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
-        migrate:
-          commands:
-            migration:
-              command: |
-                export $(cat /etc/environment | xargs)
-                export $(cat /etc/sysconfig/airflow | xargs)
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Database setup reserved for the scheduler"
-                  exit 0
-                fi
-                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                  su -c '/usr/local/bin/airflow initdb' ec2-user
-                else
-                  su -c '/usr/local/bin/airflow upgradedb' ec2-user
-                fi
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
-                then exec airflow scheduler
-                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
-                then exec airflow webserver
-                elif [ "$TURBINE_MACHINE" == "WORKER" ]
-                then exec airflow worker
-                else echo "TURBINE_MACHINE value unknown" && exit 1
-                fi
-            /usr/lib/tmpfiles.d/airflow.conf:
-              content: |
-                D /run/airflow 0755 ec2-user ec2-user
-            /usr/lib/systemd/system/airflow.service:
-              content: |
-                [Service]
-                EnvironmentFile=/etc/sysconfig/airflow
-                User=ec2-user
-                Group=ec2-user
-                ExecStart=/usr/bin/turbine
-                Restart=always
-                RestartSec=5s
-                KillMode=mixed
-                TimeoutStopSec=24h
-                [Install]
-                WantedBy=multi-user.target
-            /usr/lib/systemd/system/watcher.path:
-              content: |
-                [Unit]
-                After=airflow.service
-                PartOf=airflow.service
-                [Path]
-                PathModified=/etc/sysconfig/airflow
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/watcher.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStartPre=/usr/bin/systemctl daemon-reload
-                ExecStart=/usr/bin/systemctl restart airflow
-          commands:
-            setup:
-              command: !Sub |
-                HAS_DEPLOYMENT=$(aws deploy list-deployments \
-                  --application-name ${AWS::StackName}-deployment-application \
-                  --deployment-group ${AWS::StackName}-deployment-group \
-                  --region ${AWS::Region} | \
-                  jq '.deployments | has(0)')
-
-                systemctl enable airflow.service watcher.path
-
-                if [ "$HAS_DEPLOYMENT" = "false" ]; then
-                  systemctl start airflow
-                else
-                  echo "Deployment pending, deferring service start"
-                fi
-        lchooks:
-          files:
-            /usr/bin/lchkill:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
-                TERMINATE_MESSAGE="Terminating EC2 instance <$INSTANCE_ID>"
-                TERMINATING=$(aws autoscaling describe-scaling-activities \
-                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                  --max-items 100 \
-                  --region '${AWS::Region}' | \
-                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
-                  '.Activities[]
-                  | select(.Description
-                  | test($TERMINATE_MESSAGE)) != []')
-
-                if [ "$TERMINATING" = "true" ]; then
-                  systemctl stop airflow
-                fi
-            /usr/lib/systemd/system/lchkill.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchkill.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchkill
-            /usr/bin/lchbeat:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                SERVICE_STATUS=$(systemctl is-active airflow)
-
-                if [ "$SERVICE_STATUS" = "deactivating" ]; then
-                  aws autoscaling record-lifecycle-action-heartbeat \
-                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                    --region '${AWS::Region}'
-                fi
-            /usr/lib/systemd/system/lchbeat.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchbeat.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchbeat
-          commands:
-            setup:
-              command: |
-                if [ "$TURBINE_MACHINE" = "WORKER" ]; then
-                  systemctl enable lchkill.timer lchbeat.timer
-                fi
-        metahup:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                role=${AirflowRole}
-                interval=1
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v \
-                  --region ${AWS::Region} \
-                  --role ${AirflowRole} \
-                  --stack ${AWS::StackName} \
-                  --resource Meta
-                runas=root
-            /lib/systemd/system/cfn-hup.service:
-              content: |
-                [Service]
-                ExecStart=/opt/aws/bin/cfn-hup
-                Restart=always
-                [Install]
-                WantedBy=multi-user.target
-          commands:
-            setup:
-              command: |
-                systemctl enable cfn-hup.service
-                systemctl start cfn-hup.service
-        cdagent:
-          packages:
-            yum:
-              ruby: []
-              wget: []
-          commands:
-            install:
-              command: !Sub |
-                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
-                chmod +x ./install
-                ./install auto
 
 Outputs:
   DeploymentsBucket:
