@@ -162,6 +162,18 @@ Resources:
               - 1
               - !GetAZs
 
+  SGStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-sg.template
+      Parameters:
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
+        VPCCIDR: !Ref VPCCIDR
+
   AirflowStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -192,6 +204,8 @@ Resources:
         LoadDefaultConn: !Ref LoadDefaultConn
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+        EfsAccessSG: !GetAtt SGStack.Outputs.EfsAccessSecurityGroup
+        DbConnectionSG: !GetAtt SGStack.Outputs.DbConnectionSecurityGroup
 
 Outputs:
   DeploymentsBucket:

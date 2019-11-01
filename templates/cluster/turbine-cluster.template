@@ -51,6 +51,10 @@ Parameters:
     Type: String
   QSS3KeyPrefix:
     Type: String
+  EfsAccessSG:
+    Type: String
+  DbConnectionSG:
+    Type: String
 
 Resources:
 
@@ -560,10 +564,36 @@ Resources:
 
   LogsBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+          SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+         BlockPublicAcls: True
+         BlockPublicPolicy: True
+         IgnorePublicAcls: True
+         RestrictPublicBuckets: True
+      VersioningConfiguration:
+         Status: Enabled
     DeletionPolicy: Retain
 
   DeploymentsBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      VersioningConfiguration:
+        Status: Enabled
 
   # Custom cloudformation hooks that signal to target: Delete, Update, Create
   CleanUpDeployments:
@@ -891,6 +921,7 @@ Resources:
 
   # ---------------------------- Shared Storage Volumes (EFS)------------------------------
 
+  # TODO: Get EfsAccessSG from turbine-sg.template
   EfsFileSystem:
     Type: AWS::EFS::FileSystem
     Properties:
@@ -904,7 +935,7 @@ Resources:
       FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref PrivateSubnet1AID
       SecurityGroups:
-        - !Ref Access
+        - !Ref EfsAccessSG
 
   EfsMountTarget2A:
     Type: AWS::EFS::MountTarget
@@ -912,7 +943,7 @@ Resources:
       FileSystemId: !Ref EfsFileSystem
       SubnetId: !Ref PrivateSubnet2AID
       SecurityGroups:
-        - !Ref Access
+        - !Ref EfsAccessSG
 
   # TODO: Move to Services as Database or External template
   # ---------------------------- Airflow Postgres----------------------------------------
@@ -925,6 +956,7 @@ Resources:
         - !Ref PrivateSubnet1AID
         - !Ref PrivateSubnet2AID
 
+  # TODO: Get SG from turbine-sg.template
   Database:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -939,46 +971,13 @@ Resources:
           Value: !Sub ${AWS::StackName}-database
       DBSubnetGroupName: !Ref DBs
       VPCSecurityGroups:
-        - !Ref Connection
+        - !Ref DbConnectionSG
 
   # TODO: Move to Database/External Services template
   # ---------------------------- SQS Queuing---------------------------------------------
   Tasks:
     Type: AWS::SQS::Queue
     Properties: {}
-
-  # TODO: Move to SG template
-  # ---------------------------- Security Groups-----------------------------------------
-
-  Access:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for the shared filesystem across Airflow
-        instances.
-      SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
-          IpProtocol: TCP
-          FromPort: 2049
-          ToPort: 2049
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-access'
-
-  Connection:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security Rules with permissions for database connections for Airflow.
-      SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
-          IpProtocol: TCP
-          FromPort: 5432
-          ToPort: 5432
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-connection
 
 Outputs:
   DeploymentsBucket:

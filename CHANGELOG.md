@@ -12,16 +12,19 @@ Comments are good, we love comments!!
 
 ### 2. Structure
 
-- More granular approach <- easier for debugging
+- More granular approach <- easier for maintaining and debugging
   * external services templates contains database and SQS
-  * Security groups have their own template 
+  * All security groups have a dedicated template 
 - Templates split in `cluster` and `services`
 
-### 3. Delete Buckets
+### 3. Log and Deployment Bucket
 
-Incident: DELETE_FAILED with Logs and Deployment Bucket are not empty
+Incident: After dag run, cloudformation DELETE_FAILED with "Logs and Deployment 
+Bucket are not empty"
 
-- Added custom cfn event + Lambda function for cleaning deployments bucket contents when delete-stack
+- Private Buckets by default
+- Added custom Cfn event + Lambda function for cleaning deployments bucket 
+content when delete-stack
 - Retain Logs bucket for error investigation or dag data archiving
 
 
