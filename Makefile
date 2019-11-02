@@ -41,6 +41,7 @@ artifacts:
 	aws s3 cp --recursive submodules/quickstart-aws-vpc s3://${PROJECT_NAME}-${AWS_REGION}/${PROJECT_NAME}submodules/quickstart-aws-vpc/templates/
 	aws s3 cp --recursive templates/cluster s3://${PROJECT_NAME}-${AWS_REGION}/${PROJECT_NAME}templates
 	aws s3 cp --recursive templates/services s3://${PROJECT_NAME}-${AWS_REGION}/${PROJECT_NAME}templates
+	aws s3 cp --recursive templates/ci s3://${PROJECT_NAME}-${AWS_REGION}/${PROJECT_NAME}templates
 
 # DELETE ME
 cluster:
