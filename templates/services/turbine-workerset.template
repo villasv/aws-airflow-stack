@@ -53,7 +53,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
-        Security Rules with permissions for node itercommunication between
+        Security Rules with permissions for node intercommunication between
         Airflow worker instances.
       VpcId: !Ref VPCID
       SecurityGroupIngress:
@@ -89,6 +89,7 @@ Resources:
       HeartbeatTimeout: 300
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
 
+  # ShrinkAlarm and GrowthAlarm are triggered by the treshold [...] from Metric Workerload
   ShrinkAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:

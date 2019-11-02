@@ -58,6 +58,8 @@ Parameters:
 
 Resources:
 
+  # ------------------------ Create Cluster Instance Services---------------------------------
+
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -133,7 +135,7 @@ Resources:
     DependsOn:
       - Meta
 
-  # ---------------------- Airflow EC2 cluster instance configuration-----------------------------
+  # ---------------------- Turbine EC2 cluster instance configuration-----------------------------
 
   Meta:
     Type: AWS::CloudFormation::WaitConditionHandle
@@ -569,14 +571,12 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
         - ServerSideEncryptionByDefault:
-          SSEAlgorithm: AES256
+            SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
          BlockPublicAcls: True
          BlockPublicPolicy: True
          IgnorePublicAcls: True
          RestrictPublicBuckets: True
-      VersioningConfiguration:
-         Status: Enabled
     DeletionPolicy: Retain
 
   DeploymentsBucket:
@@ -586,16 +586,14 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-            SSEAlgorithm: AES256
+              SSEAlgorithm: AES256
       PublicAccessBlockConfiguration:
         BlockPublicAcls: True
         BlockPublicPolicy: True
         IgnorePublicAcls: True
         RestrictPublicBuckets: True
-      VersioningConfiguration:
-        Status: Enabled
 
-  # Custom cloudformation hooks that signal to target: Delete, Update, Create
+  # Custom CloudFormation hook that signals to target: Delete, Update, Create
   CleanUpDeployments:
     DependsOn: cleanupDeployBucket
     Type: Custom::cleanupdeploy
@@ -606,8 +604,7 @@ Resources:
           - "Arn"
       BucketName: !Ref DeploymentsBucket
 
-  # Removes all objects from LogsBucket and DeploymentsBucket upon cfn Delete
-  # TODO: Use SQS for two events triggering the same lambda function
+  # Removes all objects from Deployments Bucket upon cfn delete-stack
   cleanupDeployBucket:
     DependsOn: DeploymentsBucket
     Type: "AWS::Lambda::Function"
@@ -761,10 +758,11 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
+  # TODO: Try moving to turbine-workerset.template
   # ---------------------- Metric for Scaling Mechanism-----------------------
 
   # Allowing 'Metric Lambda' to access the cloudwatch metric 'Turbine'
-  Logger:
+  MetricRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -785,6 +783,8 @@ Resources:
                   - cloudwatch:GetMetric*
                   - cloudwatch:PutMetricData
 
+  # How is the Metric Lambda connected to the ASG?
+  # Alarms are triggered above or below treshold based on Lambda Metric
   Metric:
     Type: AWS::Lambda::Function
     Properties:
@@ -801,6 +801,8 @@ Resources:
               _d.setMinutes(d.getMinutes() + m);
               return _d;
             };
+
+            # TODO: Understand time series results (is it an array, a map or a table)?
             const getMetricAtTime = (ms, m, t) => {
               const m_idx = ms.MetricDataResults
                 .map(_r => _r.Id)
@@ -829,6 +831,8 @@ Resources:
               curr.setSeconds(0); curr.setMilliseconds(0);
               const prev = datePlusMinutes(curr, -5);
               const back = datePlusMinutes(prev, -5);
+
+              # -------Step1: Get the relevant variables for worker load calculation--------
               const metrics = await cw.getMetricData({
                 StartTime: back, EndTime: curr,
                 ScanBy: 'TimestampDescending',
@@ -866,6 +870,7 @@ Resources:
                       Stat: 'Average',
                       Unit: 'None', }},
               ]}).promise();
+
               const ANOMV = getMetricAtTime(metrics, 'maxANOMV', prev);
               const NOER = getMetricAtTime(metrics, 'sumNOER', prev);
               const GISI = getMetricAtTime(metrics, 'avgGISI', prev);
@@ -877,6 +882,8 @@ Resources:
                 l = 1 - NOER / (M * 0.098444 * 300);
               else
                 l = (ANOMV > 0) ? 1.0 : 0.0;
+
+              # Results are pushed into the Metric 'WorkerLoad'
               await cw.putMetricData({
                 Namespace: 'Turbine',
                 MetricData: [{ MetricName: 'WorkerLoad',
@@ -892,7 +899,7 @@ Resources:
               - Tasks
               - QueueName
       Role: !GetAtt
-        - Logger
+        - MetricRole
         - Arn
     Metadata:
       'AWS::CloudFormation::Designer':
