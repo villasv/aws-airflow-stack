@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  Turbine resources for supporting the main Airflow cluster:
+    - RDS Airflow metadata database
+    - SQS Broker
+    - EFS shared directory
+
+Parameters:
+  PrivateSubnet1ID:
+    Type: String
+  PrivateSubnet2ID:
+    Type: String
+  EfsSecurityGroup:
+    Type: String
+  DbSecurityGroup:
+    Type: String
+  PostgresDbUser:
+    Type: String
+  PostgresMasterPasswd:
+    Type: String
+
+Resources:
+
+  # ---------------------------- Shared Storage Volumes (EFS)------------------------------
+
+  EfsFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-filesystem
+
+  EfsMountTarget1A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet1ID
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  EfsMountTarget2A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet2ID
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  # ---------------------------- Airflow Postgres----------------------------------------
+
+  DBs:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref PrivateSubnet1ID
+        - !Ref PrivateSubnet2ID
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
+      Engine: postgres
+      MasterUsername: !Ref PostgresDbUser
+      MasterUserPassword: !Ref PostgresMasterPasswd
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-database
+      DBSubnetGroupName: !Ref DBs
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+
+  # ---------------------------- SQS Queuing---------------------------------------------
+
+  Tasks:
+    Type: AWS::SQS::Queue
+    Properties: {}
+
+Outputs:
+  TaskQueueName:
+    Value: !GetAtt Tasks.QueueName
+  DatabaseAddress:
+    Value: !GetAtt Database.Endpoint.Address
+  EfsFS:
+    Value: !Ref EfsFileSystem

@@ -4,7 +4,8 @@ Description: >-
   CI CodeDeploy resources for Airflow build.
 
   NOTE: The DeploymentsBucket is defined in turbine-cluster.template for
-  the cluster instance configuration dependency.
+  the cluster instance configuration depends on it. This is in order to
+  avoid circular dependency between CIStack and AirflowStack.
 
 Parameters:
   SchedulerScalingGroup:

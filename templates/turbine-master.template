@@ -198,14 +198,31 @@ Resources:
         MaxGroupSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
-        DbMasterUsername: !Ref DbMasterUsername
-        DbMasterPassword: !Ref DbMasterPassword
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultConn: !Ref LoadDefaultConn
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-        EfsAccessSG: !GetAtt SGStack.Outputs.EfsAccessSecurityGroup
-        DbConnectionSG: !GetAtt SGStack.Outputs.DbConnectionSecurityGroup
+        DbMasterUsername: !Ref DbMasterUsername
+        DbMasterPassword: !Ref DbMasterPassword
+        DbEndpointAddress: !GetAtt ResourceStack.Outputs.DatabaseAddress
+        TaskQueueName: !GetAtt ResourceStack.Outputs.TaskQueueName
+        EfsFileSystem: !GetAtt ResourceStack.Outputs.EfsFS
+
+  ResourceStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-resource.template
+      Parameters:
+        PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+        EfsSecurityGroup: !GetAtt SGStack.Outputs.EfsAccessSecurityGroup
+        DbSecurityGroup: !GetAtt SGStack.Outputs.DbConnectionSecurityGroup
+        PostgresDbUser: !Ref DbMasterUsername
+        PostgresMasterPasswd: !Ref DbMasterPassword
 
   CIStack:
     Type: AWS::CloudFormation::Stack

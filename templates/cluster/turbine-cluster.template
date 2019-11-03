@@ -38,11 +38,6 @@ Parameters:
     Type: Number
   GrowthThreshold:
     Type: Number
-  DbMasterUsername:
-    Type: String
-  DbMasterPassword:
-    Type: String
-    NoEcho: true
   LoadExampleDags:
     Type: String
   LoadDefaultConn:
@@ -51,9 +46,16 @@ Parameters:
     Type: String
   QSS3KeyPrefix:
     Type: String
-  EfsAccessSG:
+  DbMasterUsername:
     Type: String
-  DbConnectionSG:
+  DbMasterPassword:
+    Type: String
+    NoEcho: true
+  DbEndpointAddress:
+    Type: String
+  TaskQueueName:
+    Type: String
+  EfsFileSystem:
     Type: String
 
 Resources:
@@ -254,7 +256,7 @@ Resources:
                   AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
                   AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
                   AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
-                - QueueName: !GetAtt Tasks.QueueName
+                - QueueName: !Ref TaskQueueName
                   DbUri: !Join
                     - ''
                     - - postgresql://
@@ -262,7 +264,7 @@ Resources:
                       - ':'
                       - !Ref DbMasterPassword
                       - '@'
-                      - !GetAtt Database.Endpoint.Address
+                      - !Ref DbEndpointAddress
                       - /airflow
           commands:
             envsubst:
@@ -523,9 +525,7 @@ Resources:
                   - sqs:SendMessage
                 Resource: !Sub
                   - arn:aws:sqs:*:${AWS::AccountId}:${queue}
-                  - queue: !GetAtt
-                      - Tasks
-                      - QueueName
+                  - queue: !Ref TaskQueueName
         - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -732,9 +732,7 @@ Resources:
               }).promise();
             };
           - asgName: !Sub '${AWS::StackName}-scaling-group'
-            queueName: !GetAtt
-              - Tasks
-              - QueueName
+            queueName: !Ref TaskQueueName
       Role: !GetAtt
         - MetricRole
         - Arn
@@ -762,65 +760,6 @@ Resources:
       SourceArn: !GetAtt
         - Timer
         - Arn
-
-  # ---------------------------- Shared Storage Volumes (EFS)------------------------------
-
-  EfsFileSystem:
-    Type: AWS::EFS::FileSystem
-    Properties:
-      FileSystemTags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-filesystem
-
-  EfsMountTarget1A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet1AID
-      SecurityGroups:
-        - !Ref EfsAccessSG
-
-  EfsMountTarget2A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet2AID
-      SecurityGroups:
-        - !Ref EfsAccessSG
-
-  # TODO: Move to Services as Database or External template
-  # ---------------------------- Airflow Postgres----------------------------------------
-
-  DBs:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
-      SubnetIds:
-        - !Ref PrivateSubnet1AID
-        - !Ref PrivateSubnet2AID
-
-  # TODO: Get SG from turbine-sg.template
-  Database:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      AllocatedStorage: '20'
-      DBInstanceClass: db.t2.micro
-      DBName: airflow
-      Engine: postgres
-      MasterUsername: !Ref DbMasterUsername
-      MasterUserPassword: !Ref DbMasterPassword
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-database
-      DBSubnetGroupName: !Ref DBs
-      VPCSecurityGroups:
-        - !Ref DbConnectionSG
-
-  # TODO: Move to Database/External Services template
-  # ---------------------------- SQS Queuing---------------------------------------------
-  Tasks:
-    Type: AWS::SQS::Queue
-    Properties: {}
 
 Outputs:
   DeploymentsBucket:
