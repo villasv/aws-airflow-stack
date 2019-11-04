@@ -3,6 +3,8 @@ Description: >-
   The Turbine-Airflow master stack, including a quickstart VPC stack and the
   Turbine-Airflow cluster stack.
 Parameters:
+
+  # Networking
   VPCCIDR:
     Description: The CIDR block for the VPC
     Type: String
@@ -49,6 +51,8 @@ Parameters:
       such.
     Type: String
     Default: 8080
+
+  # Cluster Settings
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
@@ -91,6 +95,8 @@ Parameters:
     Description: The password to be used in the airflow database.
     Type: String
     NoEcho: true
+
+  # Airflow Config
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
@@ -110,13 +116,13 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
+
+  # Quick Start Overrides
   QSS3BucketName:
     Description: >-
-      S3 bucket name for the Quick Start assets. This bucket name can include
-      numbers, lowercase letters, uppercase letters, and hyphens (-), but should
-      not start or end with a hyphen. You can specify your own bucket if you
-      copy all of the assets and submodules into it, if you want to override the
-      Quick Start behavior for your specific implementation.
+      S3 bucket name for the Quick Start assets. You can specify your own bucket
+      providing assets and submodules, if you want to override the Quick Start
+      behavior for your specific implementation.
     Type: String
     Default: turbine-quickstart
     AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
@@ -125,9 +131,9 @@ Parameters:
       letters, and hyphens (-). It cannot start or end with a hyphen (-).
   QSS3KeyPrefix:
     Description: >-
-      S3 key prefix for the Quick Start assets. Quick Start key prefix can
-      include numbers, lowercase letters, uppercase letters, hyphens (-), and
-      forward slash (/).
+      S3 key prefix for the Quick Start assets. You can scpeficy your own
+      "directory" providing the stack templates, if you want to override the
+      Quick Start behavior for your specific implementation.
     Type: String
     Default: quickstart-turbine-airflow/
     AllowedPattern: '^[0-9a-zA-Z-/]*$'
@@ -162,7 +168,7 @@ Resources:
               - 1
               - !GetAZs
 
-  AirflowStack:
+  TurbineCluster:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
@@ -195,11 +201,11 @@ Resources:
 
 Outputs:
   DeploymentsBucket:
-    Value: !GetAtt AirflowStack.Outputs.DeploymentsBucket
+    Value: !GetAtt TurbineCluster.Outputs.DeploymentsBucket
   CodeDeployApplication:
-    Value: !GetAtt AirflowStack.Outputs.CodeDeployApplication
+    Value: !GetAtt TurbineCluster.Outputs.CodeDeployApplication
   CodeDeployDeploymentGroup:
-    Value: !GetAtt AirflowStack.Outputs.CodeDeployDeploymentGroup
+    Value: !GetAtt TurbineCluster.Outputs.CodeDeployDeploymentGroup
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -231,3 +237,8 @@ Metadata:
         Parameters:
           - LoadExampleDags
           - LoadDefaultConn
+      - Label:
+          default: Quick Start Overrides
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix

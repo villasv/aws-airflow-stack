@@ -1,6 +1,8 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: The Airflow cluster stack
 Parameters:
+
+  # Networking
   VPCID:
     Type: AWS::EC2::VPC::Id
   VPCCIDR:
@@ -21,6 +23,8 @@ Parameters:
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   WebserverPort:
     Type: String
+
+  # Cluster Settings
   SchedulerInstanceType:
     Type: String
     Default: t2.micro
@@ -43,10 +47,14 @@ Parameters:
   DbMasterPassword:
     Type: String
     NoEcho: true
+
+  # Airflow Config
   LoadExampleDags:
     Type: String
   LoadDefaultConn:
     Type: String
+
+  # Quick Start Overrides
   QSS3BucketName:
     Type: String
   QSS3KeyPrefix:
@@ -897,3 +905,8 @@ Metadata:
         Parameters:
           - LoadExampleDags
           - LoadDefaultConn
+      - Label:
+          default: Quick Start Overrides
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
