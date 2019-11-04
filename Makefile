@@ -11,3 +11,9 @@ endif
 
 lint:
 	cfn-lint templates/*.template
+	
+test:
+	taskcat -c ./ci/taskcat.yaml
+
+sync:
+	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
