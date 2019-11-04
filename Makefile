@@ -13,7 +13,7 @@ lint:
 	cfn-lint templates/*.template
 
 test:
-	taskcat -c ./ci/taskcat.yaml
+	taskcat test run --input-file ./ci/taskcat.yaml
 
 sync:
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)

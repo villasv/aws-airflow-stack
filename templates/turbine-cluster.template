@@ -58,10 +58,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - /
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
-          - !Sub ${QSS3KeyPrefix}templates
-          - turbine-scheduler.template
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - templates/turbine-scheduler.template
       Parameters:
         ParentStack: !Ref AWS::StackName
         IamInstanceProfile: !Ref AirflowProfile
@@ -80,10 +80,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - /
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
-          - !Sub ${QSS3KeyPrefix}templates
-          - turbine-webserver.template
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - templates/turbine-webserver.template
       Parameters:
         ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID
@@ -105,10 +105,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - /
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
-          - !Sub ${QSS3KeyPrefix}templates
-          - turbine-workerset.template
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - templates/turbine-workerset.template
       Parameters:
         ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID

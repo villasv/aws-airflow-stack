@@ -141,10 +141,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - '/'
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
-          - !Sub ${QSS3KeyPrefix}submodules
-          - quickstart-aws-vpc/templates/aws-vpc.template
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - submodules/quickstart-aws-vpc/templates/aws-vpc.template
       Parameters:
         VPCCIDR: !Ref VPCCIDR
         PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
@@ -166,10 +166,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Join
-        - '/'
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
-          - !Sub ${QSS3KeyPrefix}templates
-          - turbine-cluster.template
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - templates/turbine-cluster.template
       Parameters:
         VPCID: !GetAtt VPCStack.Outputs.VPCID
         VPCCIDR: !Ref VPCCIDR

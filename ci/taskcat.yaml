@@ -1,10 +1,13 @@
-global:
+project:
   owner: mail@victor.villas
-  qsname: quickstart-turbine-airflow
-  regions:
-    - eu-west-1
-    - us-east-1
+  name: quickstart-turbine-airflow
+
 tests:
-  default:
-    parameter_input: parameters.json
-    template_file: turbine-master.template
+  master:
+    template: templates/turbine-master.template
+    regions:
+      - eu-west-1
+      - us-east-1
+    parameters:
+      DbMasterPassword: "$[taskcat_genpass_8A]"
+      QSS3BucketName: "$[taskcat_autobucket]"
