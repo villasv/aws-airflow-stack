@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  CI CodeDeploy resources for Airflow build.
+
+  NOTE: The DeploymentsBucket is defined in turbine-cluster.template for
+  the cluster instance configuration depends on it. This is in order to
+  avoid circular dependency between CIStack and AirflowStack.
+
+Parameters:
+  SchedulerScalingGroup:
+    Type: String
+  WebserverScalingGroup:
+    Type: String
+  WorkerSetScalingGroup:
+    Type: String
+  DeploymentsBucket:
+    Type: String
+
+Resources:
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub ${AWS::StackName}-deployment-application
+      ComputePlatform: Server
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub ${AWS::StackName}-deployment-group
+      AutoScalingGroups:
+        - !Ref SchedulerScalingGroup
+        - !Ref WebserverScalingGroup
+        - !Ref WorkerSetScalingGroup
+      ServiceRoleArn: !GetAtt
+        - CodeDeployServiceRole
+        - Arn
+
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
+
+  # Custom CloudFormation hook that signals to target: Delete, Update, Create
+  CleanUpDeployments:
+    DependsOn: cleanupDeployBucket
+    Type: Custom::cleanupdeploy
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - "cleanupDeployBucket"
+          - "Arn"
+      BucketName: !Ref DeploymentsBucket
+
+  # Removes all objects from Deployments Bucket upon cfn delete-stack
+  cleanupDeployBucket:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import json
+          import logging
+          # module cfnresponse does not exist for python3.7, use requests instead
+          # import cfnresponse
+          # Will yield a warning, but is currently the only solution for python3.7
+          # since inline code cannot import third party packages
+          from botocore.vendored import requests
+          from botocore.exceptions import ClientError
+
+          logger = logging.getLogger(__name__)
+
+          def setup(level='DEBUG', boto_level=None, **kwargs):
+              logging.root.setLevel(level)
+
+              if not boto_level:
+                  boto_level = level
+
+              logging.getLogger('boto').setLevel(boto_level)
+              logging.getLogger('boto3').setLevel(boto_level)
+              logging.getLogger('botocore').setLevel(boto_level)
+              logging.getLogger('urllib3').setLevel(boto_level)
+
+          try:
+              setup('DEBUG', formatter_cls=None, boto_level='ERROR')
+          except Exception as e:
+              logger.error(e, exc_info=True)
+
+          def clean_up_bucket(target_bucket):
+              logger.info(f"Clean content of bucket {target_bucket}.")
+              s3_resource = boto3.resource('s3')
+              try:
+                  bucket_response = s3_resource.Bucket(target_bucket).load()
+              except ClientError as e:
+                  logger.info(f"s3:://{target_bucket} not found. {e}")
+                  return
+              else:
+                  bucket_obj = s3_resource.Bucket(target_bucket)
+                  bucket_obj.objects.all().delete()
+
+          def handler(event, context):
+              # helper(event, context)
+
+              response_data = {}
+              # NOTE: The status value sent by the custom resource provider must be either SUCCESS or FAILED!!
+              try:
+                  bucket = event['ResourceProperties']['BucketName']
+                  if event['RequestType'] == 'Delete':
+                      clean_up_bucket(bucket)
+                  if event['RequestType'] == 'Update':
+                      logger.info(f"custom::cleanupbucket update. Target bucket: {bucket}")
+                  if event['RequestType'] == 'Create':
+                      logger.info(f"custom::cleanupbucket create. Target bucket: {bucket}")
+                  send_response_cfn(event, context, "SUCCESS")
+              except Exception as e:
+                  logger.info(str(e))
+                  send_response_cfn(event, context, "FAILED")
+
+          def send_response_cfn(event, context, response_status):
+              response_body = {'Status': response_status,
+                               'Reason': 'Log stream name: ' + context.log_stream_name,
+                               'PhysicalResourceId': context.log_stream_name,
+                               'StackId': event['StackId'],
+                               'RequestId': event['RequestId'],
+                               'LogicalResourceId': event['LogicalResourceId'],
+                               'Data': json.loads("{}")}
+              # Sends the response signal to the respective custom resource request
+              requests.put(event['ResponseURL'], data=json.dumps(response_body))
+      Description: cleanup Bucket on Delete Lambda function.
+      Handler: index.handler
+      Role: !GetAtt CleanupS3ExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 100
+
+  CleanupS3ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+
+  CleanupS3ExecutionPolicy:
+    DependsOn:
+      - CleanupS3ExecutionRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DeleteS3BucketLogsRolePolicy
+      Roles:
+        - Ref: CleanupS3ExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:*
+            Resource:
+              - arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+              - s3:*
+            Resource:
+              - "*"
+
+Outputs:
+  DeploymentsBucket:
+    Value: !Ref DeploymentsBucket
+  CodeDeployApplication:
+    Value: !Ref CodeDeployApplication
+  CodeDeployDeploymentGroup:
+    Value: !Ref CodeDeployDeploymentGroup

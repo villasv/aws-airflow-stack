@@ -1,0 +1,254 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  Turbine resources for supporting the main Airflow cluster:
+    - RDS Airflow metadata database
+    - SQS Broker
+    - EFS shared storage mount
+    - Custom Cluster Scaling Metric
+
+Parameters:
+  PrivateSubnet1ID:
+    Type: String
+  PrivateSubnet2ID:
+    Type: String
+  EfsSecurityGroup:
+    Type: String
+  DbSecurityGroup:
+    Type: String
+  PostgresDbUser:
+    Type: String
+  PostgresMasterPasswd:
+    Type: String
+
+Resources:
+
+  # ---------------------------- Shared Storage Volumes (EFS)------------------------------
+
+  EfsFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-filesystem
+
+  EfsMountTarget1A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet1ID
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  EfsMountTarget2A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet2ID
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  # ---------------------------- Airflow Postgres----------------------------------------
+
+  DBs:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref PrivateSubnet1ID
+        - !Ref PrivateSubnet2ID
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
+      Engine: postgres
+      MasterUsername: !Ref PostgresDbUser
+      MasterUserPassword: !Ref PostgresMasterPasswd
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-database
+      DBSubnetGroupName: !Ref DBs
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+
+  # ---------------------------- SQS Queue-----------------------------------------------
+
+  Tasks:
+    Type: AWS::SQS::Queue
+    Properties: {}
+
+  # ---------------------------- Custom Cluster Scaling Metric---------------------------
+
+  # How is the Metric Lambda connected to the ASG? How is the threshold being calculated?
+  # Alarms are triggered above or below threshold based on Lambda Metric. ASG reacts to the Alarms.
+  Metric:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs8.10
+      Handler: index.handler
+      Code:
+        ZipFile: !Sub
+          - |
+            var AWS = require('aws-sdk');
+            AWS.config.update({region: '${AWS::Region}'});
+            var cw = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+            const datePlusMinutes = (d, m) => {
+              const _d = new Date(d);
+              _d.setMinutes(d.getMinutes() + m);
+              return _d;
+            };
+
+            const getMetricAtTime = (ms, m, t) => {
+              const m_idx = ms.MetricDataResults
+                .map(_r => _r.Id)
+                .indexOf(m);
+              const t_idx = ms.MetricDataResults[m_idx]
+                .Timestamps
+                .map(_t => _t.toISOString())
+                .indexOf(t.toISOString());
+              return ms.MetricDataResults[m_idx]
+                .Values[t_idx];
+            };
+            const discount = (ms, m, t1, t2, ws) => {
+              let incs = 0, d = t1;
+              let v1 = getMetricAtTime(ms, m, d), v2;
+              for (let i = 0; d < t2 ; i++) {
+                d = datePlusMinutes(t1, i+1);
+                v2 = getMetricAtTime(ms, m, d);
+                if (v2 > v1) incs += ws[i];
+                v1 = v2;
+              }
+              return incs;
+            };
+            exports.handler = async function(event, context) {
+              let curr = new Date();
+              curr.setMinutes(Math.floor(curr.getMinutes()/5)*5-5);
+              curr.setSeconds(0); curr.setMilliseconds(0);
+              const prev = datePlusMinutes(curr, -5);
+              const back = datePlusMinutes(prev, -5);
+
+              # ------- Step1: Get the relevant variables for worker load calculation--------
+              const metrics = await cw.getMetricData({
+                StartTime: back, EndTime: curr,
+                ScanBy: 'TimestampDescending',
+                MetricDataQueries: [
+                  { Id: 'maxANOMV', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'ApproximateNumberOfMessagesVisible',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Maximum',
+                      Unit: 'Count' }},
+                  { Id: 'sumNOER', MetricStat: {
+                      Metric: { Namespace: 'AWS/SQS',
+                                MetricName: 'NumberOfEmptyReceives',
+                                Dimensions: [{ Name: 'QueueName',
+                                              Value: '${queueName}' }]},
+                      Period: 300,
+                      Stat: 'Sum',
+                      Unit: 'Count', }},
+                  { Id: 'avgGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupInServiceInstances',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 300,
+                      Stat: 'Average',
+                      Unit: 'None', }},
+                  { Id: 'uGISI', MetricStat: {
+                      Metric: { Namespace: 'AWS/AutoScaling',
+                                MetricName: 'GroupDesiredCapacity',
+                                Dimensions: [{ Name: 'AutoScalingGroupName',
+                                              Value: '${asgName}' }]},
+                      Period: 60,
+                      Stat: 'Average',
+                      Unit: 'None', }},
+              ]}).promise();
+
+              # ---------Step2: Calculate Threshold---------------------------------------
+              const ANOMV = getMetricAtTime(metrics, 'maxANOMV', prev);
+              const NOER = getMetricAtTime(metrics, 'sumNOER', prev);
+              const GISI = getMetricAtTime(metrics, 'avgGISI', prev);
+              const ws = [0, 0, 0, 0.1, 0.3, 0.3, 0.3, 0.3, 0.2];
+              const dGISI = discount(metrics, 'uGISI', back, curr, ws);
+              const M = GISI - dGISI;
+              let l;
+              if (M > 0)
+                l = 1 - NOER / (M * 0.098444 * 300);
+              else
+                l = (ANOMV > 0) ? 1.0 : 0.0;
+
+              # ---------Step3: Push results into the Metric 'WorkerLoad'-----------------
+              await cw.putMetricData({
+                Namespace: 'Turbine',
+                MetricData: [{ MetricName: 'WorkerLoad',
+                              Dimensions: [ { Name: 'StackName',
+                                              Value: '${AWS::StackName}' }],
+                              Timestamp: prev,
+                              Value: (l > 0) ? l : 0,
+                              Unit: 'None' }],
+              }).promise();
+            };
+          - asgName: !Sub '${AWS::StackName}-scaling-group'
+            queueName: !GetAtt Tasks.QueueName
+      Role: !GetAtt
+        - MetricRole
+        - Arn
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 94c385fa-fb13-42cc-a292-7e68c10956f3
+
+  Timer:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt
+            - Metric
+            - Arn
+          Id: TargetFunction
+
+  Invoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Metric
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt
+        - Timer
+        - Arn
+
+  # Allowing 'Metric Lambda' to access the CloudWatch metric 'Turbine'
+  MetricRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-cloudwatch-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - cloudwatch:GetMetric*
+                  - cloudwatch:PutMetricData
+
+Outputs:
+  TaskQueueName:
+    Value: !GetAtt Tasks.QueueName
+  DatabaseAddress:
+    Value: !GetAtt Database.Endpoint.Address
+  EfsFS:
+    Value: !Ref EfsFileSystem

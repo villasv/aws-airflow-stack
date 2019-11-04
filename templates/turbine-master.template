@@ -162,6 +162,18 @@ Resources:
               - 1
               - !GetAZs
 
+  SGStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-sg.template
+      Parameters:
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
+        VPCCIDR: !Ref VPCCIDR
+
   AirflowStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -186,20 +198,54 @@ Resources:
         MaxGroupSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
-        DbMasterUsername: !Ref DbMasterUsername
-        DbMasterPassword: !Ref DbMasterPassword
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultConn: !Ref LoadDefaultConn
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+        DbMasterUsername: !Ref DbMasterUsername
+        DbMasterPassword: !Ref DbMasterPassword
+        DbEndpointAddress: !GetAtt ResourceStack.Outputs.DatabaseAddress
+        TaskQueueName: !GetAtt ResourceStack.Outputs.TaskQueueName
+        EfsFileSystem: !GetAtt ResourceStack.Outputs.EfsFS
+
+  ResourceStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-resource.template
+      Parameters:
+        PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+        EfsSecurityGroup: !GetAtt SGStack.Outputs.EfsAccessSecurityGroup
+        DbSecurityGroup: !GetAtt SGStack.Outputs.DbConnectionSecurityGroup
+        PostgresDbUser: !Ref DbMasterUsername
+        PostgresMasterPasswd: !Ref DbMasterPassword
+
+  CIStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - '/'
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com
+          - !Sub ${QSS3KeyPrefix}templates
+          - turbine-codedeploy.template
+      Parameters:
+        DeploymentsBucket: !GetAtt AirflowStack.Outputs.DeploymentsBucket
+        SchedulerScalingGroup: !GetAtt AirflowStack.Outputs.SchedulerAutoScaling
+        WebserverScalingGroup: !GetAtt AirflowStack.Outputs.WebserverAutoScaling
+        WorkerSetScalingGroup: !GetAtt AirflowStack.Outputs.WorkerSetAutoScaling
 
 Outputs:
+  # NOTE: This is the context required by CodeDeploy create-deployment for 'example project airflow'
   DeploymentsBucket:
-    Value: !GetAtt AirflowStack.Outputs.DeploymentsBucket
+    Value: !GetAtt CIStack.Outputs.DeploymentsBucket
   CodeDeployApplication:
-    Value: !GetAtt AirflowStack.Outputs.CodeDeployApplication
+    Value: !GetAtt CIStack.Outputs.CodeDeployApplication
   CodeDeployDeploymentGroup:
-    Value: !GetAtt AirflowStack.Outputs.CodeDeployDeploymentGroup
+    Value: !GetAtt CIStack.Outputs.CodeDeployDeploymentGroup
 
 Metadata:
   AWS::CloudFormation::Interface:

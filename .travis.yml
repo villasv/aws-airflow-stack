@@ -7,6 +7,9 @@ install:
 git:
     submodules: false
 before_install:
+    # DELETE ME
+    - export BASE_IP=0.0.0.0/0
+
     - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
     - git submodule update --init --recursive
     - git checkout .gitmodules

@@ -1,5 +1,12 @@
-ifndef stack-name
-$(error stack-name is not set)
+define message1
+	Environment variable stack_name is required. Not set.
+        Use following command:
+        "$$ export stack_name=<your stack>"
+
+endef
+
+ifndef stack_name
+$(error $(message1))
 endif
 ifndef revision
 revision := $(shell date --utc +%Y%m%dT%H%M%SZ)
@@ -8,16 +15,17 @@ endif
 
 define getRef
 $(shell aws cloudformation describe-stacks \
-	--stack-name $(stack-name) \
+	--stack-name $(stack_name) \
 	--query "Stacks[0].Outputs[?OutputKey=='$(1)'].OutputValue" \
 	--output text)
 endef
+
 APPLICATION := $(call getRef,CodeDeployApplication)
 DEPLOYMENT_GROUP := $(call getRef,CodeDeployDeploymentGroup)
 DEPLOYMENTS_BUCKET := $(call getRef,DeploymentsBucket)
 
 
-PACKAGE := $(stack-name)_$(revision).tgz
+PACKAGE := $(stack_name)_$(revision).tgz
 
 
 package:
