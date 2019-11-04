@@ -8,7 +8,7 @@ Contact: olmighty99@gmail.com
 
 ### 1. Comments
 
-Comments are good, we love comments!!
+- Comments are good, we love comments!!
 
 ### 2. Structure
 
@@ -20,7 +20,7 @@ Comments are good, we love comments!!
 
 ### 3. Log and Deployment Bucket
 
-- Private Buckets by default
+- Private Buckets by default (explicit)
 
 Incident: After dag run, CloudFormation DELETE_FAILED with "Logs and Deployment 
 Bucket are not empty"
