@@ -91,9 +91,6 @@ If you follow this blueprint, a deployment is as simple as:
 make deploy stack-name=yourcoolstackname
 ```
 
-> **GOTCHA**: if you rely on the default connections, be sure to configure
-> `aws_default` to use the appropriate region!
-
 ## Maintenance and Operation
 
 Sometimes the cluster operators will want to perform some additional setup,
