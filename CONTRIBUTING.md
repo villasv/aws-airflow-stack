@@ -29,12 +29,12 @@ Tools:
     pip install --user cfn-lint
     ```
 
-- taskcat v0.9 (requires Python 3.6)
+- taskcat
     ```bash
     pip install --user taskcat
     ```
 
-- aws-nuke v2.12
+- aws-nuke
     ```bash
     wget https://github.com/rebuy-de/aws-nuke/releases/download/v2.12.0/aws-nuke-v2.12.0-linux-amd64
     sudo chmod +x  aws-nuke-v2.12.0-linux-amd64

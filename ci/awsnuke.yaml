@@ -1,0 +1,30 @@
+regions:
+  - us-east-1
+  - us-west-1
+  - global
+
+account-blacklist:
+  - ""
+
+accounts:
+  "186619377145":
+    filters:
+      IAMRole:
+        - OrganizationAccountAccessRole
+      IAMRolePolicy:
+        - type: glob
+          value: OrganizationAccountAccessRole -> *
+      IAMUser:
+        - travis-ci
+      IAMUserAccessKey:
+        - type: glob
+          value: travis-ci -> *
+      IAMUserPolicyAttachment:
+        - type: glob
+          value: travis-ci -> *
+      S3Bucket:
+        - property: Name
+          value: turbine-quickstart
+      S3Object:
+        - property: Bucket
+          value: turbine-quickstart
