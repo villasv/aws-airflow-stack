@@ -12,7 +12,7 @@ endif
 lint:
 	cfn-lint templates/*.template
 
-test: lint
+test:
 	taskcat test run --input-file ./ci/taskcat.yaml
 
 nuke:
