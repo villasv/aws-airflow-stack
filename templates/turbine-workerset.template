@@ -39,8 +39,8 @@ Resources:
       InstanceType: !Ref InstanceType
       SecurityGroups:
         - !Ref SecurityGroup
-      UserData: !Base64
-        'Fn::Sub': |
+      UserData:
+        Fn::Base64: !Sub |
           #!/bin/bash -xe
           echo 'TURBINE_MACHINE=WORKER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
@@ -63,7 +63,7 @@ Resources:
           ToPort: 8793
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-sg
+          Value: turbine-workerset-sg
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -78,7 +78,7 @@ Resources:
         - !Ref PrivateSubnet2AID
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-worker
+          Value: turbine-workerset-worker
           PropagateAtLaunch: true
 
   LifecycleHook:
@@ -89,27 +89,11 @@ Resources:
       HeartbeatTimeout: 300
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
 
-  ShrinkAlarm:
+  LoadMoreThanThresholdAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmActions:
-        - !Ref ShrinkScalingPolicy
-      Namespace: Turbine
-      MetricName: WorkerLoad
-      Dimensions:
-        - Name: StackName
-          Value: !Ref AWS::StackName
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: !Ref ShrinkThreshold
-      ComparisonOperator: LessThanOrEqualToThreshold
-
-  GrowthAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmActions:
-        - !Ref GrowthScalingPolicy
+        - !Ref LoadMoreThanThresholdPolicy
       Namespace: Turbine
       MetricName: WorkerLoad
       Dimensions:
@@ -121,21 +105,37 @@ Resources:
       Threshold: !Ref GrowthThreshold
       ComparisonOperator: GreaterThanOrEqualToThreshold
 
-  ShrinkScalingPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties:
-      AdjustmentType: ChangeInCapacity
-      PolicyType: SimpleScaling
-      ScalingAdjustment: -1
-      Cooldown: '600'
-      AutoScalingGroupName: !Ref AutoScalingGroup
-
-  GrowthScalingPolicy:
+  LoadMoreThanThresholdPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
       AdjustmentType: ChangeInCapacity
       PolicyType: SimpleScaling
       ScalingAdjustment: 1
+      Cooldown: '600'
+      AutoScalingGroupName: !Ref AutoScalingGroup
+
+  LoadLessThanThresholdAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - !Ref LoadLessThanThresholdPolicy
+      Namespace: Turbine
+      MetricName: WorkerLoad
+      Dimensions:
+        - Name: StackName
+          Value: !Ref AWS::StackName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref ShrinkThreshold
+      ComparisonOperator: LessThanOrEqualToThreshold
+
+  LoadLessThanThresholdPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
       Cooldown: '600'
       AutoScalingGroupName: !Ref AutoScalingGroup
 
