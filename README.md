@@ -1,6 +1,6 @@
 <img src="img/logo.png" align="right" width="25%" />
 
-# Turbine [![](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon)](#get-it-working) [![](https://img.shields.io/github/stars/villasv/aws-airflow-stack.svg?logo=github&style=flat-square)](https://github.com/villasv/aws-airflow-stack)
+# Turbine [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working) [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/travis/villasv/aws-airflow-stack/master.svg?style=flat-square&logo=gitlab&logoColor=white&label=taskcat)](https://scrutinizer-ci.com/g/villasv/aws-airflow-stack/build-status/master)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
@@ -13,15 +13,14 @@ configure in a few commands.
 
 ## Overview
 
-![Designer](/aws/cloud-formation-designer.png)
+![stack diagram](/img/stack-diagram.png)
 
-The stack is composed mainly of two EC2 machines, one for the Airflow webserver
-and one for the Airflow scheduler, plus an Auto Scaling Group of EC2 machines
-for Airflow workers. Supporting resources include an RDS instance to host the
-Airflow metadata database, an SQS instance to be used as broker backend, S3
-buckets for logs and deployment bundles, an EFS instance to serve as shared
-directory, and auto scaling metrics, alarms and triggers. All other resources
-are the usual boilerplate to keep the wind blowing.
+The stack is composed mainly of three services: the Airflow web server, the
+Airflow scheduler, and the Airflow worker. Supporting resources include an RDS
+to host the Airflow metadata database, an SQS to be used as broker backend, S3
+buckets for logs and deployment bundles, an EFS to serve as shared directory,
+and a custom CloudWatch metric measured by a timed AWS Lambda. All other
+resources are the usual boilerplate to keep the wind blowing.
 
 ### Deployment and File Sharing
 
@@ -33,7 +32,7 @@ to begin with.
 
 There's also an EFS shared directory mounted at at `/mnt/efs`, which can be
 useful for staging files potentially used by workers on different machines and
-other syncrhonization scenarios commonly found in ETL/Big Data applications. It
+other synchronization scenarios commonly found in ETL/Big Data applications. It
 facilitates migrating legacy workloads not ready for running on distributed
 workers.
 
@@ -46,12 +45,12 @@ but the metric objective is to measure if the cluster is correctly sized for the
 influx of tasks. Worker instances have lifecycle hooks promoting a graceful
 shutdown, waiting for tasks completion when terminating.
 
-**The goal of the auto scaling feature is to respond to changes in queue load,
+The goal of the auto scaling feature is to respond to changes in queue load,
 which could mean an idle cluster becoming active or a busy cluster becoming
 idle, the start/end of a backfill, many DAGs with similar schedules hitting
-their due time, DAGs that branch to many parallel operators. Scaling in response
-to machine resources like facing CPU intensive tasks is not the goal**; the
-latter is a very advanced scenario and would be best handled by Celery's own
+their due time, DAGs that branch to many parallel operators. **Scaling in
+response to machine resources like facing CPU intensive tasks is not the goal**;
+the latter is a very advanced scenario and would be best handled by Celery's own
 scaling mechanism or offloading the computation to another system (like Spark or
 Kubernetes) and use Airflow only for orchestration.
 
@@ -59,21 +58,19 @@ Kubernetes) and use Airflow only for orchestration.
 
 ### 0. Prerequisites
 
-- A key file for remote SSH access
-  [(Guide)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
-
-- Configured AWS CLI for deploying your own files [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
+- Configured AWS CLI for deploying your own files
+  [(Guide)](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
 
 ### 1. Deploy the stack
 
 Create a new stack using the latest template definition at
-[`aws/cloud-formation-template.yml`](/aws/cloud-formation-template.yml). The
+[`templates/turbine-master.template`](/templates/turbine-master.template). The
 following button will deploy the stack available in this project's `master`
 branch (defaults to your last used region):
 
-[![Launch](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://s3.amazonaws.com/villasv/turbine/aws/cloud-formation-template.yml)
+[![Launch](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/images/cloudformation-launch-stack-button.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://turbine-quickstart.s3.amazonaws.com/quickstart-turbine-airflow/templates/turbine-master.template)
 
-The stack resources take around 10 minutes to create, while the airflow
+The stack resources take around 15 minutes to create, while the airflow
 installation and bootstrap another 3 to 5 minutes. After that you can already
 access the Airflow UI and deploy your own Airflow DAGs.
 
@@ -83,9 +80,10 @@ The only requirement is that you configure the deployment to copy your Airflow
 home directory to `/airflow`. After crafting your `appspec.yml`, you can use the
 AWS CLI to deploy your project.
 
-For convenience, you can use this [`Makefile`](/src/Makefile) to handle the
-packaging, upload and deployment commands. A minimal working example of an
-Airflow project to deploy can be found at [`src/airflow`](/src/airflow).
+For convenience, you can use this [`Makefile`](/examples/project/Makefile) to
+handle the packaging, upload and deployment commands. A minimal working example
+of an Airflow project to deploy can be found at
+[`examples/project/airflow`](/examples/project/airflow).
 
 If you follow this blueprint, a deployment is as simple as:
 
@@ -93,22 +91,27 @@ If you follow this blueprint, a deployment is as simple as:
 make deploy stack-name=yourcoolstackname
 ```
 
-> **GOTCHA**: if you rely on the default connections, be sure to configure
-> `aws_default` to use the appropriate region!
-
 ## Maintenance and Operation
 
-Sometimes the cluster operators will want to perform some aditional setup, debug
-or just inspect the Airflow services and database. The stack is designed to
-miminize this need, but just in case it also offers decent internal tooling for
-those scenarios.
+Sometimes the cluster operators will want to perform some additional setup,
+debug or just inspect the Airflow services and database. The stack is designed
+to minimize this need, but just in case it also offers decent internal tooling
+for those scenarios.
+
+### Using Systems Manager Sessions
+
+Instead of the usual SSH procedure, this stack encourages the use of AWS Systems
+Manager Sessions for increased security and auditing capabilities. You can still
+use the CLI after a bit more configuration and not having to expose your
+instances or creating bastion instances is worth the effort. You can read more
+about it in the Session Manager
+[docs](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html).
 
 ### Running Airflow commands
 
 The environment variables used by the Airflow service are not immediately
-available for the `ec2-user` when you SSH into one of the instances. Before
-running Airflow commands, you need to use a convenience script exporting the
-right variables:
+available in the shell. Before running Airflow commands, you need to use a
+convenience script exporting the right variables:
 
 ```bash
 $ source /tmp/env.sh
@@ -129,14 +132,7 @@ $ sudo journalctl -u airflow -n 50
 
 ## FAQ
 
-1. Why is there an empty `Dummy` subnet in the VPC?
-
-    There's no official support on CloudFormation for choosing in which VPC a
-    RDS Instance is deployed. The only alternatives are to let it live in the
-    default VPC and communicate with peering or to use DBSubnetGroup, which
-    requires associated subnets that cover at least 2 Availability Zones.
-
-2. Why does auto scaling takes so long to kick in?
+1. Why does auto scaling takes so long to kick in?
 
     AWS doesn't provide minute-level granularity on SQS metrics, only 5 minute
     aggregates. Also, CloudWatch stamps aggregate metrics with their initial
@@ -144,7 +140,7 @@ $ sudo journalctl -u airflow -n 50
     the past. This is why the load metric is always 5~10 minutes delayed. To
     avoid oscillating allocations, the alarm action has a 10 minutes cooldown.
 
-3. Why can't I stop running tasks by terminating all workers?
+2. Why can't I stop running tasks by terminating all workers?
 
     Workers have lifecycle hooks that make sure to wait for Celery to finish its
     tasks before allowing EC2 to terminate that instance (except maybe for Spot

@@ -16,7 +16,27 @@ opinion in the discussion or actively solving a problem. All forms of community
 interaction are welcomed contributions, so writing blog posts and tutorials or
 making citations at presentations and workshops are appreciated too.
 
-**But...** It would be best if everyone tried keep chatty discussions out of the
-issue tracker. The best channel is the official Airflow [Slack
+**But...** It would be best if everyone tried to keep chatty discussions out of
+the issue tracker. The best channel is the official Airflow [Slack
 channel](https://apache-airflow.slack.com/messages/CCRR5EBA7/) dedicated to AWS
 deployments.
+
+## Local Development
+
+Tools:
+- cfn-python-lint
+    ```bash
+    pip install --user cfn-lint
+    ```
+
+- taskcat
+    ```bash
+    pip install --user taskcat
+    ```
+
+- aws-nuke
+    ```bash
+    wget https://github.com/rebuy-de/aws-nuke/releases/download/v2.12.0/aws-nuke-v2.12.0-linux-amd64
+    sudo chmod +x  aws-nuke-v2.12.0-linux-amd64
+    sudo mv  aws-nuke-v2.12.0-linux-amd64 /usr/bin/aws-nuke
+    ```

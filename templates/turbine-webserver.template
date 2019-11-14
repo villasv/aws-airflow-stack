@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ParentStack:
+    Type: String
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+  IngressCIDR:
+    Type: String
+    AllowedPattern: >-
+      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  IngressPort:
+    Type: String
+  IamInstanceProfile:
+    Type: String
+  IamRole:
+    Type: String
+  ImageId:
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Type: String
+  PublicSubnet1ID:
+    Type: String
+  PublicSubnet2ID:
+    Type: String
+
+Resources:
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for node itercommunication between
+        Airflow worker instances.
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - CidrIp: !Ref IngressCIDR
+          IpProtocol: TCP
+          FromPort: !Ref IngressPort
+          ToPort: !Ref IngressPort
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref IamInstanceProfile
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref SecurityGroup
+      UserData: !Base64
+        'Fn::Sub': |
+          #!/bin/bash -xe
+          echo 'TURBINE_MACHINE=WEBSERVER' > /etc/environment
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${ParentStack} \
+            --resource Meta
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MaxSize: '1'
+      MinSize: '1'
+      MetricsCollection:
+        - Granularity: 1Minute
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-webserver
+          PropagateAtLaunch: true
+
+Outputs:
+  AutoScalingGroup:
+    Value: !Ref AutoScalingGroup
