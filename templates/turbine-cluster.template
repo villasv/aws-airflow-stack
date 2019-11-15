@@ -211,6 +211,9 @@ Resources:
         ShrinkThreshold: !Ref ShrinkThreshold
         QueueName: !GetAtt TaskQueue.QueueName
         SharedCloudInitStack: !Ref AWS::StackName
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
+
     DependsOn:
       - SharedCloudInitMetadata
 
