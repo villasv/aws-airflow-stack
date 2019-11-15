@@ -18,5 +18,8 @@ test:
 nuke:
 	aws-nuke -c ci/awsnuke.yaml --profile turbine --force --no-dry-run
 
-sync:
+pack:
+	7z a library.zip ./functions/*
+
+sync: pack
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)

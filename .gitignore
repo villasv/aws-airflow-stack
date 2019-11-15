@@ -1,2 +1,5 @@
 # taskcat
 taskcat_outputs/
+
+# packs
+**/*.zip

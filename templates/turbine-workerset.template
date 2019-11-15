@@ -29,6 +29,30 @@ Parameters:
   SharedCloudInitStack:
     Type: String
 
+  # Quick Start Overrides
+  QSS3BucketName:
+    Description: >-
+      S3 bucket name for the Quick Start assets. You can specify your own bucket
+      providing assets and submodules, if you want to override the Quick Start
+      behavior for your specific implementation.
+    Type: String
+    Default: turbine-quickstart
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: >-
+      Quick Start bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
+  QSS3KeyPrefix:
+    Description: >-
+      S3 key prefix for the Quick Start assets. You can scpeficy your own
+      "directory" providing the stack templates, if you want to override the
+      Quick Start behavior for your specific implementation.
+    Type: String
+    Default: quickstart-turbine-airflow/
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
+
 Resources:
 
   LaunchConfiguration:
@@ -231,6 +255,38 @@ Resources:
       SourceArn: !GetAtt
         - CloudWatchMetricLambdaTimer
         - Arn
+
+  CloudWatchMetricLambda2:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.7
+      Handler: load_metric.handler
+      Code:
+        S3Bucket: !Ref QSS3BucketName
+        S3Key: !Sub ${QSS3KeyPrefix}library.zip
+      Environment:
+        Variables:
+          GroupName: !Ref AutoScalingGroup
+          QueueName: !Ref QueueName
+          StackName: !Ref AWS::StackName
+      Role: !GetAtt CloudWatchMetricLambdaRole.Arn
+
+  CloudWatchMetricLambdaTimer2:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Id: TargetFunction
+          Arn: !GetAtt CloudWatchMetricLambda2.Arn
+
+  CloudWatchMetricLambdaPermission2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      FunctionName: !Ref CloudWatchMetricLambda2
+      SourceArn: !GetAtt CloudWatchMetricLambdaTimer2.Arn
 
   LoadAboveThresholdAlarm:
     Type: AWS::CloudWatch::Alarm
