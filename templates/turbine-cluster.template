@@ -1,64 +1,137 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: The Airflow cluster stack
+Description: >-
+  The Turbine-Airflow cluster stack, composed mainly of the Airflow web server,
+  the Airflow scheduler, and the Airflow worker nested stacks. Supporting
+  resources include an RDS to host the Airflow metadata database, an SQS to be
+  used as broker backend, S3 buckets for logs and deployment bundles, an EFS to
+  serve as shared directory, and a custom CloudWatch metric measured by a timed
+  AWS Lambda.
 Parameters:
 
   # Networking
   VPCID:
+    Description: An existing VPC for the cluster
     Type: AWS::EC2::VPC::Id
-  VPCCIDR:
-    Type: String
-    AllowedPattern: >-
-      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PublicSubnet1ID:
-    Type: String
+    Description: An existing public Subnet in some Availability Zone
+    Type: AWS::EC2::Subnet::Id
   PublicSubnet2ID:
-    Type: String
+    Description: An existing public Subnet in another Availability Zone
+    Type: AWS::EC2::Subnet::Id
   PrivateSubnet1AID:
-    Type: String
+    Description: An existing private Subnet in some Availability Zone
+    Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
-    Type: String
+    Description: An existing private Subnet in another Availability Zone
+    Type: AWS::EC2::Subnet::Id
   AllowedWebBlock:
+    Description: >-
+      The IPv4 CIDR block to allow HTTP access in the webserver. The default of
+      0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
+      secure.
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Default: 0.0.0.0/0
   WebserverPort:
-    Type: String
+    Description: >-
+      The port Airflow webserver will be listening.
+    Type: Number
+    Default: 8080
+    MinValue: 1024
+    MaxValue: 65535
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
 
   # Cluster Settings
   SchedulerInstanceType:
+    Description: EC2 instance type to use for the scheduler.
     Type: String
-    Default: t2.micro
+    Default: t3.micro
   WebserverInstanceType:
+    Description: EC2 instance type to use for the webserver.
     Type: String
-    Default: t2.micro
+    Default: t3.micro
   WorkerInstanceType:
+    Description: EC2 instance type to use for the workers.
     Type: String
-    Default: t2.small
+    Default: t3.medium
   MinGroupSize:
+    Description: The minimum number of active worker instances.
     Type: Number
+    Default: 1
   MaxGroupSize:
+    Description: The maximum number of active worker instances.
     Type: Number
+    Default: 10
   ShrinkThreshold:
+    Description: >-
+      The timeout (in seconds, multiple of 60) after which the queue staying
+      empty will trigger the AutoScaling group to Scale In, deallocating one
+      worker instance.
     Type: Number
+    Default: 0.5
   GrowthThreshold:
+    Description: >-
+      The threshold for the average queue size from which going equal or above
+      will trigger the AutoScaling group to Scale Out, allocating one worker
+      instance.
     Type: Number
+    Default: 0.9
   DbMasterUsername:
+    Description: The username to be used in the airflow database.
     Type: String
+    Default: airflow
   DbMasterPassword:
+    Description: The password to be used in the airflow database.
     Type: String
     NoEcho: true
 
   # Airflow Config
   LoadExampleDags:
+    Description: >-
+      Load the example DAGs distributed with Airflow. Useful if deploying a
+      stack for demonstrating a few topologies, operators and scheduling
+      strategies.
     Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
   LoadDefaultConn:
+    Description: >-
+      Load the default connections initialized by Airflow. Most consider these
+      unnecessary, which is why the default is to not load them.
     Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
 
   # Quick Start Overrides
   QSS3BucketName:
+    Description: >-
+      S3 bucket name for the Quick Start assets. You can specify your own bucket
+      providing assets and submodules, if you want to override the Quick Start
+      behavior for your specific implementation.
     Type: String
+    Default: turbine-quickstart
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: >-
+      Quick Start bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
   QSS3KeyPrefix:
+    Description: >-
+      S3 key prefix for the Quick Start assets. You can scpeficy your own
+      "directory" providing the stack templates, if you want to override the
+      Quick Start behavior for your specific implementation.
     Type: String
+    Default: quickstart-turbine-airflow/
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
 
 Resources:
 
@@ -71,7 +144,10 @@ Resources:
           - !Ref QSS3KeyPrefix
           - templates/turbine-scheduler.template
       Parameters:
-        ParentStack: !Ref AWS::StackName
+        VPCID: !Ref VPCID
+        PrivateSubnet1AID: !Ref PrivateSubnet1AID
+        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+        InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IamInstanceProfile: !Ref AirflowProfile
         IamRole: !Ref AirflowRole
         ImageId: !FindInMap
@@ -79,10 +155,9 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref SchedulerInstanceType
-        PrivateSubnet1AID: !Ref PrivateSubnet1AID
-        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+        SharedCloudInitStack: !Ref AWS::StackName
     DependsOn:
-      - Meta
+      - SharedCloudInitMetadata
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -93,8 +168,10 @@ Resources:
           - !Ref QSS3KeyPrefix
           - templates/turbine-webserver.template
       Parameters:
-        ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID
+        PublicSubnet1ID: !Ref PublicSubnet1ID
+        PublicSubnet2ID: !Ref PublicSubnet2ID
+        InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IngressCIDR: !Ref AllowedWebBlock
         IngressPort: !Ref WebserverPort
         IamInstanceProfile: !Ref AirflowProfile
@@ -104,10 +181,9 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref WebserverInstanceType
-        PublicSubnet1ID: !Ref PublicSubnet1ID
-        PublicSubnet2ID: !Ref PublicSubnet2ID
+        SharedCloudInitStack: !Ref AWS::StackName
     DependsOn:
-      - Meta
+      - SharedCloudInitMetadata
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -118,9 +194,10 @@ Resources:
           - !Ref QSS3KeyPrefix
           - templates/turbine-workerset.template
       Parameters:
-        ParentStack: !Ref AWS::StackName
         VPCID: !Ref VPCID
-        LogIngressCIDR: !Ref VPCCIDR
+        PrivateSubnet1AID: !Ref PrivateSubnet1AID
+        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+        InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IamInstanceProfile: !Ref AirflowProfile
         IamRole: !Ref AirflowRole
         ImageId: !FindInMap
@@ -128,15 +205,14 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref WorkerInstanceType
-        PrivateSubnet1AID: !Ref PrivateSubnet1AID
-        PrivateSubnet2AID: !Ref PrivateSubnet2AID
         MinSize: !Ref MinGroupSize
         MaxSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
         QueueName: !GetAtt TaskQueue.QueueName
+        SharedCloudInitStack: !Ref AWS::StackName
     DependsOn:
-      - Meta
+      - SharedCloudInitMetadata
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -229,6 +305,17 @@ Resources:
     Type: AWS::SQS::Queue
     Properties: {}
 
+  InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        The security group shared by all Airflow instances used as inbound rule
+        for the other more specific resource security groups.
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: airflow-instances-sg
+
   Access:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -236,7 +323,7 @@ Resources:
         Security Rules with permissions for the shared filesystem across Airflow
         instances.
       SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
           IpProtocol: TCP
           FromPort: 2049
           ToPort: 2049
@@ -250,7 +337,7 @@ Resources:
     Properties:
       GroupDescription: Security Rules with permissions for database connections for Airflow.
       SecurityGroupIngress:
-        - CidrIp: !Ref VPCCIDR
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
           IpProtocol: TCP
           FromPort: 5432
           ToPort: 5432
@@ -356,7 +443,7 @@ Resources:
       Roles:
         - !Ref AirflowRole
 
-  Meta:
+  SharedCloudInitMetadata:
     Type: AWS::CloudFormation::WaitConditionHandle
     Properties: {}
     Metadata:
@@ -727,7 +814,6 @@ Metadata:
           default: Networking
         Parameters:
           - VPCID
-          - VPCCIDR
           - PublicSubnet1ID
           - PublicSubnet2ID
           - PrivateSubnet1AID

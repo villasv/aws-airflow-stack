@@ -1,13 +1,13 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  ParentStack:
-    Type: String
   VPCID:
     Type: AWS::EC2::VPC::Id
-  LogIngressCIDR:
-    Type: String
-    AllowedPattern: >-
-      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  PrivateSubnet1AID:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2AID:
+    Type: AWS::EC2::Subnet::Id
+  InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
   IamInstanceProfile:
     Type: String
   IamRole:
@@ -20,15 +20,13 @@ Parameters:
     Type: Number
   MaxSize:
     Type: Number
-  PrivateSubnet1AID:
-    Type: String
-  PrivateSubnet2AID:
-    Type: String
   ShrinkThreshold:
     Type: Number
   GrowthThreshold:
     Type: Number
   QueueName:
+    Type: String
+  SharedCloudInitStack:
     Type: String
 
 Resources:
@@ -40,7 +38,8 @@ Resources:
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref SecurityGroup
+        - !Ref InstancesSecurityGroup
+        - !Ref WorkersetSecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -48,18 +47,18 @@ Resources:
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
-            --stack ${ParentStack} \
-            --resource Meta
+            --stack ${SharedCloudInitStack} \
+            --resource SharedCloudInitMetadata
 
-  SecurityGroup:
+  WorkersetSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
-        Security Rules with permissions for node itercommunication between
-        Airflow worker instances.
+        The security group used by the Airflow worker instances. It exposes the
+        a special port where the Airflow webserver can fetch logs directly.
       VpcId: !Ref VPCID
       SecurityGroupIngress:
-        - CidrIp: !Ref LogIngressCIDR
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
           IpProtocol: TCP
           FromPort: 8793
           ToPort: 8793
@@ -80,7 +79,7 @@ Resources:
         - !Ref PrivateSubnet2AID
       Tags:
         - Key: Name
-          Value: turbine-workerset-worker
+          Value: turbine-worker
           PropagateAtLaunch: true
 
   CloudWatchMetricLambda:
