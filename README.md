@@ -39,11 +39,10 @@ workers.
 ### Workers and Auto Scaling
 
 The stack includes an estimate of the cluster load average made by analyzing the
-amount of failed attempts to retrieve a task from the queue. The rationale is
-detailed [elsewhere](https://github.com/villasv/aws-airflow-stack/issues/63),
-but the metric objective is to measure if the cluster is correctly sized for the
-influx of tasks. Worker instances have lifecycle hooks promoting a graceful
-shutdown, waiting for tasks completion when terminating.
+amount of failed attempts to retrieve a task from the queue. The metric
+objective is to measure if the cluster is correctly sized for the influx of
+tasks. Worker instances have lifecycle hooks promoting a graceful shutdown,
+waiting for tasks completion when terminating.
 
 The goal of the auto scaling feature is to respond to changes in queue load,
 which could mean an idle cluster becoming active or a busy cluster becoming
@@ -147,6 +146,13 @@ $ sudo journalctl -u airflow -n 50
     Instances going out of capacity). If you want to kill running tasks, you
     will need to SSH into worker instances and stop the airflow service
     forcefully.
+
+3. Is there any documentation around the architectural decisions?
+
+    Yes, most of them should be available in the project's GitHub
+    [Wiki](https://github.com/villasv/aws-airflow-stack/wiki). It doesn't mean
+    those decisions are final, but reading them beforehand will help formulating
+    new proposals.
 
 ## Contributing
 
