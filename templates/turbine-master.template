@@ -46,11 +46,14 @@ Parameters:
     Default: 0.0.0.0/0
   WebserverPort:
     Description: >-
-      The port Airflow webserver will be listening. Ports below 1024 can be
-      opened only with root privileges and the airflow process does not run as
-      such.
-    Type: String
+      The port Airflow webserver will be listening.
+    Type: Number
     Default: 8080
+    MinValue: 1024
+    MaxValue: 65535
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
 
   # Cluster Settings
   SchedulerInstanceType:
@@ -178,7 +181,6 @@ Resources:
           - templates/turbine-cluster.template
       Parameters:
         VPCID: !GetAtt VPCStack.Outputs.VPCID
-        VPCCIDR: !Ref VPCCIDR
         PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
         PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
         PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID

@@ -1,15 +1,19 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  ParentStack:
-    Type: String
   VPCID:
     Type: AWS::EC2::VPC::Id
+  PublicSubnet1ID:
+    Type: AWS::EC2::Subnet::Id
+  PublicSubnet2ID:
+    Type: AWS::EC2::Subnet::Id
+  InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
   IngressCIDR:
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   IngressPort:
-    Type: String
+    Type: Number
   IamInstanceProfile:
     Type: String
   IamRole:
@@ -18,28 +22,10 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  PublicSubnet1ID:
-    Type: String
-  PublicSubnet2ID:
+  SharedCloudInitStack:
     Type: String
 
 Resources:
-
-  SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for node itercommunication between
-        Airflow worker instances.
-      VpcId: !Ref VPCID
-      SecurityGroupIngress:
-        - CidrIp: !Ref IngressCIDR
-          IpProtocol: TCP
-          FromPort: !Ref IngressPort
-          ToPort: !Ref IngressPort
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-sg
 
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -48,16 +34,33 @@ Resources:
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref SecurityGroup
-      UserData: !Base64
-        'Fn::Sub': |
+        - !Ref InstancesSecurityGroup
+        - !Ref WebserverSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
           #!/bin/bash -xe
           echo 'TURBINE_MACHINE=WEBSERVER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
-            --stack ${ParentStack} \
-            --resource Meta
+            --stack ${SharedCloudInitStack} \
+            --resource SharedCloudInitMetadata
+
+  WebserverSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        The security group used by the Airflow webserver instance. It exposes
+        the specified port for web access in from a given ip range.
+      VpcId: !Ref VPCID
+      SecurityGroupIngress:
+        - CidrIp: !Ref IngressCIDR
+          IpProtocol: TCP
+          FromPort: !Ref IngressPort
+          ToPort: !Ref IngressPort
+      Tags:
+        - Key: Name
+          Value: turbine-webserver-sg
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -72,7 +75,7 @@ Resources:
         - !Ref PublicSubnet2ID
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-webserver
+          Value: turbine-webserver
           PropagateAtLaunch: true
 
 Outputs:

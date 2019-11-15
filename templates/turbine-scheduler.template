@@ -1,7 +1,13 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  ParentStack:
-    Type: String
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnet1AID:
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2AID:
+    Type: AWS::EC2::Subnet::Id
+  InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
   IamInstanceProfile:
     Type: String
   IamRole:
@@ -10,9 +16,7 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  PrivateSubnet1AID:
-    Type: String
-  PrivateSubnet2AID:
+  SharedCloudInitStack:
     Type: String
 
 Resources:
@@ -23,15 +27,29 @@ Resources:
       IamInstanceProfile: !Ref IamInstanceProfile
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
-      UserData: !Base64
-        'Fn::Sub': |
+      SecurityGroups:
+        - !Ref InstancesSecurityGroup
+        - !Ref SchedulerSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
           #!/bin/bash -xe
           echo 'TURBINE_MACHINE=SCHEDULER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
-            --stack ${ParentStack} \
-            --resource Meta
+            --stack ${SharedCloudInitStack} \
+            --resource SharedCloudInitMetadata
+
+  SchedulerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        The security group used by the Airflow scheduler instance. Not initially
+        useful but included to facilitate narrowing custom rules.
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: turbine-scheduler-sg
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -46,7 +64,7 @@ Resources:
         - !Ref PrivateSubnet2AID
       Tags:
         - Key: Name
-          Value: !Sub ${AWS::StackName}-scheduler
+          Value: turbine-scheduler
           PropagateAtLaunch: true
 
 Outputs:
