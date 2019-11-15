@@ -67,9 +67,9 @@ Parameters:
     Default: 10
   ShrinkThreshold:
     Description: >-
-      The timeout (in seconds, multiple of 60) after which the queue staying
-      empty will trigger the AutoScaling group to Scale In, deallocating one
-      worker instance.
+      The threshold for the average queue size from which going equal or below
+      will trigger the AutoScaling group to Scale In, deallocating one worker
+      instance.
     Type: Number
     Default: 0.5
   GrowthThreshold:

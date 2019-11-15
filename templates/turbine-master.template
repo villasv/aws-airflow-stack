@@ -24,13 +24,13 @@ Parameters:
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.1.0/24
   PrivateSubnet1ACIDR:
-    Description: The CIDR block for the hidden Subnet in the first Availability Zone
+    Description: The CIDR block for the private Subnet in the first Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.10.0/24
   PrivateSubnet2ACIDR:
-    Description: The CIDR block for the hidden Subnet in the second Availability Zone
+    Description: The CIDR block for the private Subnet in the second Availability Zone
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
@@ -78,9 +78,9 @@ Parameters:
     Default: 10
   ShrinkThreshold:
     Description: >-
-      The timeout (in seconds, multiple of 60) after which the queue staying
-      empty will trigger the AutoScaling group to Scale In, deallocating one
-      worker instance.
+      The threshold for the average queue size from which going equal or below
+      will trigger the AutoScaling group to Scale In, deallocating one worker
+      instance.
     Type: Number
     Default: 0.5
   GrowthThreshold:
