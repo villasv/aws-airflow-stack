@@ -263,7 +263,7 @@ Resources:
       Handler: load_metric.handler
       Code:
         S3Bucket: !Ref QSS3BucketName
-        S3Key: !Sub ${QSS3KeyPrefix}library.zip
+        S3Key: !Sub ${QSS3KeyPrefix}functions/functions.zip
       Environment:
         Variables:
           GroupName: !Ref AutoScalingGroup

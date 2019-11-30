@@ -123,7 +123,3 @@ def put_metric(time, value):
             }
         ],
     )
-
-
-if __name__ == "__main__":
-    handler({}, None)

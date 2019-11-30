@@ -109,11 +109,11 @@ about it in the Session Manager
 ### Running Airflow commands
 
 The environment variables used by the Airflow service are not immediately
-available in the shell. Before running Airflow commands, you need to use load
-the Airflow configuration:
+available in the shell. Before running Airflow commands, you need to load the
+Airflow configuration:
 
 ```bash
-$ export $(cat /etc/sysconfig/airflow | xargs)
+$ export $(xargs </etc/sysconfig/airflow)
 $ airflow list_dags
 ```
 
