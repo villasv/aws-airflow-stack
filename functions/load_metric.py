@@ -1,33 +1,34 @@
-import boto3
 import datetime
 import logging
 import os
 
-cloudwatch = boto3.client("cloudwatch")
-logger = logging.getLogger()
-logger.setLevel(os.environ.get("LOGLEVEL", logging.INFO))
+import boto3
+
+CW = boto3.client("cloudwatch")
+logging.getLogger().setLevel(os.environ.get("LOGLEVEL", logging.INFO))
 
 
-def handler(event, context):
-    logger.debug(f"environment variables:\n{os.environ}")
+def handler(_event, _context):
+    logging.debug("environment variables:\n %s", os.environ)
     before, latest = get_period_timestamps()
     metrics = get_metrics(before, latest)
-    logger.debug(f"available metrics for {before}~{latest}:\n{metrics}")
+    logging.debug("available metrics for %s~%s:\n%s", before, latest, metrics)
 
-    ANOMV = metrics["maxANOMV"][latest]
-    NOER = metrics["sumNOER"][latest]
-    GISI = metrics["avgGISI"][latest]
+    messages = metrics["maxANOMV"][latest]
+    empty_receives = metrics["sumNOER"][latest]
+    instances = metrics["avgGISI"][latest]
+    logging.info("ANOMV=%s NOER=%s GISI=%s", messages, empty_receives, instances)
 
-    if GISI > 0:
-        l = 1 - NOER / (GISI * 0.098444 * 300)
-    elif ANOMV > 0:
-        l = 1
+    if instances > 0:
+        load = 1 - empty_receives / (instances * 0.098444 * 300)
+    elif messages > 0:
+        load = 1
     else:
-        l = 0
-    logger.info(f"ANOMV={ANOMV} NOER={NOER} GISI={GISI} => l={l}")
+        load = 0
 
-    put_metric(latest, l)
-    return {"WorkersClusterLoad": l}
+    logging.info("L=%s", load)
+    put_metric(latest, load)
+    return {"WorkersClusterLoad": load}
 
 
 def get_period_timestamps():
@@ -38,12 +39,12 @@ def get_period_timestamps():
     return last_5min_mark - datetime.timedelta(minutes=5), last_5min_mark
 
 
-def get_metrics(t1, t2):
+def get_metrics(t_1, t_2):
     queue = os.environ["QueueName"]
     group = os.environ["GroupName"]
-    response = cloudwatch.get_metric_data(
-        StartTime=t1,
-        EndTime=t2 + datetime.timedelta(minutes=1),
+    response = CW.get_metric_data(
+        StartTime=t_1,
+        EndTime=t_2 + datetime.timedelta(minutes=1),
         ScanBy="TimestampAscending",
         MetricDataQueries=[
             {
@@ -111,7 +112,7 @@ def get_metrics(t1, t2):
 
 
 def put_metric(time, value):
-    cloudwatch.put_metric_data(
+    CW.put_metric_data(
         Namespace="Turbine",
         MetricData=[
             {
