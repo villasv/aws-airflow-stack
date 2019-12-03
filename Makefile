@@ -19,7 +19,7 @@ nuke:
 	aws-nuke -c ci/awsnuke.yaml --profile turbine --force --no-dry-run
 
 pack:
-	7z a ./functions/functions.zip ./functions/*.py
+	7z a ./functions/package.zip ./functions/*.py
 
 sync: pack
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
