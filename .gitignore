@@ -3,6 +3,7 @@ taskcat_outputs/
 
 # packs
 **/*.zip
+**/*.tgz
 
 
 # Created by https://www.gitignore.io/api/python

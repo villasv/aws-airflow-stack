@@ -10,40 +10,40 @@ logging.getLogger().setLevel(os.environ.get("LOGLEVEL", logging.INFO))
 
 def handler(_event, _context):
     logging.debug("environment variables:\n %s", os.environ)
-    before, latest = get_period_timestamps()
-    metrics = get_metrics(before, latest)
-    logging.debug("available metrics for %s~%s:\n%s", before, latest, metrics)
 
-    messages = metrics["maxANOMV"][latest]
-    empty_receives = metrics["sumNOER"][latest]
-    instances = metrics["avgGISI"][latest]
-    logging.info("ANOMV=%s NOER=%s GISI=%s", messages, empty_receives, instances)
+    timestamp = datetime.datetime.now(datetime.timezone.utc)
+    timestamp = timestamp - datetime.timedelta(
+        minutes=timestamp.minute % 5 + 10,
+        seconds=timestamp.second,
+        microseconds=timestamp.microsecond,
+    )
+    logging.info("evaluating at [%s]", timestamp)
 
-    if instances > 0:
-        load = 1.0 - empty_receives / (instances * 0.098444 * 300)
+    metrics = get_metrics(timestamp)
+    logging.debug("available metrics: %s", metrics)
+
+    messages = metrics["maxANOMV"]
+    requests = metrics["sumNOER"]
+    machines = metrics["avgGISI"]
+    logging.info("ANOMV=%s NOER=%s GISI=%s", messages, requests, machines)
+
+    if machines > 0:
+        load = 1.0 - requests / (machines * 0.098444 * 300)
     elif messages > 0:
         load = 1.0
     else:
         load = 0.0
 
     logging.info("L=%s", load)
-    put_metric(latest, load)
+    put_metric(timestamp, load)
 
 
-def get_period_timestamps():
-    now = datetime.datetime.now(datetime.timezone.utc)
-    last_5min_mark = now - datetime.timedelta(
-        minutes=now.minute % 5 + 5, seconds=now.second, microseconds=now.microsecond,
-    )
-    return last_5min_mark - datetime.timedelta(minutes=5), last_5min_mark
-
-
-def get_metrics(t_1, t_2):
+def get_metrics(timestamp):
     queue = os.environ["QueueName"]
     group = os.environ["GroupName"]
     response = CW.get_metric_data(
-        StartTime=t_1,
-        EndTime=t_2 + datetime.timedelta(minutes=1),
+        StartTime=timestamp,
+        EndTime=timestamp + datetime.timedelta(minutes=5),
         ScanBy="TimestampAscending",
         MetricDataQueries=[
             {
@@ -87,25 +87,10 @@ def get_metrics(t_1, t_2):
                     "Unit": "None",
                 },
             },
-            {
-                "Id": "uniGDC",
-                "MetricStat": {
-                    "Metric": {
-                        "Namespace": "AWS/AutoScaling",
-                        "MetricName": "GroupDesiredCapacity",
-                        "Dimensions": [
-                            {"Name": "AutoScalingGroupName", "Value": f"{group}"}
-                        ],
-                    },
-                    "Period": 60,
-                    "Stat": "Average",
-                    "Unit": "None",
-                },
-            },
         ],
     )
     return {
-        m["Id"]: dict(zip(m["Timestamps"], m["Values"]))
+        m["Id"]: dict(zip(m["Timestamps"], m["Values"]))[timestamp]
         for m in response["MetricDataResults"]
     }
 
