@@ -20,15 +20,14 @@ def handler(_event, _context):
     logging.info("ANOMV=%s NOER=%s GISI=%s", messages, empty_receives, instances)
 
     if instances > 0:
-        load = 1 - empty_receives / (instances * 0.098444 * 300)
+        load = 1.0 - empty_receives / (instances * 0.098444 * 300)
     elif messages > 0:
-        load = 1
+        load = 1.0
     else:
-        load = 0
+        load = 0.0
 
     logging.info("L=%s", load)
     put_metric(latest, load)
-    return {"WorkersClusterLoad": load}
 
 
 def get_period_timestamps():
@@ -116,7 +115,7 @@ def put_metric(time, value):
         Namespace="Turbine",
         MetricData=[
             {
-                "MetricName": "WorkersClusterLoad",
+                "MetricName": "ClusterLoad",
                 "Dimensions": [{"Name": "StackName", "Value": os.environ["StackName"]}],
                 "Timestamp": time,
                 "Value": value,
