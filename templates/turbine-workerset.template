@@ -218,7 +218,7 @@ Resources:
     Properties:
       AutoScalingGroupName: !Ref AutoScalingGroup
       DefaultResult: CONTINUE
-      HeartbeatTimeout: 300
+      HeartbeatTimeout: 180
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
 
 Outputs:
