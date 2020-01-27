@@ -32,7 +32,7 @@ def handler(_event, _context):
     elif messages > 0:
         load = 1.0
     else:
-        load = 0.0
+        return
 
     logging.info("L=%s", load)
     put_metric(timestamp, load)
