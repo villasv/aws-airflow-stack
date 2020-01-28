@@ -1,6 +1,7 @@
 project:
   owner: mail@victor.villas
   name: quickstart-turbine-airflow
+  shorten_stack_name: True
 
 tests:
   master:
