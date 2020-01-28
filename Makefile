@@ -12,14 +12,12 @@ endif
 lint:
 	cfn-lint templates/*.template
 
-test:
-	taskcat test run --input-file ./ci/taskcat.yaml
-
 nuke:
 	aws-nuke -c ci/awsnuke.yaml --profile turbine --force --no-dry-run
 
-pack:
+sync:
 	7z a ./functions/package.zip ./functions/*.py
-
-sync: pack
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
+
+test:
+	taskcat test run --input-file ./ci/taskcat.yaml

@@ -10,8 +10,14 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v1
-
-    - name: CloudFormation Linter
-      uses: scottbrenner/cfn-lint-action@master
       with:
-        args: templates/*.template
+        submodules: true
+
+    - name: Setup Python
+      uses: actions/setup-python@v1
+
+    - name: Install CFN Lint
+      run: pip install cfn-lint
+
+    - name: Lint Templates
+      run: make lint

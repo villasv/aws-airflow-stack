@@ -1,0 +1,34 @@
+name: Sync CloudFormation Files
+
+on: [push]
+
+jobs:
+  sync:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+      with:
+        submodules: true
+
+    - name: Setup Python
+      uses: actions/setup-python@v1
+
+    - name: Install AWS CLI
+      run: pip install awscli
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Infer Branch Name
+      shell: bash
+      run: echo "::set-env name=BRANCH::${GITHUB_REF#refs/heads/}"
+
+    - name: Sync Files
+      run: make sync
