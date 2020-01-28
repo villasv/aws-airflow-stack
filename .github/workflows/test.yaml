@@ -17,7 +17,7 @@ jobs:
       uses: actions/setup-python@v1
 
     - name: Install TaskCat
-      run: pip install taskcat
+      run: pip install taskcat==0.9.14.dev0
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
