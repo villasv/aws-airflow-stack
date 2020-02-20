@@ -503,7 +503,7 @@ Resources:
                   pycurl
                 SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
                   celery[sqs] \
-                  apache-airflow[celery,postgres,s3,crypto]==1.10.6
+                  apache-airflow[celery,postgres,s3,crypto]==1.10.9
         secrets:
           commands:
             generate:
@@ -610,11 +610,11 @@ Resources:
               content: |
                 #!/bin/sh
                 if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
-                then exec airflow scheduler
+                then exec /usr/local/bin/airflow scheduler
                 elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
-                then exec airflow webserver
+                then exec /usr/local/bin/airflow webserver
                 elif [ "$TURBINE_MACHINE" == "WORKER" ]
-                then exec airflow worker
+                then exec /usr/local/bin/airflow worker
                 else echo "TURBINE_MACHINE value unknown" && exit 1
                 fi
             /usr/lib/tmpfiles.d/airflow.conf:
