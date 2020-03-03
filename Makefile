@@ -13,7 +13,7 @@ lint:
 	cfn-lint templates/*.template
 
 nuke:
-	aws-nuke -c ci/awsnuke.yaml --profile turbine --force --no-dry-run
+	aws-nuke -c ci/awsnuke.yaml --force --quiet --no-dry-run
 
 pack:
 	7z a ./functions/package.zip ./functions/*.py

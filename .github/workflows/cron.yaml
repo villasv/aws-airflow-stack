@@ -8,13 +8,19 @@ jobs:
   nuke:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v1
-      with:
-        submodules: true
-    - name: Setup Python
-      uses: actions/setup-python@v1
-    - name: Install AWS Nuke
-      run: pip install aws-nuke
-    - name: Nuke Resources
-      run: make nuke
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Install AWS Nuke
+        run: curl -fsSL "https://github.com/rebuy-de/aws-nuke/releases/download/v2.14.0/aws-nuke-v2.14.0-linux-amd64" --output aws-nuke
+      - name: Make nuke executable
+        run: echo "::add-path::$(pwd)" && chmod +x aws-nuke
+      - name: Nuke Resources
+        run: make nuke
