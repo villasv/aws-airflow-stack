@@ -15,9 +15,11 @@ lint:
 nuke:
 	aws-nuke -c ci/awsnuke.yaml --profile turbine --force --no-dry-run
 
-sync:
+pack:
 	7z a ./functions/package.zip ./functions/*.py
+
+sync: pack
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
 
-test:
+test: pack
 	taskcat test run --input-file ./ci/taskcat.yaml
