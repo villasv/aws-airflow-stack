@@ -1,0 +1,64 @@
+name: Stack Release Pipeline
+
+on: [push]
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: Setup Python
+        uses: actions/setup-python@v1
+      - name: Install CFN Lint
+        run: pip install cfn-lint
+      - name: Lint Templates
+        run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: Setup Python
+        uses: actions/setup-python@v1
+      - name: Install TaskCat
+        run: pip install taskcat==0.9.14.dev0
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Test Stacks
+        run: make test
+
+  sync:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: Setup Python
+        uses: actions/setup-python@v1
+      - name: Install AWS CLI
+        run: pip install awscli
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Infer Branch Name
+        shell: bash
+        run: echo "::set-env name=BRANCH::${GITHUB_REF#refs/heads/}"
+      - name: Sync Files
+        run: make sync

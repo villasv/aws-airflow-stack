@@ -1,25 +1,20 @@
-name: Nuke CloudFormation Resources
+name: AWS Resources Housekeeping
 
 on:
-  schedule: # every day at midnight
-    - cron: '0 0 * * *'
+  schedule: # every six hours
+    - cron: '0 */6 * * *'
 
 jobs:
   nuke:
-
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout
       uses: actions/checkout@v1
       with:
         submodules: true
-
     - name: Setup Python
       uses: actions/setup-python@v1
-
     - name: Install AWS Nuke
       run: pip install aws-nuke
-
     - name: Nuke Resources
       run: make nuke
