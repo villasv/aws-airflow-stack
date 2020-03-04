@@ -2,6 +2,7 @@ project:
   owner: mail@victor.villas
   name: quickstart-turbine-airflow
   shorten_stack_name: True
+  s3_regional_buckets: True
 
 tests:
   master:
