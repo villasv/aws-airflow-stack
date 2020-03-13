@@ -39,6 +39,29 @@ Resources:
             --role ${IamRole} \
             --stack ${SharedCloudInitStack} \
             --resource SharedCloudInitMetadata
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource SchedulerInitMetadata
+
+  SchedulerInitMetadata:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Properties: {}
+    Metadata:
+      AWS::CloudFormation::Init:
+        migrate:
+          commands:
+            migration:
+              command: |
+                sudo su - ec2-user
+                export $(cat /etc/environment | xargs)
+                export $(cat /etc/sysconfig/airflow | xargs)
+                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
+                  airflow initdb
+                else
+                  airflow upgradedb
+                fi
 
   SchedulerSecurityGroup:
     Type: AWS::EC2::SecurityGroup

@@ -88,7 +88,8 @@ Parameters:
     Type: String
     AllowedPattern: ^[^@"\/]{8,128}$
     ConstraintDescription: >-
-      The password must contain from 8 to 128 characters and can include any printable ASCII character except "/", """, or "@".
+      The password must contain from 8 to 128 characters and can include any
+      printable ASCII character except "/", """, or "@".
     NoEcho: true
 
   # Airflow Config
@@ -588,21 +589,6 @@ Resources:
                 fi
 
                 echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
-        migrate:
-          commands:
-            migration:
-              command: |
-                export $(cat /etc/environment | xargs)
-                export $(cat /etc/sysconfig/airflow | xargs)
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Database setup reserved for the scheduler"
-                  exit 0
-                fi
-                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                  su -c '/usr/local/bin/airflow initdb' ec2-user
-                else
-                  su -c '/usr/local/bin/airflow upgradedb' ec2-user
-                fi
         service:
           files:
             /usr/bin/turbine:
