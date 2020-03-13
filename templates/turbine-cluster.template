@@ -501,11 +501,9 @@ Resources:
           commands:
             install:
               command: |
-                PYCURL_SSL_LIBRARY=openssl pip3 install \
-                  --no-cache-dir --compile --ignore-installed \
-                  pycurl
-                pip3 install celery[sqs] \
-                  apache-airflow[celery,postgres,s3,crypto]==1.10.9
+                sudo su - ec2-user
+                PYCURL_SSL_LIBRARY=openssl pip3 install --user \
+                  celery[sqs] apache-airflow[celery,postgres,s3,crypto]==1.10.9
         secrets:
           commands:
             generate:
