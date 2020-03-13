@@ -492,29 +492,6 @@ Resources:
                   celery[sqs] apache-airflow[celery,postgres,s3,crypto]==1.10.9
         secrets:
           commands:
-            generate:
-              command: !Sub |
-                export $(cat /etc/environment | xargs)
-
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Secret generation reserved for the scheduler"
-                  exit 0
-                fi
-                FERNET_KEY=$(aws ssm get-parameter \
-                  --name ${AWS::StackName}-fernet-key \
-                  --region '${AWS::Region}' \
-                  --query 'Parameter.Value')
-                if [ "$FERNET_KEY" = "" ]; then
-                  FERNET_KEY=$(python3 -c "if True:#
-                    from cryptography.fernet import Fernet
-                    key = Fernet.generate_key().decode()
-                    print(key)")
-                  aws ssm put-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --value $FERNET_KEY \
-                    --type SecureString
-                fi
             retrieve:
               command: !Sub |
                 while [ "$FERNET_KEY" = "" ]; do

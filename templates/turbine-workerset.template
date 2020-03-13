@@ -233,6 +233,11 @@ Resources:
     Properties: {}
     Metadata:
       AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - filesystem
+            - termination
+            - hearbeat
         filesystem:
           commands:
             mkdir:

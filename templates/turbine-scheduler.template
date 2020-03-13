@@ -37,6 +37,12 @@ Resources:
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource SchedulerInitMetadata
+            --configsets setup
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
             --stack ${ClusterStack} \
             --resource SharedCloudInitMetadata
           /opt/aws/bin/cfn-init -v \
@@ -77,6 +83,11 @@ Resources:
     Properties: {}
     Metadata:
       AWS::CloudFormation::Init:
+        configSets:
+          setup:
+            - secrets
+          default:
+            - migrate
         migrate:
           commands:
             migration:
@@ -88,6 +99,25 @@ Resources:
                   airflow initdb
                 else
                   airflow upgradedb
+                fi
+        secrets:
+          commands:
+            generate:
+              command: !Sub |
+                FERNET_KEY=$(aws ssm get-parameter \
+                  --name ${ClusterStack}-fernet-key \
+                  --region '${AWS::Region}' \
+                  --query 'Parameter.Value')
+                if [ "$FERNET_KEY" = "" ]; then
+                  FERNET_KEY=$(python3 -c "if True:#
+                    from cryptography.fernet import Fernet
+                    key = Fernet.generate_key().decode()
+                    print(key)")
+                  aws ssm put-parameter \
+                    --name ${ClusterStack}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --value $FERNET_KEY \
+                    --type SecureString
                 fi
 
 Outputs:
