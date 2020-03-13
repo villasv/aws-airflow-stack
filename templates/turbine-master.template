@@ -97,6 +97,9 @@ Parameters:
   DbMasterPassword:
     Description: The password to be used in the airflow database.
     Type: String
+    AllowedPattern: ^[^@"\/]{8,128}$
+    ConstraintDescription: >-
+      The password must contain from 8 to 128 characters and can include any printable ASCII character except "/", """, or "@".
     NoEcho: true
 
   # Airflow Config
