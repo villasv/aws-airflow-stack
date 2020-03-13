@@ -1,0 +1,15 @@
+project:
+  owner: mail@victor.villas
+  name: quickstart-turbine-airflow
+  shorten_stack_name: True
+  s3_regional_buckets: True
+
+tests:
+  master:
+    template: templates/turbine-master.template
+    regions:
+      - us-east-1
+      - us-east-2
+    parameters:
+      DbMasterPassword: "$[taskcat_genpass_8A]"
+      QSS3BucketName: "$[taskcat_autobucket]"
