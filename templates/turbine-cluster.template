@@ -510,7 +510,6 @@ Resources:
             /etc/sysconfig/airflow:
               content: !Sub
                 - |
-                  TURBINE_MACHINE=${!TURBINE_MACHINE}
                   AWS_DEFAULT_REGION=${AWS::Region}
                   AIRFLOW_HOME=/airflow
                   AIRFLOW__CORE__EXECUTOR=CeleryExecutor
@@ -553,18 +552,6 @@ Resources:
                 echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
         service:
           files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
-                then exec /usr/local/bin/airflow scheduler
-                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
-                then exec /usr/local/bin/airflow webserver
-                elif [ "$TURBINE_MACHINE" == "WORKER" ]
-                then exec /usr/local/bin/airflow worker
-                else echo "TURBINE_MACHINE value unknown" && exit 1
-                fi
             /usr/lib/tmpfiles.d/airflow.conf:
               content: |
                 D /run/airflow 0755 ec2-user ec2-user

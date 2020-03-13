@@ -39,12 +39,22 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          echo 'TURBINE_MACHINE=WEBSERVER' > /etc/environment
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource WebserverInitMetadata
+            --configsets setup
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
             --stack ${ClusterStack} \
             --resource SharedCloudInitMetadata
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource WebserverInitMetadata
 
   WebserverSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -77,6 +87,22 @@ Resources:
         - Key: Name
           Value: turbine-webserver
           PropagateAtLaunch: true
+
+  WebserverInitMetadata:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Properties: {}
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          setup:
+            - service
+        service:
+          files:
+            /usr/bin/turbine:
+              mode: 755
+              content: |
+                #!/bin/sh
+                exec /usr/local/bin/airflow webserver
 
 Outputs:
   AutoScalingGroup:

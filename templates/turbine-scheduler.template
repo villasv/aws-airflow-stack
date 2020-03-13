@@ -33,7 +33,6 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          echo 'TURBINE_MACHINE=SCHEDULER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
@@ -85,21 +84,17 @@ Resources:
       AWS::CloudFormation::Init:
         configSets:
           setup:
+            - service
             - secrets
           default:
             - migrate
-        migrate:
-          commands:
-            migration:
-              command: |
-                sudo su - ec2-user
-                export $(cat /etc/environment | xargs)
-                export $(cat /etc/sysconfig/airflow | xargs)
-                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                  airflow initdb
-                else
-                  airflow upgradedb
-                fi
+        service:
+          files:
+            /usr/bin/turbine:
+              mode: 755
+              content: |
+                #!/bin/sh
+                exec /usr/local/bin/airflow scheduler
         secrets:
           commands:
             generate:
@@ -118,6 +113,17 @@ Resources:
                     --region '${AWS::Region}' \
                     --value $FERNET_KEY \
                     --type SecureString
+                fi
+        migrate:
+          commands:
+            migration:
+              command: |
+                sudo su - ec2-user
+                export $(cat /etc/sysconfig/airflow | xargs)
+                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
+                  airflow initdb
+                else
+                  airflow upgradedb
                 fi
 
 Outputs:
