@@ -501,8 +501,7 @@ Resources:
                 PYCURL_SSL_LIBRARY=openssl pip3 install \
                   --no-cache-dir --compile --ignore-installed \
                   pycurl
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  celery[sqs] \
+                pip3 install celery[sqs] \
                   apache-airflow[celery,postgres,s3,crypto]==1.10.9
         secrets:
           commands:
