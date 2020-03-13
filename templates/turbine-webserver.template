@@ -96,6 +96,8 @@ Resources:
         configSets:
           setup:
             - service
+          default:
+            - sysconf
         service:
           files:
             /usr/bin/turbine:
@@ -103,6 +105,23 @@ Resources:
               content: |
                 #!/bin/sh
                 exec /usr/local/bin/airflow webserver
+        sysconf:
+          commands:
+            webvars:
+              command: !Sub |
+                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
+                  http://169.254.169.254/latest/meta-data/public-ipv4)
+                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
+                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
+                if [ $PUBLIC = "200" ]
+                then HOSTNAME=$PUB_IPV4
+                else HOSTNAME=$LOC_IPV4
+                fi
+                BASE_URL=$http://$HOSTNAME:${IngressPort}
+                echo "AIRFLOW__WEBSERVER__BASE_URL=$BASE_URL" \
+                  >> /etc/sysconfig/airflow
+                echo "AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${IngressPort}" \
+                  >> /etc/sysconfig/airflow
 
 Outputs:
   AutoScalingGroup:
