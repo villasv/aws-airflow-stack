@@ -458,13 +458,9 @@ Resources:
       AWS::CloudFormation::Init:
         configSets:
           default:
-            - filesys
             - runtime
-            - secrets
             - sysconf
-            - migrate
             - service
-            - lchooks
             - metahup
             - cdagent
         runtime:
@@ -490,21 +486,6 @@ Resources:
                 sudo su - ec2-user
                 PYCURL_SSL_LIBRARY=openssl pip3 install --user \
                   celery[sqs] apache-airflow[celery,postgres,s3,crypto]==1.10.9
-        secrets:
-          commands:
-            retrieve:
-              command: !Sub |
-                while [ "$FERNET_KEY" = "" ]; do
-                  echo "Waiting for Fernet key to be available..."
-                  sleep 1
-                  FERNET_KEY=$(aws ssm get-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --with-decryption \
-                    --query 'Parameter.Value' \
-                    --output text)
-                done
-                echo "FERNET_KEY=$FERNET_KEY" >> /etc/environment
         sysconf:
           files:
             /etc/sysconfig/airflow:
@@ -538,8 +519,16 @@ Resources:
           commands:
             envsubst:
               command: |
-                export $(cat /etc/environment | xargs)
-
+                while [ "$FERNET_KEY" = "" ]; do
+                  echo "Waiting for Fernet key to be available..."
+                  sleep 1
+                  FERNET_KEY=$(aws ssm get-parameter \
+                    --name ${AWS::StackName}-fernet-key \
+                    --region '${AWS::Region}' \
+                    --with-decryption \
+                    --query 'Parameter.Value' \
+                    --output text)
+                done
                 PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
                   http://169.254.169.254/latest/meta-data/public-ipv4)
                 PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
@@ -548,7 +537,6 @@ Resources:
                 then HOSTNAME=$PUB_IPV4
                 else HOSTNAME=$LOC_IPV4
                 fi
-
                 echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
         service:
           files:
