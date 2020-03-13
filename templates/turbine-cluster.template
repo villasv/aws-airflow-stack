@@ -159,7 +159,7 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref SchedulerInstanceType
-        SharedCloudInitStack: !Ref AWS::StackName
+        ClusterStack: !Ref AWS::StackName
     DependsOn:
       - SharedCloudInitMetadata
 
@@ -185,7 +185,7 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref WebserverInstanceType
-        SharedCloudInitStack: !Ref AWS::StackName
+        ClusterStack: !Ref AWS::StackName
     DependsOn:
       - SharedCloudInitMetadata
 
@@ -213,8 +213,9 @@ Resources:
         MaxSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
+        EfsFileSystem: !Ref EfsFileSystem
         QueueName: !GetAtt TaskQueue.QueueName
-        SharedCloudInitStack: !Ref AWS::StackName
+        ClusterStack: !Ref AWS::StackName
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -466,22 +467,6 @@ Resources:
             - lchooks
             - metahup
             - cdagent
-        filesys:
-          commands:
-            mkdir:
-              test: test ! -d /airflow
-              command: |
-                mkdir /airflow
-                chown -R ec2-user /airflow
-            mount:
-              test: test ! -d /mnt/efs
-              command: !Sub |
-                mkdir /mnt/efs
-                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
-                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
-                param="$param,hard,timeo=600,retrans=2,noresvport"
-                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
-                mount /mnt/efs && chown -R ec2-user /mnt/efs
         runtime:
           packages:
             yum:
@@ -649,67 +634,6 @@ Resources:
                   systemctl start airflow
                 else
                   echo "Deployment pending, deferring service start"
-                fi
-        lchooks:
-          files:
-            /usr/bin/lchkill:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
-                TERMINATE_MESSAGE="Terminating EC2 instance <$INSTANCE_ID>"
-                TERMINATING=$(aws autoscaling describe-scaling-activities \
-                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                  --max-items 100 \
-                  --region '${AWS::Region}' | \
-                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
-                  '.Activities[]
-                  | select(.Description
-                  | test($TERMINATE_MESSAGE)) != []')
-
-                if [ "$TERMINATING" = "true" ]; then
-                  systemctl stop airflow
-                fi
-            /usr/lib/systemd/system/lchkill.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchkill.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchkill
-            /usr/bin/lchbeat:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                SERVICE_STATUS=$(systemctl is-active airflow)
-
-                if [ "$SERVICE_STATUS" = "deactivating" ]; then
-                  aws autoscaling record-lifecycle-action-heartbeat \
-                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                    --region '${AWS::Region}'
-                fi
-            /usr/lib/systemd/system/lchbeat.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchbeat.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchbeat
-          commands:
-            setup:
-              command: |
-                if [ "$TURBINE_MACHINE" = "WORKER" ]; then
-                  systemctl enable lchkill.timer lchbeat.timer
                 fi
         metahup:
           files:

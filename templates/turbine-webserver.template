@@ -22,7 +22,7 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  SharedCloudInitStack:
+  ClusterStack:
     Type: String
 
 Resources:
@@ -43,7 +43,7 @@ Resources:
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
             --role ${IamRole} \
-            --stack ${SharedCloudInitStack} \
+            --stack ${ClusterStack} \
             --resource SharedCloudInitMetadata
 
   WebserverSecurityGroup:
