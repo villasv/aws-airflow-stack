@@ -630,7 +630,7 @@ Resources:
 
                 systemctl enable airflow.service watcher.path
 
-                if [ "$HAS_DEPLOYMENT" = "false" ]; then
+                if [ "$HAS_DEPLOYMENT" != "true" ]; then
                   systemctl start airflow
                 else
                   echo "Deployment pending, deferring service start"
