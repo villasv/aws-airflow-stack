@@ -1,6 +1,6 @@
-<img src="img/logo.png" align="right" width="25%" />
+<img src=".github/img/logo.png" align="right" width="25%" />
 
-# Turbine [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working) [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/travis/villasv/aws-airflow-stack/master.svg?style=flat-square&logo=gitlab&logoColor=white&label=taskcat)](https://scrutinizer-ci.com/g/villasv/aws-airflow-stack/build-status/master)
+# Turbine [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/github/workflow/status/villasv/aws-airflow-stack/Stack%20Release%20Pipeline?style=flat-square&logo=github&logoColor=white&label=build)](https://github.com/villasv/aws-airflow-stack/actions?query=workflow%3A%22Stack+Release+Pipeline%22+branch%3Amaster) [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working)
 
 Turbine is the set of bare metals behind a simple yet complete and efficient
 Airflow setup.
@@ -13,7 +13,7 @@ configure in a few commands.
 
 ## Overview
 
-![stack diagram](/img/stack-diagram.png)
+![stack diagram](/.github/img/stack-diagram.png)
 
 The stack is composed mainly of three services: the Airflow web server, the
 Airflow scheduler, and the Airflow worker. Supporting resources include an RDS
