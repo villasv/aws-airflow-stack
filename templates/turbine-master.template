@@ -114,7 +114,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  LoadDefaultConn:
+  LoadDefaultCons:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
@@ -201,7 +201,7 @@ Resources:
         DbMasterUsername: !Ref DbMasterUsername
         DbMasterPassword: !Ref DbMasterPassword
         LoadExampleDags: !Ref LoadExampleDags
-        LoadDefaultConn: !Ref LoadDefaultConn
+        LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -242,7 +242,7 @@ Metadata:
           default: Airflow Config
         Parameters:
           - LoadExampleDags
-          - LoadDefaultConn
+          - LoadDefaultCons
       - Label:
           default: Quick Start Overrides
         Parameters:

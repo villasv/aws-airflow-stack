@@ -10,11 +10,46 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
   IamInstanceProfile:
     Type: String
+  IamRole:
+    Type: String
   ImageId:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
   SecretKeyName:
+    Type: String
+  LogsBucket:
+    Type: String
+  QueueName:
+    Type: String
+  CodeDeployGroup:
+    Type: String
+  CodeDeployApp:
+    Type: String
+
+  # Airflow Config
+  LoadExampleDags:
+    Description: >-
+      Load the example DAGs distributed with Airflow. Useful if deploying a
+      stack for demonstrating a few topologies, operators and scheduling
+      strategies.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+  LoadDefaultCons:
+    Description: >-
+      Load the default connections initialized by Airflow. Most consider these
+      unnecessary, which is why the default is to not load them.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+  DatabaseURI:
+    Description: >-
+      The connection string URI to be used to connect to the metadata database.
     Type: String
 
   # Quick Start Overrides
@@ -55,7 +90,36 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt
+          /opt/aws/bin/cfn-init -v \
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource LaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $?
+            --region ${AWS::Region} \
+            --role ${IamRole} \
+            --stack ${AWS::StackName} \
+            --resource LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            setup:
+              command: !Sub |
+                export AWS_REGION="${AWS::Region}"
+                export AWS_STACK_NAME="${AWS::StackName}"
+                export IAM_ROLE="${IamRole}"
+                export SECRET_KEY_NAME="${SecretKeyName}"
+                export LOAD_EXAMPLES="${LoadExampleDags}"
+                export LOAD_DEFAULTS="${LoadDefaultCons}"
+                export DATABASE_URI="${DatabaseURI}"
+                export LOGS_BUCKET="${LogsBucket}"
+                export QUEUE_NAME="${QueueName}"
+                export CODE_DEPLOY_GROUP="${CodeDeployGroup}"
+                export CODE_DEPLOY_APP="${CodeDeployApp}"
+                aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
+                chmod +x /opt/turbine/scheduler.setup.sh
+                /opt/turbine/scheduler.setup.sh
 
   SchedulerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -83,61 +147,6 @@ Resources:
         - Key: Name
           Value: turbine-scheduler
           PropagateAtLaunch: true
-
-  SchedulerInitMetadata:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          setup:
-            - secrets
-            - service
-          default:
-            - migrate
-        secrets:
-          packages:
-            yum:
-              - python3
-            python:
-              - cryptography
-          commands:
-            generate:
-              command: !Sub |
-                pip3 install cryptography
-                FERNET_KEY=$(aws ssm get-parameter \
-                  --name ${SecretKeyName} \
-                  --region '${AWS::Region}' \
-                  --query 'Parameter.Value')
-                if [ "$FERNET_KEY" = "" ]; then
-                  FERNET_KEY=$(python3 -c "if True:#
-                    from cryptography.fernet import Fernet
-                    key = Fernet.generate_key().decode()
-                    print(key)")
-                  aws ssm put-parameter \
-                    --name ${SecretKeyName} \
-                    --region '${AWS::Region}' \
-                    --value $FERNET_KEY \
-                    --type SecureString
-                fi
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                exec /usr/local/bin/airflow scheduler
-        migrate:
-          commands:
-            migration:
-              command: |
-                sudo su - ec2-user
-                export $(cat /etc/sysconfig/airflow | xargs)
-                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                  airflow initdb
-                else
-                  airflow upgradedb
-                fi
 
 Outputs:
   AutoScalingGroup:

@@ -103,7 +103,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  LoadDefaultConn:
+  LoadDefaultCons:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
@@ -152,17 +152,31 @@ Resources:
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IamInstanceProfile: !Ref AirflowProfile
+        IamInstanceProfile: !Ref IamInstanceProfile
+        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref SchedulerInstanceType
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
+        LogsBucket: !Ref LogsBucket
+        QueueName: !GetAtt TaskQueue.QueueName
+        CodeDeployGroup: !Ref AWS::StackName
+        CodeDeployApp: !Ref AWS::StackName
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
+        DatabaseURI: !Join
+          - ''
+          - - postgresql://
+            - !Ref DbMasterUsername
+            - ':'
+            - !Ref DbMasterPassword
+            - '@'
+            - !GetAtt Database.Endpoint.Address
+            - /airflow
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-    DependsOn:
-      - SharedCloudInitMetadata
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -179,16 +193,31 @@ Resources:
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IngressCIDR: !Ref AllowedWebBlock
         IngressPort: !Ref WebserverPort
-        IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
+        IamInstanceProfile: !Ref IamInstanceProfile
+        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref WebserverInstanceType
-        ClusterStack: !Ref AWS::StackName
-    DependsOn:
-      - SharedCloudInitMetadata
+        SecretKeyName: !Sub ${AWS::StackName}-fernet-key
+        LogsBucket: !Ref LogsBucket
+        QueueName: !GetAtt TaskQueue.QueueName
+        CodeDeployGroup: !Ref AWS::StackName
+        CodeDeployApp: !Ref AWS::StackName
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
+        DatabaseURI: !Join
+          - ''
+          - - postgresql://
+            - !Ref DbMasterUsername
+            - ':'
+            - !Ref DbMasterPassword
+            - '@'
+            - !GetAtt Database.Endpoint.Address
+            - /airflow
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -203,8 +232,8 @@ Resources:
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
+        IamInstanceProfile: !Ref IamInstanceProfile
+        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
@@ -215,12 +244,25 @@ Resources:
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
         EfsFileSystem: !Ref EfsFileSystem
-        QueueName: !GetAtt TaskQueue.QueueName
         ClusterStack: !Ref AWS::StackName
+        SecretKeyName: !Sub ${AWS::StackName}-fernet-key
+        LogsBucket: !Ref LogsBucket
+        QueueName: !GetAtt TaskQueue.QueueName
+        CodeDeployGroup: !Ref AWS::StackName
+        CodeDeployApp: !Ref AWS::StackName
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
+        DatabaseURI: !Join
+          - ''
+          - - postgresql://
+            - !Ref DbMasterUsername
+            - ':'
+            - !Ref DbMasterPassword
+            - '@'
+            - !GetAtt Database.Endpoint.Address
+            - /airflow
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-    DependsOn:
-      - SharedCloudInitMetadata
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -231,14 +273,14 @@ Resources:
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
-      ApplicationName: !Sub ${AWS::StackName}-deployment-application
+      ApplicationName: !Ref AWS::StackName
       ComputePlatform: Server
 
   CodeDeployDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       ApplicationName: !Ref CodeDeployApplication
-      DeploymentGroupName: !Sub ${AWS::StackName}-deployment-group
+      DeploymentGroupName: !Ref AWS::StackName
       AutoScalingGroups:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
@@ -354,7 +396,7 @@ Resources:
         - Key: Name
           Value: !Sub ${AWS::StackName}-connection
 
-  AirflowRole:
+  IamRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -445,181 +487,11 @@ Resources:
                   - autoscaling:DescribeScalingActivities
                 Resource: '*'
 
-  AirflowProfile:
+  IamInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - !Ref AirflowRole
-
-  SharedCloudInitMetadata:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          default:
-            - runtime
-            - sysconf
-            - service
-            - metahup
-            - cdagent
-        runtime:
-          packages:
-            yum:
-              - git
-              - gcc
-              - gcc-c++
-              - jq
-              - lapack-devel
-              - libcurl-devel
-              - libxml2-devel
-              - libxslt-devel
-              - openssl-devel
-              - postgresql-devel
-              - python3
-              - python3-devel
-              - python3-pip
-              - python3-wheel
-          commands:
-            install:
-              command: |
-                sudo su - ec2-user
-                PYCURL_SSL_LIBRARY=openssl pip3 install --user \
-                  celery[sqs] apache-airflow[celery,postgres,s3,crypto]==1.10.9
-        sysconf:
-          files:
-            /etc/sysconfig/airflow:
-              content: !Sub
-                - |
-                  AWS_DEFAULT_REGION=${AWS::Region}
-                  AIRFLOW_HOME=/airflow
-                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-                  AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
-                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
-                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConn}
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
-                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
-                  AIRFLOW__CORE__REMOTE_LOGGING=True
-                  AIRFLOW__CELERY__BROKER_URL=sqs://
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
-                  AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
-                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
-                - QueueName: !GetAtt TaskQueue.QueueName
-                  DbUri: !Join
-                  - ''
-                  - - postgresql://
-                    - !Ref DbMasterUsername
-                    - ':'
-                    - !Ref DbMasterPassword
-                    - '@'
-                    - !GetAtt Database.Endpoint.Address
-                    - /airflow
-          commands:
-            envsubst:
-              command: |
-                while [ "$FERNET_KEY" = "" ]; do
-                  echo "Waiting for Fernet key to be available..."
-                  sleep 1
-                  FERNET_KEY=$(aws ssm get-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --with-decryption \
-                    --query 'Parameter.Value' \
-                    --output text)
-                done
-                echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
-        service:
-          files:
-            /usr/lib/tmpfiles.d/airflow.conf:
-              content: |
-                D /run/airflow 0755 ec2-user ec2-user
-            /usr/lib/systemd/system/airflow.service:
-              content: |
-                [Service]
-                EnvironmentFile=/etc/sysconfig/airflow
-                User=ec2-user
-                Group=ec2-user
-                ExecStart=/usr/bin/turbine
-                Restart=always
-                RestartSec=5s
-                KillMode=mixed
-                TimeoutStopSec=24h
-                [Install]
-                WantedBy=multi-user.target
-            /usr/lib/systemd/system/watcher.path:
-              content: |
-                [Unit]
-                After=airflow.service
-                PartOf=airflow.service
-                [Path]
-                PathModified=/etc/sysconfig/airflow
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/watcher.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStartPre=/usr/bin/systemctl daemon-reload
-                ExecStart=/usr/bin/systemctl restart airflow
-          commands:
-            setup:
-              command: !Sub |
-                HAS_DEPLOYMENT=$(aws deploy list-deployments \
-                  --application-name ${AWS::StackName}-deployment-application \
-                  --deployment-group ${AWS::StackName}-deployment-group \
-                  --region ${AWS::Region} | \
-                  jq '.deployments | has(0)')
-
-                systemctl enable airflow.service watcher.path
-
-                if [ "$HAS_DEPLOYMENT" != "true" ]; then
-                  systemctl start airflow
-                else
-                  echo "Deployment pending, deferring service start"
-                fi
-        metahup:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                role=${AirflowRole}
-                interval=1
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v \
-                  --region ${AWS::Region} \
-                  --role ${AirflowRole} \
-                  --stack ${AWS::StackName} \
-                  --resource Meta
-                runas=root
-            /lib/systemd/system/cfn-hup.service:
-              content: |
-                [Service]
-                ExecStart=/opt/aws/bin/cfn-hup
-                Restart=always
-                [Install]
-                WantedBy=multi-user.target
-          commands:
-            setup:
-              command: |
-                systemctl enable cfn-hup.service
-                systemctl start cfn-hup.service
-        cdagent:
-          packages:
-            yum:
-              - ruby
-              - wget
-          commands:
-            install:
-              command: !Sub |
-                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
-                chmod +x ./install
-                ./install auto
+        - !Ref IamRole
 
 Outputs:
   DeploymentsBucket:
@@ -691,7 +563,7 @@ Metadata:
           default: Airflow Config
         Parameters:
           - LoadExampleDags
-          - LoadDefaultConn
+          - LoadDefaultCons
       - Label:
           default: Quick Start Overrides
         Parameters:

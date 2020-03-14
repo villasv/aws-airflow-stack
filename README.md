@@ -113,7 +113,7 @@ available in the shell. Before running Airflow commands, you need to load the
 Airflow configuration:
 
 ```bash
-$ export $(xargs </etc/sysconfig/airflow)
+$ export $(xargs </etc/sysconfig/airflow.env)
 $ airflow list_dags
 ```
 

@@ -1,0 +1,4 @@
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/systemctl daemon-reload
+ExecStart=/usr/bin/systemctl restart airflow-scheduler airflow-webserver airflow-workerset

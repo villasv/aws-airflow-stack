@@ -26,9 +26,42 @@ Parameters:
     Type: Number
   EfsFileSystem:
     Type: String
+  ClusterStack:
+    Type: String
+  SecretKeyName:
+    Type: String
+  LogsBucket:
+    Type: String
   QueueName:
     Type: String
-  ClusterStack:
+  CodeDeployGroup:
+    Type: String
+  CodeDeployApp:
+    Type: String
+
+  # Airflow Config
+  LoadExampleDags:
+    Description: >-
+      Load the example DAGs distributed with Airflow. Useful if deploying a
+      stack for demonstrating a few topologies, operators and scheduling
+      strategies.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+  LoadDefaultCons:
+    Description: >-
+      Load the default connections initialized by Airflow. Most consider these
+      unnecessary, which is why the default is to not load them.
+    Type: String
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+  DatabaseURI:
+    Description: >-
+      The connection string URI to be used to connect to the metadata database.
     Type: String
 
   # Quick Start Overrides
@@ -73,18 +106,32 @@ Resources:
             --region ${AWS::Region} \
             --role ${IamRole} \
             --stack ${AWS::StackName} \
-            --resource WorkersetInitMetadata \
-            --configsets setup
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
-            --stack ${ClusterStack} \
-            --resource SharedCloudInitMetadata
-          /opt/aws/bin/cfn-init -v \
+            --resource LaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $?
             --region ${AWS::Region} \
             --role ${IamRole} \
             --stack ${AWS::StackName} \
-            --resource WorkersetInitMetadata
+            --resource LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            setup:
+              command: !Sub |
+                export AWS_REGION="${AWS::Region}"
+                export AWS_STACK_NAME="${AWS::StackName}"
+                export IAM_ROLE="${IamRole}"
+                export SECRET_KEY_NAME="${SecretKeyName}"
+                export LOAD_EXAMPLES="${LoadExampleDags}"
+                export LOAD_DEFAULTS="${LoadDefaultCons}"
+                export DATABASE_URI="${DatabaseURI}"
+                export LOGS_BUCKET="${LogsBucket}"
+                export QUEUE_NAME="${QueueName}"
+                export CODE_DEPLOY_GROUP="${CodeDeployGroup}"
+                export CODE_DEPLOY_APP="${CodeDeployApp}"
+                aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
+                chmod +x /opt/turbine/workerset.setup.sh
+                /opt/turbine/workerset.setup.sh
 
   WorkersetSecurityGroup:
     Type: AWS::EC2::SecurityGroup
