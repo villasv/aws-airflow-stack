@@ -43,7 +43,7 @@ Resources:
             --region ${AWS::Region} \
             --role ${IamRole} \
             --stack ${AWS::StackName} \
-            --resource WebserverInitMetadata
+            --resource WebserverInitMetadata \
             --configsets setup
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \

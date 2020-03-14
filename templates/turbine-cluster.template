@@ -375,7 +375,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - cloudformation:DescribeStackResource
-                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}*/*
         - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -465,20 +465,20 @@ Resources:
         runtime:
           packages:
             yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              jq: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              openssl-devel: []
-              postgresql-devel: []
-              python3: []
-              python3-devel: []
-              python3-pip: []
-              python3-wheel: []
+              - git
+              - gcc
+              - gcc-c++
+              - jq
+              - lapack-devel
+              - libcurl-devel
+              - libxml2-devel
+              - libxslt-devel
+              - openssl-devel
+              - postgresql-devel
+              - python3
+              - python3-devel
+              - python3-pip
+              - python3-wheel
           commands:
             install:
               command: |
@@ -611,8 +611,8 @@ Resources:
         cdagent:
           packages:
             yum:
-              ruby: []
-              wget: []
+              - ruby
+              - wget
           commands:
             install:
               command: !Sub |

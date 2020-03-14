@@ -37,7 +37,7 @@ Resources:
             --region ${AWS::Region} \
             --role ${IamRole} \
             --stack ${AWS::StackName} \
-            --resource SchedulerInitMetadata
+            --resource SchedulerInitMetadata \
             --configsets setup
           /opt/aws/bin/cfn-init -v \
             --region ${AWS::Region} \
@@ -89,9 +89,15 @@ Resources:
           default:
             - migrate
         secrets:
+          packages:
+            yum:
+              - python3
+            python:
+              - cryptography
           commands:
             generate:
               command: !Sub |
+                pip3 install cryptography
                 FERNET_KEY=$(aws ssm get-parameter \
                   --name ${ClusterStack}-fernet-key \
                   --region '${AWS::Region}' \
