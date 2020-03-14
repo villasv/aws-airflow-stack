@@ -10,6 +10,8 @@ endif
 
 
 lint:
+	black --check .
+	pylint-fail-under ./functions
 	cfn-lint templates/*.template
 
 nuke:
