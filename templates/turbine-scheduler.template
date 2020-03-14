@@ -10,14 +10,36 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
   IamInstanceProfile:
     Type: String
-  IamRole:
-    Type: String
   ImageId:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  ClusterStack:
+  SecretKeyName:
     Type: String
+
+  # Quick Start Overrides
+  QSS3BucketName:
+    Description: >-
+      S3 bucket name for the Quick Start assets. You can specify your own bucket
+      providing assets and submodules, if you want to override the Quick Start
+      behavior for your specific implementation.
+    Type: String
+    Default: turbine-quickstart
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    ConstraintDescription: >-
+      Quick Start bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
+  QSS3KeyPrefix:
+    Description: >-
+      S3 key prefix for the Quick Start assets. You can scpeficy your own
+      "directory" providing the stack templates, if you want to override the
+      Quick Start behavior for your specific implementation.
+    Type: String
+    Default: quickstart-turbine-airflow/
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
 
 Resources:
 
@@ -33,22 +55,7 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
-            --stack ${AWS::StackName} \
-            --resource SchedulerInitMetadata \
-            --configsets setup
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
-            --stack ${ClusterStack} \
-            --resource SharedCloudInitMetadata
-          /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
-            --stack ${AWS::StackName} \
-            --resource SchedulerInitMetadata
+          aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt
 
   SchedulerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -99,7 +106,7 @@ Resources:
               command: !Sub |
                 pip3 install cryptography
                 FERNET_KEY=$(aws ssm get-parameter \
-                  --name ${ClusterStack}-fernet-key \
+                  --name ${SecretKeyName} \
                   --region '${AWS::Region}' \
                   --query 'Parameter.Value')
                 if [ "$FERNET_KEY" = "" ]; then
@@ -108,7 +115,7 @@ Resources:
                     key = Fernet.generate_key().decode()
                     print(key)")
                   aws ssm put-parameter \
-                    --name ${ClusterStack}-fernet-key \
+                    --name ${SecretKeyName} \
                     --region '${AWS::Region}' \
                     --value $FERNET_KEY \
                     --type SecureString

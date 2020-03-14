@@ -153,13 +153,14 @@ Resources:
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref SchedulerInstanceType
-        ClusterStack: !Ref AWS::StackName
+        SecretKeyName: !Sub ${AWS::StackName}-fernet-key
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
     DependsOn:
       - SharedCloudInitMetadata
 
