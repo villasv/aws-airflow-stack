@@ -13,9 +13,9 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install CFN Lint
+      - name: Install Linters
         run: pip install black cfn-lint pylint-fail-under
-      - name: Lint Templates
+      - name: Lint Files
         run: make lint
 
   test:
