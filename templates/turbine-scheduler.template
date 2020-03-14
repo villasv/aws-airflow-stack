@@ -84,17 +84,10 @@ Resources:
       AWS::CloudFormation::Init:
         configSets:
           setup:
-            - service
             - secrets
+            - service
           default:
             - migrate
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                exec /usr/local/bin/airflow scheduler
         secrets:
           commands:
             generate:
@@ -114,6 +107,13 @@ Resources:
                     --value $FERNET_KEY \
                     --type SecureString
                 fi
+        service:
+          files:
+            /usr/bin/turbine:
+              mode: 755
+              content: |
+                #!/bin/sh
+                exec /usr/local/bin/airflow scheduler
         migrate:
           commands:
             migration:
