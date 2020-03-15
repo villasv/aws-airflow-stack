@@ -162,8 +162,6 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        CodeDeployGroup: !Ref AWS::StackName
-        CodeDeployApp: !Ref AWS::StackName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         DatabaseURI: !Join
@@ -203,8 +201,6 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        CodeDeployGroup: !Ref AWS::StackName
-        CodeDeployApp: !Ref AWS::StackName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         DatabaseURI: !Join
@@ -248,8 +244,6 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        CodeDeployGroup: !Ref AWS::StackName
-        CodeDeployApp: !Ref AWS::StackName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         DatabaseURI: !Join

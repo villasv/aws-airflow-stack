@@ -28,10 +28,6 @@ Parameters:
     Type: String
   QueueName:
     Type: String
-  CodeDeployGroup:
-    Type: String
-  CodeDeployApp:
-    Type: String
 
   # Airflow Config
   LoadExampleDags:
@@ -120,8 +116,6 @@ Resources:
                 export DATABASE_URI="${DatabaseURI}"
                 export LOGS_BUCKET="${LogsBucket}"
                 export QUEUE_NAME="${QueueName}"
-                export CODE_DEPLOY_GROUP="${CodeDeployGroup}"
-                export CODE_DEPLOY_APP="${CodeDeployApp}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/webserver.setup.sh
                 /opt/turbine/webserver.setup.sh
