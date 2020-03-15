@@ -1,5 +1,5 @@
 #!/bin/bash -xe
-SCRIPTS=$(dirname "$0")
+FILES=$(dirname "$0")
 
 yum install -y \
     gcc libcurl-devel openssl-devel \
@@ -7,13 +7,14 @@ yum install -y \
 PYCURL_SSL_LIBRARY=openssl pip3 install \
     "celery[sqs]" "apache-airflow[celery,postgres,s3,crypto]==1.10.9"
 
-cp "$SCRIPTS"/systemd/*.path /lib/systemd/system/
-cp "$SCRIPTS"/systemd/*.service /lib/systemd/system/
-cp "$SCRIPTS"/systemd/airflow.env /etc/sysconfig/airflow.env
-cp "$SCRIPTS"/systemd/airflow.conf /usr/lib/tmpfiles.d/airflow.conf
+cp "$FILES"/systemd/*.path /lib/systemd/system/
+cp "$FILES"/systemd/*.service /lib/systemd/system/
+cp "$FILES"/systemd/airflow.env /etc/sysconfig/airflow.env
+cp "$FILES"/systemd/airflow.conf /usr/lib/tmpfiles.d/airflow.conf
 mkdir -p /etc/cfn/hooks.d
-cp "$SCRIPTS"/systemd/cfn-hup.conf /etc/cfn/cfn-hup.conf
-cp "$SCRIPTS"/systemd/cfn-auto-reloader.conf /etc/cfn/hooks.d/cfn-auto-reloader.conf
+cp "$FILES"/systemd/cfn-hup.conf /etc/cfn/cfn-hup.conf
+cp "$FILES"/systemd/cfn-auto-reloader.conf /etc/cfn/hooks.d/cfn-auto-reloader.conf
+find "$FILES" -type f -iname "*.sh" -exec chmod +x {} \;
 
 while [ "$FERNET_KEY" = "" ]; do
     sleep 1
