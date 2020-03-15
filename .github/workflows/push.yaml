@@ -19,6 +19,7 @@ jobs:
         run: make lint
 
   test:
+    if: contains(github.ref, 'refs/heads/master')
     runs-on: ubuntu-latest
     needs: lint
     steps:
@@ -40,6 +41,7 @@ jobs:
         run: make test
 
   sync:
+    if: contains(github.ref, 'refs/heads/master')
     runs-on: ubuntu-latest
     needs: test
     steps:
