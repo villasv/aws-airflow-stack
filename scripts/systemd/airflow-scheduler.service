@@ -1,7 +1,6 @@
 [Unit]
 Description=Airflow scheduler daemon
-After=network.target postgresql.service mysql.service redis.service rabbitmq-server.service
-Wants=postgresql.service mysql.service redis.service rabbitmq-server.service
+Wants=airflow-confwatch.path
 
 [Service]
 EnvironmentFile=/etc/sysconfig/airflow.env
