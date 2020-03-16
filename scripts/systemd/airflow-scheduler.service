@@ -1,6 +1,6 @@
 [Unit]
 Description=Airflow scheduler daemon
-Wants=airflow-confwatch.path
+Wants=airflow-confapply.path
 
 [Service]
 EnvironmentFile=/etc/sysconfig/airflow.env

@@ -240,7 +240,6 @@ Resources:
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
         EfsFileSystem: !Ref EfsFileSystem
-        ClusterStack: !Ref AWS::StackName
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName

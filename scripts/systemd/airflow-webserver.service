@@ -1,6 +1,6 @@
 [Unit]
 Description=Airflow webserver daemon
-Wants=airflow-confwatch.path
+Wants=airflow-confapply.path
 
 [Service]
 EnvironmentFile=/etc/sysconfig/airflow.env

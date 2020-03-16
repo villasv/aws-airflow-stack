@@ -26,8 +26,6 @@ Parameters:
     Type: Number
   EfsFileSystem:
     Type: String
-  ClusterStack:
-    Type: String
   SecretKeyName:
     Type: String
   LogsBucket:
@@ -123,6 +121,7 @@ Resources:
                 export DATABASE_URI="${DatabaseURI}"
                 export LOGS_BUCKET="${LogsBucket}"
                 export QUEUE_NAME="${QueueName}"
+                export FILE_SYSTEM_ID="${EfsFileSystem}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/workerset.setup.sh
                 /opt/turbine/workerset.setup.sh
@@ -273,106 +272,6 @@ Resources:
       DefaultResult: CONTINUE
       HeartbeatTimeout: 180
       LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
-
-  WorkersetInitMetadata:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          setup:
-            - service
-          default:
-            - filesystem
-            - termination
-            - hearbeat
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                exec /usr/local/bin/airflow worker
-        filesystem:
-          commands:
-            mkdir:
-              test: test ! -d /airflow
-              command: |
-                mkdir /airflow
-                chown -R ec2-user /airflow
-            mount:
-              test: test ! -d /mnt/efs
-              command: !Sub |
-                mkdir /mnt/efs
-                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
-                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
-                param="$param,hard,timeo=600,retrans=2,noresvport"
-                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
-                mount /mnt/efs && chown -R ec2-user /mnt/efs
-        termination:
-          files:
-            /usr/bin/lchterm:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
-                TERMINATE_MESSAGE="Terminating EC2 instance <$INSTANCE_ID>"
-                TERMINATING=$(aws autoscaling describe-scaling-activities \
-                  --auto-scaling-group-name '${ClusterStack}-scaling-group' \
-                  --max-items 100 \
-                  --region '${AWS::Region}' | \
-                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
-                  '.Activities[]
-                  | select(.Description
-                  | test($TERMINATE_MESSAGE)) != []')
-                if [ "$TERMINATING" = "true" ]; then
-                  systemctl stop airflow
-                fi
-            /usr/lib/systemd/system/lchterm.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchterm.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchterm
-          commands:
-            setup:
-              command: |
-                systemctl enable lchterm.timer
-        heartbeat:
-          files:
-            /usr/bin/lchbeat:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                SERVICE_STATUS=$(systemctl is-active airflow)
-
-                if [ "$SERVICE_STATUS" = "deactivating" ]; then
-                  aws autoscaling record-lifecycle-action-heartbeat \
-                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                    --region '${AWS::Region}'
-                fi
-            /usr/lib/systemd/system/lchbeat.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchbeat.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchbeat
-          commands:
-            setup:
-              command: |
-                systemctl enable lchbeat.timer
 
 Outputs:
   AutoScalingGroup:
