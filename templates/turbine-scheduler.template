@@ -102,6 +102,7 @@ Resources:
           commands:
             setup:
               command: !Sub |
+                export AWS_REGION="${AWS::Region}"
                 export AWS_STACK_NAME="${AWS::StackName}"
                 export SECRET_KEY_NAME="${SecretKeyName}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
