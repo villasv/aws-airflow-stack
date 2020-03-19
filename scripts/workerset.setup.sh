@@ -11,5 +11,5 @@ if [ -d "/mnt/efs" ]; then
     mount /mnt/efs && chown -R ec2-user: /mnt/efs
 fi
 
-systemctl enable --now airflow-workerset
+systemctl enable airflow-workerset
 cd_agent
