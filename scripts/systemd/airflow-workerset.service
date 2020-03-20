@@ -1,6 +1,6 @@
 [Unit]
 Description=Airflow celery worker daemon
-Wants=airflow-confapply.path
+Wants=airflow-confapply-agent.path
 
 [Service]
 EnvironmentFile=/etc/sysconfig/airflow.env
