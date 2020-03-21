@@ -79,18 +79,6 @@ Parameters:
       instance.
     Type: Number
     Default: 0.9
-  DbMasterUsername:
-    Description: The username to be used in the airflow database.
-    Type: String
-    Default: airflow
-  DbMasterPassword:
-    Description: The password to be used in the airflow database.
-    Type: String
-    NoEcho: true
-    AllowedPattern: ^[^@"\/]{8,128}$
-    ConstraintDescription: >-
-      The password must contain from 8 to 128 characters and can include any
-      printable ASCII character except "/", """, or "@".
 
   # Airflow Config
   LoadExampleDags:
@@ -163,15 +151,7 @@ Resources:
         QueueName: !GetAtt TaskQueue.QueueName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseURI: !Join
-          - ''
-          - - postgresql://
-            - !Ref DbMasterUsername
-            - ':'
-            - !Ref DbMasterPassword
-            - '@'
-            - !GetAtt Database.Endpoint.Address
-            - /airflow
+        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -201,15 +181,7 @@ Resources:
         QueueName: !GetAtt TaskQueue.QueueName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseURI: !Join
-          - ''
-          - - postgresql://
-            - !Ref DbMasterUsername
-            - ':'
-            - !Ref DbMasterPassword
-            - '@'
-            - !GetAtt Database.Endpoint.Address
-            - /airflow
+        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -242,15 +214,7 @@ Resources:
         QueueName: !GetAtt TaskQueue.QueueName
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseURI: !Join
-          - ''
-          - - postgresql://
-            - !Ref DbMasterUsername
-            - ':'
-            - !Ref DbMasterPassword
-            - '@'
-            - !GetAtt Database.Endpoint.Address
-            - /airflow
+        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
 
@@ -317,29 +281,54 @@ Resources:
       SecurityGroups:
         - !Ref Access
 
-  DBs:
+  DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
+      DBSubnetGroupDescription: >
+        Associates the Database Instances with the selected VPC Subnets.
       SubnetIds:
         - !Ref PrivateSubnet1AID
         - !Ref PrivateSubnet2AID
 
-  Database:
+  DBSecretCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "airflow"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  DBInstance:
     Type: AWS::RDS::DBInstance
     Properties:
       AllocatedStorage: '20'
       DBInstanceClass: db.t2.micro
       DBName: airflow
       Engine: postgres
-      MasterUsername: !Ref DbMasterUsername
-      MasterUserPassword: !Ref DbMasterPassword
+      MasterUsername: !Join
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref DBSecretCredentials
+          - ':SecretString:username}}'
+      MasterUserPassword: !Join
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref DBSecretCredentials
+          - ':SecretString:password}}'
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-database
-      DBSubnetGroupName: !Ref DBs
+      DBSubnetGroupName: !Ref DBSubnetGroup
       VPCSecurityGroups:
         - !Ref Connection
+
+  DBSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DBSecretCredentials
+      TargetId: !Ref DBInstance
+      TargetType: AWS::RDS::DBInstance
 
   TaskQueue:
     Type: AWS::SQS::Queue
@@ -539,8 +528,6 @@ Metadata:
           - MaxGroupSize
           - ShrinkThreshold
           - GrowthThreshold
-          - DbMasterUsername
-          - DbMasterPassword
       - Label:
           default: Airflow Config
         Parameters:

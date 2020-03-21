@@ -36,23 +36,25 @@ else CD_PENDING_DEPLOY="true"
 fi
 export CD_PENDING_DEPLOY
 
-while [ "$FERNET_KEY" = "" ]; do
-    sleep 1
-    FERNET_KEY=$(aws ssm get-parameter \
-        --name "$SECRET_KEY_NAME" \
-        --region "$AWS_REGION" \
-        --with-decryption \
-        --query 'Parameter.Value' \
-        --output text)
-done
+yum install -y python3
+pip3 install cryptography
+FERNET_SALT=$(dd if=/dev/urandom bs=3 count=1)
+FERNET_KEY=$(python3 -c "if True:#
+    import base64
+    import os
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.backends imort default_backend
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    password = \"$PASSWORD\"
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),length=32,salt=\"$FERNET_SALT\",
+        iterations=100000,backend=default_backend()
+    )
+    key = kdf.derive(password)
+    key_encoded = base64.urlsafe_b64encode(key)
+    print(key)")
 export FERNET_KEY
-
-envreplace() { CONTENT=$(envsubst <"$1"); echo "$CONTENT" >"$1"; }
-envreplace /etc/sysconfig/airflow.env
-envreplace /etc/cfn/cfn-hup.conf
-envreplace /etc/cfn/hooks.d/cfn-auto-reloader.conf
-mapfile -t AIRFLOW_ENVS < /etc/sysconfig/airflow.env
-export "${AIRFLOW_ENVS[@]}"
 
 cp "$FILES"/systemd/*.{path,timer,service} /lib/systemd/system/
 cp "$FILES"/systemd/airflow.env /etc/sysconfig/airflow.env
@@ -62,7 +64,14 @@ find "$FILES" -type f -iname "*.sh" -exec chmod +x {} \;
 mkdir -p /etc/cfn/hooks.d
 cp "$FILES"/systemd/cfn-hup.conf /etc/cfn/cfn-hup.conf
 cp "$FILES"/systemd/cfn-auto-reloader.conf /etc/cfn/hooks.d/cfn-auto-reloader.conf
-systemctl enable --now cfn-hup.service
+
+envreplace() { CONTENT=$(envsubst <"$1"); echo "$CONTENT" >"$1"; }
+envreplace /etc/sysconfig/airflow.env
+envreplace /etc/cfn/cfn-hup.conf
+envreplace /etc/cfn/hooks.d/cfn-auto-reloader.conf
+mapfile -t AIRFLOW_ENVS < /etc/sysconfig/airflow.env
+export "${AIRFLOW_ENVS[@]}"
+
 
 cd_agent() {
     yum install -y ruby
@@ -76,3 +85,5 @@ export PYCURL_SSL_LIBRARY=openssl
 pip3 install "apache-airflow[celery,postgres,s3,crypto]==1.10.9" "celery[sqs]"
 mkdir /run/airflow && chown -R ec2-user: /run/airflow
 mkdir "$AIRFLOW_HOME" && chown -R ec2-user: "$AIRFLOW_HOME"
+
+systemctl enable --now cfn-hup.service

@@ -90,18 +90,6 @@ Parameters:
       instance.
     Type: Number
     Default: 0.9
-  DbMasterUsername:
-    Description: The username to be used in the airflow database.
-    Type: String
-    Default: airflow
-  DbMasterPassword:
-    Description: The password to be used in the airflow database.
-    Type: String
-    NoEcho: true
-    AllowedPattern: ^[^@"\/]{8,128}$
-    ConstraintDescription: >-
-      The password must contain from 8 to 128 characters and can include any
-      printable ASCII character except "/", """, or "@".
 
   # Airflow Config
   LoadExampleDags:
@@ -198,8 +186,6 @@ Resources:
         MaxGroupSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
-        DbMasterUsername: !Ref DbMasterUsername
-        DbMasterPassword: !Ref DbMasterPassword
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
@@ -236,8 +222,6 @@ Metadata:
           - MaxGroupSize
           - ShrinkThreshold
           - GrowthThreshold
-          - DbMasterUsername
-          - DbMasterPassword
       - Label:
           default: Airflow Config
         Parameters:

@@ -51,7 +51,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  DatabaseURI:
+  DatabaseEndpoint:
     Description: >-
       The connection string URI to be used to connect to the metadata database.
     Type: String
@@ -110,7 +110,7 @@ Resources:
                 export SECRET_KEY_NAME="${SecretKeyName}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
-                export DATABASE_URI="${DatabaseURI}"
+                export DATABASE_ENDPOINT="${DatabaseEndpoint}"
                 export LOGS_BUCKET="${LogsBucket}"
                 export QUEUE_NAME="${QueueName}"
                 export FILE_SYSTEM_ID="${EfsFileSystem}"
