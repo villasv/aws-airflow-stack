@@ -153,7 +153,6 @@ Resources:
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IamInstanceProfile: !Ref IamInstanceProfile
-        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
@@ -192,7 +191,6 @@ Resources:
         IngressCIDR: !Ref AllowedWebBlock
         IngressPort: !Ref WebserverPort
         IamInstanceProfile: !Ref IamInstanceProfile
-        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
@@ -229,7 +227,6 @@ Resources:
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IamInstanceProfile: !Ref IamInstanceProfile
-        IamRole: !Ref IamRole
         ImageId: !FindInMap
           - AWSAMIRegionMap
           - !Ref AWS::Region
@@ -404,14 +401,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
-        - PolicyName: !Sub ${AWS::StackName}-cfn-describe
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudformation:DescribeStackResource
-                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}*/*
         - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
           PolicyDocument:
             Version: 2012-10-17

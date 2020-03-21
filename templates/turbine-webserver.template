@@ -16,8 +16,6 @@ Parameters:
     Type: Number
   IamInstanceProfile:
     Type: String
-  IamRole:
-    Type: String
   ImageId:
     Type: AWS::EC2::Image::Id
   InstanceType:
@@ -92,13 +90,9 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
             --stack ${AWS::StackName} \
             --resource LaunchConfiguration
           /opt/aws/bin/cfn-signal -e $?
-            --region ${AWS::Region} \
-            --role ${IamRole} \
             --stack ${AWS::StackName} \
             --resource LaunchConfiguration
     Metadata:
