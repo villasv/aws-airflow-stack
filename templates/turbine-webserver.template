@@ -1,10 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  # Networking
   VPCID:
+    Description: An existing VPC for the cluster
     Type: AWS::EC2::VPC::Id
   PublicSubnet1ID:
+    Description: An existing public Subnet in some Availability Zone
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2ID:
+    Description: An existing public Subnet in another Availability Zone
     Type: AWS::EC2::Subnet::Id
   InstancesSecurityGroup:
     Type: AWS::EC2::SecurityGroup::Id

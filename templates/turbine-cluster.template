@@ -7,7 +7,6 @@ Description: >-
   serve as shared directory, and a custom CloudWatch metric measured by a timed
   AWS Lambda.
 Parameters:
-
   # Networking
   VPCID:
     Description: An existing VPC for the cluster

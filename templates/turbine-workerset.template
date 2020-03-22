@@ -1,10 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
+  # Networking
   VPCID:
+    Description: An existing VPC for the cluster
     Type: AWS::EC2::VPC::Id
   PrivateSubnet1AID:
+    Description: An existing private Subnet in some Availability Zone
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
+    Description: An existing private Subnet in another Availability Zone
     Type: AWS::EC2::Subnet::Id
   InstancesSecurityGroup:
     Type: AWS::EC2::SecurityGroup::Id
@@ -14,14 +18,28 @@ Parameters:
     Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
-  MinSize:
+  MinGroupSize:
+    Description: The minimum number of active worker instances.
     Type: Number
-  MaxSize:
+    Default: 1
+  MaxGroupSize:
+    Description: The maximum number of active worker instances.
     Type: Number
+    Default: 10
   ShrinkThreshold:
+    Description: >-
+      The threshold for the average queue size from which going equal or below
+      will trigger the AutoScaling group to Scale In, deallocating one worker
+      instance.
     Type: Number
+    Default: 0.5
   GrowthThreshold:
+    Description: >-
+      The threshold for the average queue size from which going equal or above
+      will trigger the AutoScaling group to Scale Out, allocating one worker
+      instance.
     Type: Number
+    Default: 0.9
   EfsFileSystem:
     Type: String
   SecretKeyName:
@@ -141,8 +159,8 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       LaunchConfigurationName: !Ref LaunchConfiguration
-      MaxSize: !Ref MaxSize
-      MinSize: !Ref MinSize
+      MaxGroupSize: !Ref MaxGroupSize
+      MinGroupSize: !Ref MinGroupSize
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:

@@ -3,7 +3,6 @@ Description: >-
   The Turbine-Airflow master stack, including a quickstart VPC stack and the
   Turbine-Airflow cluster stack.
 Parameters:
-
   # Networking
   VPCCIDR:
     Description: The CIDR block for the VPC
