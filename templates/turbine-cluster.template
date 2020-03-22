@@ -26,13 +26,11 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   AllowedWebBlock:
     Description: >-
-      The IPv4 CIDR block to allow HTTP access in the webserver. The default of
-      0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
-      secure.
+      The IPv4 CIDR block to allow HTTP access in the webserver. Using 0.0.0.0/0
+      allows HTTP from everywhere, which is convenient but less secure.
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-    Default: 0.0.0.0/0
 
   # Cluster Settings
   SchedulerInstanceType:
@@ -401,16 +399,53 @@ Resources:
                 Action:
                   - secretsmanager:GetSecretValue
                 Resource: !Ref DBSecrets
-        - PolicyName: !Sub ${AWS::StackName}-parameters-policy
+        - PolicyName: !Sub ${AWS::StackName}-deployments-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - ssm:GetParameter
-                  - ssm:PutParameter
+                  - s3:Get*
+                  - s3:List*
+                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
+              - Effect: Allow
+                Action:
+                  - codedeploy:List*
                 Resource:
-                  - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
+                  - !Join
+                    - ':'
+                    - - 'arn:aws:codedeploy'
+                      - !Ref AWS::Region
+                      - !Ref AWS::AccountId
+                      - application
+                      - !Ref CodeDeployApplication
+                  - !Join
+                    - ':'
+                    - - 'arn:aws:codedeploy'
+                      - !Ref AWS::Region
+                      - !Ref AWS::AccountId
+                      - deploymentgroup
+                      - !Ref CodeDeployApplication
+                      - /
+                      - !Ref CodeDeployDeploymentGroup
+        - PolicyName: !Sub ${AWS::StackName}-lifecycle-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                  - autoscaling:CompleteLifecycleAction
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:autoscaling
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - autoScalingGroup:*:*
+              - Effect: Allow
+                Action:
+                  - autoscaling:DescribeScalingActivities
+                Resource: '*'
         - PolicyName: !Sub ${AWS::StackName}-queue-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -431,20 +466,7 @@ Resources:
                 Resource: !Sub
                   - arn:aws:sqs:*:${AWS::AccountId}:${TaskQueueName}
                   - TaskQueueName: !GetAtt TaskQueue.QueueName
-        - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:List*
-                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-              - Effect: Allow
-                Action:
-                  - codedeploy:List*
-                Resource: !Sub arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*
-        - PolicyName: !Sub ${AWS::StackName}-logs-rw-policy
+        - PolicyName: !Sub ${AWS::StackName}-logs-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -453,19 +475,6 @@ Resources:
                   - s3:Get*
                   - s3:Put*
                 Resource: !Sub arn:aws:s3:::${LogsBucket}/*
-        - PolicyName: !Sub ${AWS::StackName}-lifecycle-heartbeat
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - autoscaling:RecordLifecycleActionHeartbeat
-                  - autoscaling:CompleteLifecycleAction
-                Resource: !Sub arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*
-              - Effect: Allow
-                Action:
-                  - autoscaling:DescribeScalingActivities
-                Resource: '*'
 
   IamInstanceProfile:
     Type: AWS::IAM::InstanceProfile

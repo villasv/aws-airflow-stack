@@ -37,13 +37,11 @@ Parameters:
     Default: 10.0.11.0/24
   AllowedWebBlock:
     Description: >-
-      The IPv4 CIDR block to allow HTTP access in the webserver. The default of
-      0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
-      secure.
+      The IPv4 CIDR block to allow HTTP access in the webserver. Using 0.0.0.0/0
+      allows HTTP from everywhere, which is convenient but less secure.
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-    Default: 0.0.0.0/0
 
   # Cluster Settings
   SchedulerInstanceType:
