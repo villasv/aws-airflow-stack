@@ -1,5 +1,4 @@
 #!/bin/bash -xe
-FILES=$(dirname "$0")
 yum install -y jq
 jsonvar() { jq -n --argjson doc "$1" -r "\$doc.$2"; }
 
@@ -16,9 +15,10 @@ export IAM_ROLE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECURITY_TOKEN
 
 EC2_DOCUMENT=$(curl "$IMDSv1/dynamic/instance-identity/document")
 AWS_REGION=$(jsonvar "$EC2_DOCUMENT" region)
+AWS_DEFAULT_REGION=$(jsonvar "$EC2_DOCUMENT" region)
 AWS_ACCOUNT_ID=$(jsonvar "$EC2_DOCUMENT" accountId)
 EC2_INSTANCE_ID=$(jsonvar "$EC2_DOCUMENT" instanceId)
-export AWS_REGION AWS_ACCOUNT_ID EC2_INSTANCE_ID
+export AWS_DEFAULT_REGION AWS_REGION AWS_ACCOUNT_ID EC2_INSTANCE_ID
 
 yum install -y python3 python3-pip python3-wheel python3-devel
 pip3 install awscurl
@@ -36,42 +36,60 @@ else CD_PENDING_DEPLOY="true"
 fi
 export CD_PENDING_DEPLOY
 
+RDS_SECRETS=$(aws secretsmanager \
+    get-secret-value --secret-id "$RDS_SECRETS_ARN")
+RDS_ENGINE=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.engine")
+RDS_USER=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.username")
+RDS_PASS=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.password")
+RDS_HOST=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.host")
+RDS_DBNAME=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.dbname")
+RDS_PORT=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.port")
+DATABASE_URI="$RDS_ENGINE://$RDS_USER:$RDS_PASS@$RDS_HOST:$RDS_PORT/$RDS_DBNAME"
+export DATABASE_URI
+
 yum install -y python3
 pip3 install cryptography
-FERNET_SALT=$(dd if=/dev/urandom bs=3 count=1)
 FERNET_KEY=$(python3 -c "if True:#
-    import base64
-    import os
+    from base64 import urlsafe_b64encode
     from cryptography.fernet import Fernet
-    from cryptography.hazmat.backends imort default_backend
+    from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    password = \"$PASSWORD\"
     kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),length=32,salt=\"$FERNET_SALT\",
-        iterations=100000,backend=default_backend()
+        algorithm=hashes.SHA256(),length=32,salt=b'$FERNET_SALT',
+        iterations=100000,backend=default_backend(),
     )
-    key = kdf.derive(password)
-    key_encoded = base64.urlsafe_b64encode(key)
-    print(key)")
+    key = kdf.derive(b'$RDS_PASS')
+    key_encoded = urlsafe_b64encode(key)
+    print(key_encoded.decode('utf8'))")
 export FERNET_KEY
 
-cp "$FILES"/systemd/*.{path,timer,service} /lib/systemd/system/
-cp "$FILES"/systemd/airflow.env /etc/sysconfig/airflow.env
-cp "$FILES"/systemd/airflow.conf /usr/lib/tmpfiles.d/airflow.conf
+FILES=$(dirname "$0")
 find "$FILES" -type f -iname "*.sh" -exec chmod +x {} \;
+envreplace() { CONTENT=$(envsubst <"$1"); echo "$CONTENT" >"$1"; }
 
 mkdir -p /etc/cfn/hooks.d
+cp "$FILES"/systemd/cfn-hup.service /lib/systemd/system/
 cp "$FILES"/systemd/cfn-hup.conf /etc/cfn/cfn-hup.conf
 cp "$FILES"/systemd/cfn-auto-reloader.conf /etc/cfn/hooks.d/cfn-auto-reloader.conf
-
-envreplace() { CONTENT=$(envsubst <"$1"); echo "$CONTENT" >"$1"; }
-envreplace /etc/sysconfig/airflow.env
 envreplace /etc/cfn/cfn-hup.conf
 envreplace /etc/cfn/hooks.d/cfn-auto-reloader.conf
+
+mkdir /run/airflow && chown -R ec2-user: /run/airflow
+cp "$FILES"/systemd/airflow-*.{path,timer,service} /lib/systemd/system/
+cp "$FILES"/systemd/airflow.env /etc/sysconfig/airflow.env
+cp "$FILES"/systemd/airflow.conf /usr/lib/tmpfiles.d/airflow.conf
+envreplace /etc/sysconfig/airflow.env
+
 mapfile -t AIRFLOW_ENVS < /etc/sysconfig/airflow.env
 export "${AIRFLOW_ENVS[@]}"
 
+yum install -y gcc libcurl-devel openssl-devel
+export PYCURL_SSL_LIBRARY=openssl
+pip3 install "apache-airflow[celery,postgres,s3,crypto]==1.10.9" "celery[sqs]"
+mkdir "$AIRFLOW_HOME" && chown -R ec2-user: "$AIRFLOW_HOME"
+
+systemctl enable --now cfn-hup.service
 
 cd_agent() {
     yum install -y ruby
@@ -79,11 +97,3 @@ cd_agent() {
     chmod +x ./install
     ./install auto
 }
-
-yum install -y gcc libcurl-devel openssl-devel
-export PYCURL_SSL_LIBRARY=openssl
-pip3 install "apache-airflow[celery,postgres,s3,crypto]==1.10.9" "celery[sqs]"
-mkdir /run/airflow && chown -R ec2-user: /run/airflow
-mkdir "$AIRFLOW_HOME" && chown -R ec2-user: "$AIRFLOW_HOME"
-
-systemctl enable --now cfn-hup.service

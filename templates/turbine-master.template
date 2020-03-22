@@ -44,16 +44,6 @@ Parameters:
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 0.0.0.0/0
-  WebserverPort:
-    Description: >-
-      The port Airflow webserver will be listening.
-    Type: Number
-    Default: 8080
-    MinValue: 1024
-    MaxValue: 65535
-    ConstraintDescription: >-
-      Ports below 1024 can be opened only with root privileges and the airflow
-      process does not run as such.
 
   # Cluster Settings
   SchedulerInstanceType:
@@ -111,6 +101,16 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
+  WebserverPort:
+    Description: >-
+      The port Airflow webserver will be listening.
+    Type: Number
+    Default: 8080
+    MinValue: 1024
+    MaxValue: 65535
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
 
   # Quick Start Overrides
   QSS3BucketName:

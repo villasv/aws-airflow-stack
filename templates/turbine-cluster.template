@@ -33,16 +33,6 @@ Parameters:
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 0.0.0.0/0
-  WebserverPort:
-    Description: >-
-      The port Airflow webserver will be listening.
-    Type: Number
-    Default: 8080
-    MinValue: 1024
-    MaxValue: 65535
-    ConstraintDescription: >-
-      Ports below 1024 can be opened only with root privileges and the airflow
-      process does not run as such.
 
   # Cluster Settings
   SchedulerInstanceType:
@@ -100,6 +90,16 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
+  WebserverPort:
+    Description: >-
+      The port Airflow webserver will be listening.
+    Type: Number
+    Default: 8080
+    MinValue: 1024
+    MaxValue: 65535
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
 
   # Quick Start Overrides
   QSS3BucketName:
@@ -149,11 +149,13 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
+        RDSSecretsArn: !Ref DBSecrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - DBSecretsAttachment
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -179,11 +181,13 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
+        RDSSecretsArn: !Ref DBSecrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - DBSecretsAttachment
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -212,11 +216,13 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
+        RDSSecretsArn: !Ref DBSecrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
-        DatabaseEndpoint: !GetAtt DBInstance.Endpoint.Address
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - DBSecretsAttachment
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -290,7 +296,7 @@ Resources:
         - !Ref PrivateSubnet1AID
         - !Ref PrivateSubnet2AID
 
-  DBSecretCredentials:
+  DBSecrets:
     Type: AWS::SecretsManager::Secret
     Properties:
       GenerateSecretString:
@@ -309,24 +315,21 @@ Resources:
       MasterUsername: !Join
         - ''
         - - '{{resolve:secretsmanager:'
-          - !Ref DBSecretCredentials
+          - !Ref DBSecrets
           - ':SecretString:username}}'
       MasterUserPassword: !Join
         - ''
         - - '{{resolve:secretsmanager:'
-          - !Ref DBSecretCredentials
+          - !Ref DBSecrets
           - ':SecretString:password}}'
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-database
       DBSubnetGroupName: !Ref DBSubnetGroup
       VPCSecurityGroups:
         - !Ref Connection
 
-  DBSecretAttachment:
+  DBSecretsAttachment:
     Type: AWS::SecretsManager::SecretTargetAttachment
     Properties:
-      SecretId: !Ref DBSecretCredentials
+      SecretId: !Ref DBSecrets
       TargetId: !Ref DBInstance
       TargetType: AWS::RDS::DBInstance
 
@@ -390,7 +393,15 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
-        - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
+        - PolicyName: !Sub ${AWS::StackName}-secrets-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DBSecrets
+        - PolicyName: !Sub ${AWS::StackName}-parameters-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -400,7 +411,7 @@ Resources:
                   - ssm:PutParameter
                 Resource:
                   - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
-        - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
+        - PolicyName: !Sub ${AWS::StackName}-queue-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -418,10 +429,8 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:SendMessage
                 Resource: !Sub
-                  - arn:aws:sqs:*:${AWS::AccountId}:${queue}
-                  - queue: !GetAtt
-                      - TaskQueue
-                      - QueueName
+                  - arn:aws:sqs:*:${AWS::AccountId}:${TaskQueueName}
+                  - TaskQueueName: !GetAtt TaskQueue.QueueName
         - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
           PolicyDocument:
             Version: 2012-10-17

@@ -21,6 +21,13 @@ Parameters:
   QueueName:
     Type: String
 
+  # Cluster Resources
+  RDSSecretsArn:
+    Description: >-
+      The AWS Secrets Manager resource ARN holding the metadata database
+      credentials.
+    Type: String
+
   # Airflow Config
   LoadExampleDags:
     Description: >-
@@ -41,10 +48,6 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  DatabaseEndpoint:
-    Description: >-
-      The connection string URI to be used to connect to the metadata database.
-    Type: String
 
   # Quick Start Overrides
   QSS3BucketName:
@@ -98,12 +101,12 @@ Resources:
               command: !Sub |
                 export AWS_REGION="${AWS::Region}"
                 export AWS_STACK_NAME="${AWS::StackName}"
+                export LOGS_BUCKET="${LogsBucket}"
                 export SECRET_KEY_NAME="${SecretKeyName}"
+                export QUEUE_NAME="${QueueName}"
+                export RDS_SECRETS_ARN="${RDSSecretsArn}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
-                export DATABASE_ENDPOINT="${DatabaseEndpoint}"
-                export LOGS_BUCKET="${LogsBucket}"
-                export QUEUE_NAME="${QueueName}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/scheduler.setup.sh
                 /opt/turbine/scheduler.setup.sh
