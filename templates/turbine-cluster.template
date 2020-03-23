@@ -407,24 +407,6 @@ Resources:
                   - s3:Get*
                   - s3:List*
                 Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-        - PolicyName: !Sub ${AWS::StackName}-lifecycle-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - autoscaling:RecordLifecycleActionHeartbeat
-                  - autoscaling:CompleteLifecycleAction
-                Resource: !Join
-                  - ':'
-                  - - arn:aws:autoscaling
-                    - !Ref AWS::Region
-                    - !Ref AWS::AccountId
-                    - autoScalingGroup:*:*
-              - Effect: Allow
-                Action:
-                  - autoscaling:DescribeScalingActivities
-                Resource: '*'
         - PolicyName: !Sub ${AWS::StackName}-queue-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -454,6 +436,24 @@ Resources:
                   - s3:Get*
                   - s3:Put*
                 Resource: !Sub arn:aws:s3:::${LogsBucket}/*
+        - PolicyName: !Sub ${AWS::StackName}-lifecycle-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                  - autoscaling:CompleteLifecycleAction
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:autoscaling
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - autoScalingGroup:*:*
+              - Effect: Allow
+                Action:
+                  - autoscaling:DescribeScalingActivities
+                Resource: '*'
 
   IamInstanceProfile:
     Type: AWS::IAM::InstanceProfile
