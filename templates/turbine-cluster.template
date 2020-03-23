@@ -205,8 +205,8 @@ Resources:
           - !Ref AWS::Region
           - AMZNLINUX2
         InstanceType: !Ref WorkerInstanceType
-        MinSize: !Ref MinGroupSize
-        MaxSize: !Ref MaxGroupSize
+        MinGroupSize: !Ref MinGroupSize
+        MaxGroupSize: !Ref MaxGroupSize
         GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
         EfsFileSystem: !Ref EfsFileSystem
@@ -407,26 +407,6 @@ Resources:
                   - s3:Get*
                   - s3:List*
                 Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-              - Effect: Allow
-                Action:
-                  - codedeploy:List*
-                Resource:
-                  - !Join
-                    - ':'
-                    - - 'arn:aws:codedeploy'
-                      - !Ref AWS::Region
-                      - !Ref AWS::AccountId
-                      - application
-                      - !Ref CodeDeployApplication
-                  - !Join
-                    - ':'
-                    - - 'arn:aws:codedeploy'
-                      - !Ref AWS::Region
-                      - !Ref AWS::AccountId
-                      - deploymentgroup
-                      - !Ref CodeDeployApplication
-                      - /
-                      - !Ref CodeDeployDeploymentGroup
         - PolicyName: !Sub ${AWS::StackName}-lifecycle-policy
           PolicyDocument:
             Version: 2012-10-17

@@ -159,8 +159,8 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       LaunchConfigurationName: !Ref LaunchConfiguration
-      MaxGroupSize: !Ref MaxGroupSize
-      MinGroupSize: !Ref MinGroupSize
+      MaxSize: !Ref MaxGroupSize
+      MinSize: !Ref MinGroupSize
       MetricsCollection:
         - Granularity: 1Minute
       VPCZoneIdentifier:
