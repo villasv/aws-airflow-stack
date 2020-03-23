@@ -7,11 +7,12 @@ for template in Path("./templates").iterdir():
         TEMPLATES[str(template)] = load_yaml(f.read())
 
 
-# def test_requirements():
-#     for f, yaml in TEMPLATES.items():
-#         for param, specs in yaml['Parameters'].items():
-#             assert 'Description' in specs
-#             assert 'Type' in specs
+def test_attributes():
+    for f, yaml in TEMPLATES.items():
+        for param, specs in yaml['Parameters'].items():
+            keys = list(specs.keys())
+            assert ((param, keys[0]) == (param, 'Description'))
+            assert ((param, keys[1]) == (param, 'Type'))
 
 
 def test_consistency():
@@ -22,7 +23,8 @@ def test_consistency():
                     continue
                 for param2, specs2 in yaml2['Parameters'].items():
                     if param1 == param2:
-                        assert (param1, dump_yaml(specs1)) == (param2,dump_yaml(specs2))
-
-if __name__ == "__main__":
-    test_consistency()
+                        assert (
+                            (param1, dump_yaml(specs1))
+                            ==
+                            (param2, dump_yaml(specs2))
+                        )
