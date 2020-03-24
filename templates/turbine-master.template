@@ -1,7 +1,12 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  The Turbine-Airflow master stack, including a quickstart VPC stack and the
-  Turbine-Airflow cluster stack.
+  This template creates a Quick Start VPC stack and a Turbine-Airflow cluster
+  stack. The Quick Start VPC stack creates a Multi-AZ VPC infrastructure with
+  two private subnets and managed NAT gateways in the two public subnets. If you
+  deploy the Quick Start in a region that doesn't support NAT gateways, NAT
+  instances are deployed instead. **WARNING** This template creates AWS
+  resources. You will be billed for the AWS resources used if you create a stack
+  from this template. QS(0027)
 Parameters:
   # Networking
   VPCCIDR:
@@ -98,7 +103,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  WebserverPort:
+  WebServerPort:
     Description: >-
       The port Airflow webserver will be listening.
     Type: Number
@@ -175,7 +180,7 @@ Resources:
         PrivateSubnet1AID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
         PrivateSubnet2AID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
         AllowedWebBlock: !Ref AllowedWebBlock
-        WebserverPort: !Ref WebserverPort
+        WebServerPort: !Ref WebServerPort
         SchedulerInstanceType: !Ref SchedulerInstanceType
         WebserverInstanceType: !Ref WebserverInstanceType
         WorkerInstanceType: !Ref WorkerInstanceType
@@ -208,7 +213,6 @@ Metadata:
           - PrivateSubnet1ACIDR
           - PrivateSubnet2ACIDR
           - AllowedWebBlock
-          - WebserverPort
       - Label:
           default: Cluster Settings
         Parameters:
@@ -224,6 +228,7 @@ Metadata:
         Parameters:
           - LoadExampleDags
           - LoadDefaultCons
+          - WebServerPort
       - Label:
           default: Quick Start Overrides
         Parameters:

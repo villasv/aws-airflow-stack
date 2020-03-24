@@ -87,7 +87,7 @@ Parameters:
       - 'False'
       - 'True'
     Default: 'False'
-  WebserverPort:
+  WebServerPort:
     Description: >-
       The port Airflow webserver will be listening.
     Type: Number
@@ -124,6 +124,20 @@ Parameters:
 
 Resources:
 
+  MetadataStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join
+        - ''
+        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
+          - !Ref QSS3KeyPrefix
+          - templates/turbine-metadata.template
+      Parameters:
+        VPCID: !Ref VPCID
+        PrivateSubnet1AID: !Ref PrivateSubnet1AID
+        PrivateSubnet2AID: !Ref PrivateSubnet2AID
+        IngressSecurityGroup: !Ref InstancesSecurityGroup
+
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -146,13 +160,11 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !Ref DBSecrets
+        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-    DependsOn:
-      - DBSecretsAttachment
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -168,7 +180,7 @@ Resources:
         PublicSubnet2ID: !Ref PublicSubnet2ID
         InstancesSecurityGroup: !Ref InstancesSecurityGroup
         IngressCIDR: !Ref AllowedWebBlock
-        IngressPort: !Ref WebserverPort
+        IngressPort: !Ref WebServerPort
         IamInstanceProfile: !Ref IamInstanceProfile
         ImageId: !FindInMap
           - AWSAMIRegionMap
@@ -178,13 +190,11 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !Ref DBSecrets
+        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-    DependsOn:
-      - DBSecretsAttachment
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -213,13 +223,11 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !Ref DBSecrets
+        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-    DependsOn:
-      - DBSecretsAttachment
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -242,9 +250,7 @@ Resources:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
         - !GetAtt WorkerSetStack.Outputs.AutoScalingGroup
-      ServiceRoleArn: !GetAtt
-        - CodeDeployServiceRole
-        - Arn
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
 
   CodeDeployServiceRole:
     Type: AWS::IAM::Role
@@ -284,52 +290,6 @@ Resources:
       SecurityGroups:
         - !Ref Access
 
-  DBSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: >
-        Associates the Database Instances with the selected VPC Subnets.
-      SubnetIds:
-        - !Ref PrivateSubnet1AID
-        - !Ref PrivateSubnet2AID
-
-  DBSecrets:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      GenerateSecretString:
-        SecretStringTemplate: '{"username": "airflow"}'
-        GenerateStringKey: "password"
-        PasswordLength: 16
-        ExcludeCharacters: '"@/\'
-
-  DBInstance:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      AllocatedStorage: '20'
-      DBInstanceClass: db.t2.micro
-      DBName: airflow
-      Engine: postgres
-      MasterUsername: !Join
-        - ''
-        - - '{{resolve:secretsmanager:'
-          - !Ref DBSecrets
-          - ':SecretString:username}}'
-      MasterUserPassword: !Join
-        - ''
-        - - '{{resolve:secretsmanager:'
-          - !Ref DBSecrets
-          - ':SecretString:password}}'
-      DBSubnetGroupName: !Ref DBSubnetGroup
-      VPCSecurityGroups:
-        - !Ref Connection
-
-  DBSecretsAttachment:
-    Type: AWS::SecretsManager::SecretTargetAttachment
-    Properties:
-      SecretId: !Ref DBSecrets
-      TargetId: !Ref DBInstance
-      TargetType: AWS::RDS::DBInstance
-
   TaskQueue:
     Type: AWS::SQS::Queue
     Properties: {}
@@ -361,20 +321,6 @@ Resources:
         - Key: Name
           Value: !Sub '${AWS::StackName}-access'
 
-  Connection:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security Rules with permissions for database connections for Airflow.
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-          IpProtocol: TCP
-          FromPort: 5432
-          ToPort: 5432
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-connection
-
   IamRole:
     Type: AWS::IAM::Role
     Properties:
@@ -397,7 +343,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !Ref DBSecrets
+                Resource: !GetAtt MetadataStack.Outputs.Secrets
         - PolicyName: !Sub ${AWS::StackName}-deployments-policy
           PolicyDocument:
             Version: 2012-10-17
@@ -514,7 +460,7 @@ Metadata:
           - PrivateSubnet1AID
           - PrivateSubnet2AID
           - AllowedWebBlock
-          - WebserverPort
+          - WebServerPort
       - Label:
           default: Cluster Settings
         Parameters:
