@@ -1,11 +1,12 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  The Turbine-Airflow cluster stack, composed mainly of the Airflow web server,
-  the Airflow scheduler, and the Airflow worker nested stacks. Supporting
-  resources include an RDS to host the Airflow metadata database, an SQS to be
-  used as broker backend, S3 buckets for logs and deployment bundles, an EFS to
-  serve as shared directory, and a custom CloudWatch metric measured by a timed
-  AWS Lambda.
+  This template creates the Airflow supporting resources including an RDS
+  instance to host the Airflow metadata database, an SQS to be used as broker
+  backend, S3 buckets for logs and deployment bundles, an EFS to serve as shared
+  directory, and then creates the Airflow scheduler, webserver and workers
+  nested stacks. **WARNING** This template creates AWS resources. You will be
+  billed for the AWS resources used if you create a stack from this template.
+  QS(0027)
 Parameters:
   # Networking
   VPCID:
@@ -124,19 +125,64 @@ Parameters:
 
 Resources:
 
-  MetadataStack:
-    Type: AWS::CloudFormation::Stack
+  #region Metadata Database
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
     Properties:
-      TemplateURL: !Join
+      DBSubnetGroupDescription: >
+        Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
+      Engine: postgres
+      MasterUsername: !Join
         - ''
-        - - !Sub https://${QSS3BucketName}.s3.amazonaws.com/
-          - !Ref QSS3KeyPrefix
-          - templates/turbine-metadata.template
-      Parameters:
-        VPCID: !Ref VPCID
-        PrivateSubnet1AID: !Ref PrivateSubnet1AID
-        PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        IngressSecurityGroup: !Ref InstancesSecurityGroup
+        - - '{{resolve:secretsmanager:'
+          - !Ref Secret
+          - ':SecretString:username}}'
+      MasterUserPassword: !Join
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref Secret
+          - ':SecretString:password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref SecurityGroup
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Rules with permissions for database connections for Airflow.
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
+          IpProtocol: TCP
+          FromPort: 5432
+          ToPort: 5432
+      VpcId: !Ref VPCID
+
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "airflow"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  SecretTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref Secret
+      TargetId: !Ref DBInstance
+      TargetType: AWS::RDS::DBInstance
+  #endregion
 
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
@@ -156,7 +202,7 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
+        RDSSecretsArn: !Ref Secret
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
@@ -182,7 +228,7 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
+        RDSSecretsArn: !Ref Secret
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
@@ -211,7 +257,7 @@ Resources:
         SecretKeyName: !Sub ${AWS::StackName}-fernet-key
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName
-        RDSSecretsArn: !GetAtt MetadataStack.Outputs.Secrets
+        RDSSecretsArn: !Ref Secret
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
@@ -331,7 +377,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - secretsmanager:GetSecretValue
-                Resource: !GetAtt MetadataStack.Outputs.Secrets
+                Resource: !Ref Secret
         - PolicyName: !Sub ${AWS::StackName}-deployments-policy
           PolicyDocument:
             Version: 2012-10-17

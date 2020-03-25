@@ -4,9 +4,13 @@ Description: >-
   stack. The Quick Start VPC stack creates a Multi-AZ VPC infrastructure with
   two private subnets and managed NAT gateways in the two public subnets. If you
   deploy the Quick Start in a region that doesn't support NAT gateways, NAT
-  instances are deployed instead. **WARNING** This template creates AWS
-  resources. You will be billed for the AWS resources used if you create a stack
-  from this template. QS(0027)
+  instances are deployed instead. The Turbine-Airflow cluster stack creates the
+  Airflow supporting resources including an RDS instance to host the Airflow
+  metadata database, an SQS to be used as broker backend, S3 buckets for logs
+  and deployment bundles, an EFS to serve as shared directory, and then creates
+  the Airflow scheduler, webserver and workers nested stacks. **WARNING** This
+  template creates AWS resources. You will be billed for the AWS resources used
+  if you create a stack from this template. QS(0027)
 Parameters:
   # Networking
   VPCCIDR:

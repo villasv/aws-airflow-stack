@@ -14,8 +14,6 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
   IamInstanceProfile:
     Type: String
-  ImageId:
-    Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
   SecretKeyName:

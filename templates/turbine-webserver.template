@@ -20,8 +20,6 @@ Parameters:
     Type: Number
   IamInstanceProfile:
     Type: String
-  ImageId:
-    Type: AWS::EC2::Image::Id
   InstanceType:
     Type: String
   SecretKeyName:
