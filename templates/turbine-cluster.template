@@ -332,7 +332,7 @@ Resources:
         VPCID: !Ref VPCID
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
+        SecurityGroup: !Ref InstancesSecurityGroup
         InstanceType: !Ref SchedulerInstanceType
         LogsBucket: !Ref LogsBucket
         QueueName: !GetAtt TaskQueue.QueueName

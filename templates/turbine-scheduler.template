@@ -1,81 +1,133 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the Airflow scheduler instance in a highly available
+  auto scaling group, using the instance UserData and CloudFormation Helper
+  Scripts to install and configure the Apache Airflow services and other utility
+  agents. **WARNING** This template creates AWS resources. You will be billed
+  for the AWS resources used if you create a stack from this template. QS(0027)
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC network configuration
+        Parameters:
+          - PrivateSubnet1AID
+          - PrivateSubnet2AID
+          - SecurityGroupID
+      - Label:
+          default: Turbine cluster configuration
+        Parameters:
+          - DatabaseSecret
+          - QueueName
+          - LogsBucket
+      - Label:
+          default: Turbine scheduler configuration
+        Parameters:
+          - InstanceType
+      - Label:
+          default: Apache Airflow configuration
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultCons
+      - Label:
+          default: AWS Quick Start configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
+    ParameterLabels:
+      PrivateSubnet1AID:
+        default: Private subnet 1 ID
+      PrivateSubnet2AID:
+        default: Private subnet 2 ID
+      SecurityGroupID:
+        default: Security group ID
+      DatabaseSecret:
+        default: Database secret
+      QueueName:
+        default: Queue name
+      LogsBucket:
+        default: Logs bucket
+      InstanceType:
+        default: Scheduler instance type
+      LoadExampleDags:
+        default: Load example DAGs
+      LoadDefaultCons:
+        default: Load default connections
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
 Parameters:
-  # Networking
-  VPCID:
-    Description: An existing VPC for the cluster.
-    Type: AWS::EC2::VPC::Id
   PrivateSubnet1AID:
     Description: An existing private Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
     Description: An existing private Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-
-  # Cluster Resources
+  SecurityGroupID:
+    Description: >-
+      Security Group ID of an externally managed security group that gives
+      instances access to relevant external resources like the metadata database
+      endpoints in the two provided subnets.
+    Type: AWS::EC2::SecurityGroup::Id
   DatabaseSecret:
     Description: >-
       The AWS SecretsManager Secret resource name (ARN) of the secure secret
       storing the metadata database connection credentials.
     Type: String
   QueueName:
+    Description: >-
+      Name of the queue to be used as message broker between the scheduler and
+      worker instances.
     Type: String
   LogsBucket:
-    Type: String
-  ManagedPolicy:
-    Type: String
     Description: >-
-      The IAM ManagedPolicy resource name (ARN) to attach to the instances of
-      this stack to allow access to externally managed resources.
-
-  # Scheduler Settings
+      Name of the bucket where task logs are remotely stored.
+    Type: String
   InstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
-
-  # Airflow Config
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
       stack for demonstrating a few topologies, operators and scheduling
       strategies.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
+    Type: String
   LoadDefaultCons:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
-
-  # Quick Start Overrides
+    Type: String
   QSS3BucketName:
     Description: >-
       S3 bucket name for the Quick Start assets. You can specify your own bucket
       providing assets and submodules, if you want to override the Quick Start
       behavior for your specific implementation.
-    Type: String
-    Default: turbine-quickstart
-    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
     ConstraintDescription: >-
       Quick Start bucket name can include numbers, lowercase letters, uppercase
       letters, and hyphens (-). It cannot start or end with a hyphen (-).
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    Default: turbine-quickstart
+    Type: String
   QSS3KeyPrefix:
     Description: >-
       S3 key prefix for the Quick Start assets. You can scpeficy your own
       "directory" providing the stack templates, if you want to override the
       Quick Start behavior for your specific implementation.
-    Type: String
-    Default: quickstart-turbine-airflow/
-    AllowedPattern: '^[0-9a-zA-Z-/]*$'
     ConstraintDescription: >-
       Quick Start key prefix can include numbers, lowercase letters, uppercase
       letters, hyphens (-), and forward slash (/).
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    Default: quickstart-turbine-airflow/
+    Type: String
 
 Resources:
 
@@ -105,7 +157,7 @@ Resources:
         - AMZNLINUX2
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref SecurityGroup
+        - !Ref SecurityGroupID
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -151,9 +203,8 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
-        - !Ref ManagedPolicy
       Policies:
-        - PolicyName: !Sub TurbineSchedulerCfnHupDescribePolicy-${AWS::StackName}
+        - PolicyName: !Sub TurbineAirflowSchedulerDescribeStackPolicy-${AWS::StackName}
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -166,24 +217,45 @@ Resources:
                     - !Ref AWS::Region
                     - !Ref AWS::AccountId
                     - !Sub stack/${AWS::StackName}/LaunchConfiguration
-
-  SecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-          The security group used by the Turbine Airflow Scheduler instances.
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: turbine-airflow-scheduler-sg
+        - PolicyName: !Sub TurbineAirflowSchedulerGetSecretPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseSecret
+        - PolicyName: !Sub TurbineAirflowSchedulerQueueRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ListQueues
+                Resource:
+                  - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${QueueName}
+        - PolicyName: !Sub TurbineAirflowSchedulerLogsRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:Get*
+                  - s3:Put*
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
 
 Outputs:
   AutoScalingGroup:
     Value: !Ref AutoScalingGroup
-  IamRole:
-    Value: !Ref IamRole
-  SecurityGroup:
-    Value: !Ref SecurityGroup
 
 Mappings:
   AWSAMIRegionMap:

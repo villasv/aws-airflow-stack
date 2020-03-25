@@ -1,34 +1,34 @@
 import re
-from templates import MASTER, CLUSTER
+from templates import MASTER, CLUSTER, SCHEDULER
 
 
 def test_if_vpc_configuration_comes_first():
-    # TODO: add scheduler, webserver, workerset
-    for template in [MASTER, CLUSTER]:
+    # TODO: add webserver, workerset
+    for template in [MASTER, CLUSTER, SCHEDULER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         groups = [group["Label"]["default"] for group in interface["ParameterGroups"]]
         assert "VPC" in groups[0]
 
 
 def test_if_quickstart_configuration_comes_first():
-    # TODO: add scheduler, webserver, workerset
-    for template in [MASTER, CLUSTER]:
+    # TODO: add webserver, workerset
+    for template in [MASTER, CLUSTER, SCHEDULER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         groups = [group["Label"]["default"] for group in interface["ParameterGroups"]]
         assert "Quick Start" in groups[-1]
 
 
 def test_if_parameters_are_pascal_case():
-    # TODO: add scheduler, webserver, workerset
-    for template in [MASTER, CLUSTER]:
+    # TODO: add webserver, workerset
+    for template in [MASTER, CLUSTER, SCHEDULER]:
         params = list(template["Parameters"].keys())
         for param in params:
             assert param[0] == param[0].upper()
 
 
 def test_if_labels_include_punctuation():
-    # TODO: add scheduler, webserver, workerset
-    for template in [MASTER, CLUSTER]:
+    # TODO: add webserver, workerset
+    for template in [MASTER, CLUSTER, SCHEDULER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         labels = list(interface.keys())
         for label in labels:
