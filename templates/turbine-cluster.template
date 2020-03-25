@@ -184,6 +184,48 @@ Resources:
       TargetType: AWS::RDS::DBInstance
   #endregion
 
+  #region Shared Filesystem
+  EfsFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-filesystem
+
+  EfsMountTarget1A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet1AID
+      SecurityGroups:
+        - !Ref Access
+
+  EfsMountTarget2A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EfsFileSystem
+      SubnetId: !Ref PrivateSubnet2AID
+      SecurityGroups:
+        - !Ref Access
+
+  Access:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for the shared filesystem across Airflow
+        instances.
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
+          IpProtocol: TCP
+          FromPort: 2049
+          ToPort: 2049
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-access'
+
+  #endregion
+
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -207,6 +249,8 @@ Resources:
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - SecretTargetAttachment
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -233,6 +277,8 @@ Resources:
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - SecretTargetAttachment
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -262,6 +308,8 @@ Resources:
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
+    DependsOn:
+      - SecretTargetAttachment
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -301,29 +349,6 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
 
-  EfsFileSystem:
-    Type: AWS::EFS::FileSystem
-    Properties:
-      FileSystemTags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-filesystem
-
-  EfsMountTarget1A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet1AID
-      SecurityGroups:
-        - !Ref Access
-
-  EfsMountTarget2A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet2AID
-      SecurityGroups:
-        - !Ref Access
-
   TaskQueue:
     Type: AWS::SQS::Queue
     Properties: {}
@@ -338,22 +363,6 @@ Resources:
       Tags:
         - Key: Name
           Value: airflow-instances-sg
-
-  Access:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for the shared filesystem across Airflow
-        instances.
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-          IpProtocol: TCP
-          FromPort: 2049
-          ToPort: 2049
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-access'
 
   IamRole:
     Type: AWS::IAM::Role
