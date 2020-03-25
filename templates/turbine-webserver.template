@@ -2,24 +2,20 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   # Networking
   VPCID:
-    Description: An existing VPC for the cluster
+    Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
   PublicSubnet1ID:
-    Description: An existing public Subnet in some Availability Zone
+    Description: An existing public Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2ID:
-    Description: An existing public Subnet in another Availability Zone
+    Description: An existing public Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-  InstancesSecurityGroup:
-    Type: AWS::EC2::SecurityGroup::Id
   IngressCIDR:
     Type: String
     AllowedPattern: >-
       ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   IngressPort:
     Type: Number
-  IamInstanceProfile:
-    Type: String
   InstanceType:
     Type: String
   SecretKeyName:
@@ -30,10 +26,10 @@ Parameters:
     Type: String
 
   # Cluster Resources
-  RDSSecretsArn:
+  SecretCredentials:
     Description: >-
-      The AWS Secrets Manager resource ARN holding the metadata database
-      credentials.
+      The AWS SecretsManager Secret resource name (ARN) of the secure secret
+      storing the metadata database connection credentials.
     Type: String
 
   # Airflow Config
@@ -92,8 +88,7 @@ Resources:
         - AMZNLINUX2
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref InstancesSecurityGroup
-        - !Ref WebserverSecurityGroup
+        - !Ref SecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -113,14 +108,14 @@ Resources:
                 export SECRET_KEY_NAME="${SecretKeyName}"
                 export LOGS_BUCKET="${LogsBucket}"
                 export QUEUE_NAME="${QueueName}"
-                export RDS_SECRETS_ARN="${RDSSecretsArn}"
+                export DB_SECRETS_ARN="${SecretCredentials}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/webserver.setup.sh
                 /opt/turbine/webserver.setup.sh
 
-  WebserverSecurityGroup:
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
@@ -187,9 +182,48 @@ Resources:
                 echo "AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${IngressPort}" \
                   >> /etc/sysconfig/airflow.env
 
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: TurbineWebserverCfnHupDescribePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:cloudformation
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+
 Outputs:
   AutoScalingGroup:
     Value: !Ref AutoScalingGroup
+  IamRole:
+    Value: !Ref IamRole
+  SecurityGroup:
+    Value: !Ref SecurityGroup
 
 Mappings:
   AWSAMIRegionMap:

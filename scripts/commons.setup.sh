@@ -36,15 +36,15 @@ else CD_PENDING_DEPLOY="true"
 fi
 export CD_PENDING_DEPLOY
 
-RDS_SECRETS=$(aws secretsmanager \
-    get-secret-value --secret-id "$RDS_SECRETS_ARN")
-RDS_ENGINE=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.engine")
-RDS_USER=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.username")
-RDS_PASS=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.password")
-RDS_HOST=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.host")
-RDS_DBNAME=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.dbname")
-RDS_PORT=$(jsonvar "$RDS_SECRETS" "SecretString | fromjson.port")
-DATABASE_URI="$RDS_ENGINE://$RDS_USER:$RDS_PASS@$RDS_HOST:$RDS_PORT/$RDS_DBNAME"
+DB_SECRETS=$(aws secretsmanager \
+    get-secret-value --secret-id "$DB_SECRETS_ARN")
+DB_ENGINE=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.engine")
+DB_USER=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.username")
+DB_PASS=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.password")
+DB_HOST=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.host")
+DB_DBNAME=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.dbname")
+DB_PORT=$(jsonvar "$DB_SECRETS" "SecretString | fromjson.port")
+DATABASE_URI="$DB_ENGINE://$DB_USER:$DB_PASS@$DB_HOST:$DB_PORT/$DB_DBNAME"
 export DATABASE_URI
 
 yum install -y python3
@@ -59,7 +59,7 @@ FERNET_KEY=$(python3 -c "if True:#
         algorithm=hashes.SHA256(),length=32,salt=b'$FERNET_SALT',
         iterations=100000,backend=default_backend(),
     )
-    key = kdf.derive(b'$RDS_PASS')
+    key = kdf.derive(b'$DB_PASS')
     key_encoded = urlsafe_b64encode(key)
     print(key_encoded.decode('utf8'))")
 export FERNET_KEY

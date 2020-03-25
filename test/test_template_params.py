@@ -1,30 +1,84 @@
-from pathlib import Path
-from cfn_tools import load_yaml, dump_yaml
-
-TEMPLATES = {}
-for template in Path("./templates").iterdir():
-    with template.open() as f:
-        TEMPLATES[str(template)] = load_yaml(f.read())
+import re
+from cfn_tools import dump_yaml
+from templates import MASTER, CLUSTER
 
 
-def test_attributes():
-    for f, yaml in TEMPLATES.items():
-        for param, specs in yaml['Parameters'].items():
-            keys = list(specs.keys())
-            assert ((param, keys[0]) == (param, 'Description'))
-            assert ((param, keys[1]) == (param, 'Type'))
+def test_if_important_properties_are_specified():
+    # TODO: add scheduler, webserver, workerset
+    targets = [MASTER, CLUSTER]
+    for template in targets:
+        for specs in template["Parameters"].values():
+            assert "Description" in specs
+            assert "Type" in specs
+            if "AllowedPattern" in specs:
+                assert "ConstraintDescription" in specs
+            if "MinValue" in specs or "MaxValue" in specs:
+                assert "ConstraintDescription" in specs
+
+
+def test_if_properties_are_in_order():
+    # TODO: add scheduler, webserver, workerset
+    targets = [MASTER, CLUSTER]
+
+    def is_ordered(left, right, array):
+        left_index = array.index(left) if left in array else None
+        right_index = array.index(right) if right in array else None
+        if left_index is None or right_index is None:
+            return True
+        return left_index < right_index
+
+    for template in targets:
+        for spec in template["Parameters"].values():
+            props = list(spec.keys())
+
+            assert is_ordered("Description", "ConstraintDescription", props)
+            assert is_ordered("ConstraintDescription", "AllowedPattern", props)
+            assert is_ordered("AllowedPattern", "Default", props)
+            assert is_ordered("Default", "Type", props)
+
+            assert is_ordered("Description", "AllowedValues", props)
+            assert is_ordered("AllowedValues", "Default", props)
+
+            assert is_ordered("ConstraintDescription", "MinValue", props)
+            assert is_ordered("MinValue", "MaxValue", props)
+            assert is_ordered("MaxValue", "Default", props)
+
+
+def test_if_default_value_satisfies_pattern():
+    # TODO: add scheduler, webserver, workerset
+    targets = [MASTER, CLUSTER]
+    for template in targets:
+        for specs in template["Parameters"].values():
+            if "AllowedPattern" in specs and "Default" in specs:
+                assert re.match(specs["AllowedPattern"], specs["Default"])
+
+
+def test_if_description_ends_in_dot():
+    # TODO: add scheduler, webserver, workerset
+    targets = [MASTER, CLUSTER]
+    for template in targets:
+        for specs in template["Parameters"].values():
+            assert specs["Description"].endswith(".")
+
+
+def test_if_constraint_description_ends_in_dot():
+    # TODO: add scheduler, webserver, workerset
+    targets = [MASTER, CLUSTER]
+    for template in targets:
+        for specs in template["Parameters"].values():
+            if "ConstraintDescription" in specs:
+                assert specs["ConstraintDescription"].endswith(".")
 
 
 def test_consistency():
-    for f1, yaml1 in TEMPLATES.items():
-        for param1, specs1 in yaml1['Parameters'].items():
-            for f2, yaml2 in TEMPLATES.items():
-                if (f1 == f2):
-                    continue
-                for param2, specs2 in yaml2['Parameters'].items():
-                    if param1 == param2:
-                        assert (
-                            (param1, dump_yaml(specs1))
-                            ==
-                            (param2, dump_yaml(specs2))
-                        )
+    pairs = [
+        (MASTER, CLUSTER),
+        # (CLUSTER, SCHEDULER),
+        # (CLUSTER, WEBSERVER),
+        # (CLUSTER, WORKERSET),
+    ]
+    for (t_outer, t_inner) in pairs:
+        for param1, specs1 in t_outer["Parameters"].items():
+            for param2, specs2 in t_inner["Parameters"].items():
+                if param1 == param2:
+                    assert (param1, dump_yaml(specs1)) == (param2, dump_yaml(specs2))

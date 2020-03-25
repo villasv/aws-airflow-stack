@@ -2,32 +2,34 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   # Networking
   VPCID:
-    Description: An existing VPC for the cluster
+    Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
   PrivateSubnet1AID:
-    Description: An existing private Subnet in some Availability Zone
+    Description: An existing private Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
-    Description: An existing private Subnet in another Availability Zone
+    Description: An existing private Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-  InstancesSecurityGroup:
-    Type: AWS::EC2::SecurityGroup::Id
-  IamInstanceProfile:
-    Type: String
-  InstanceType:
-    Type: String
-  SecretKeyName:
-    Type: String
-  LogsBucket:
+
+  # Cluster Resources
+  DatabaseSecret:
+    Description: >-
+      The AWS SecretsManager Secret resource name (ARN) of the secure secret
+      storing the metadata database connection credentials.
     Type: String
   QueueName:
     Type: String
-
-  # Cluster Resources
-  RDSSecretsArn:
+  LogsBucket:
+    Type: String
+  ManagedPolicy:
+    Type: String
     Description: >-
-      The AWS Secrets Manager resource ARN holding the metadata database
-      credentials.
+      The IAM ManagedPolicy resource name (ARN) to attach to the instances of
+      this stack to allow access to externally managed resources.
+
+  # Scheduler Settings
+  InstanceType:
+    Description: EC2 instance type to use for the scheduler.
     Type: String
 
   # Airflow Config
@@ -77,6 +79,22 @@ Parameters:
 
 Resources:
 
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MaxSize: '1'
+      MinSize: '1'
+      MetricsCollection:
+        - Granularity: 1Minute
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+      Tags:
+        - Key: Name
+          Value: turbine-scheduler
+          PropagateAtLaunch: true
+
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -87,8 +105,7 @@ Resources:
         - AMZNLINUX2
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref InstancesSecurityGroup
-        - !Ref SchedulerSecurityGroup
+        - !Ref SecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -106,45 +123,67 @@ Resources:
               command: !Sub |
                 export AWS_STACK_NAME="${AWS::StackName}"
                 export LOGS_BUCKET="${LogsBucket}"
-                export SECRET_KEY_NAME="${SecretKeyName}"
                 export QUEUE_NAME="${QueueName}"
-                export RDS_SECRETS_ARN="${RDSSecretsArn}"
+                export DB_SECRETS_ARN="${DatabaseSecret}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/scheduler.setup.sh
                 /opt/turbine/scheduler.setup.sh
 
-  SchedulerSecurityGroup:
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+        - !Ref ManagedPolicy
+      Policies:
+        - PolicyName: !Sub TurbineSchedulerCfnHupDescribePolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:cloudformation
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
-        The security group used by the Airflow scheduler instance. Not initially
-        useful but included to facilitate narrowing custom rules.
+          The security group used by the Turbine Airflow Scheduler instances.
       VpcId: !Ref VPCID
       Tags:
         - Key: Name
-          Value: turbine-scheduler-sg
-
-  AutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      LaunchConfigurationName: !Ref LaunchConfiguration
-      MaxSize: '1'
-      MinSize: '1'
-      MetricsCollection:
-        - Granularity: 1Minute
-      VPCZoneIdentifier:
-        - !Ref PrivateSubnet1AID
-        - !Ref PrivateSubnet2AID
-      Tags:
-        - Key: Name
-          Value: turbine-scheduler
-          PropagateAtLaunch: true
+          Value: turbine-airflow-scheduler-sg
 
 Outputs:
   AutoScalingGroup:
     Value: !Ref AutoScalingGroup
+  IamRole:
+    Value: !Ref IamRole
+  SecurityGroup:
+    Value: !Ref SecurityGroup
 
 Mappings:
   AWSAMIRegionMap:

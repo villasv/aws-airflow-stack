@@ -2,24 +2,20 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   # Networking
   VPCID:
-    Description: An existing VPC for the cluster
+    Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
   PrivateSubnet1AID:
-    Description: An existing private Subnet in some Availability Zone
+    Description: An existing private Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
-    Description: An existing private Subnet in another Availability Zone
+    Description: An existing private Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-  InstancesSecurityGroup:
-    Type: AWS::EC2::SecurityGroup::Id
-  IamInstanceProfile:
-    Type: String
   InstanceType:
     Type: String
   MinGroupSize:
     Description: The minimum number of active worker instances.
     Type: Number
-    Default: 1
+    Default: 0
   MaxGroupSize:
     Description: The maximum number of active worker instances.
     Type: Number
@@ -38,8 +34,6 @@ Parameters:
       instance.
     Type: Number
     Default: 0.9
-  EfsFileSystem:
-    Type: String
   SecretKeyName:
     Type: String
   LogsBucket:
@@ -48,10 +42,10 @@ Parameters:
     Type: String
 
   # Cluster Resources
-  RDSSecretsArn:
+  SecretCredentials:
     Description: >-
-      The AWS Secrets Manager resource ARN holding the metadata database
-      credentials.
+      The AWS SecretsManager Secret resource name (ARN) of the secure secret
+      storing the metadata database connection credentials.
     Type: String
 
   # Airflow Config
@@ -111,8 +105,7 @@ Resources:
         - AMZNLINUX2
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref InstancesSecurityGroup
-        - !Ref WorkersetSecurityGroup
+        - !Ref SecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -132,26 +125,26 @@ Resources:
                 export SECRET_KEY_NAME="${SecretKeyName}"
                 export QUEUE_NAME="${QueueName}"
                 export LOGS_BUCKET="${LogsBucket}"
-                export FILE_SYSTEM_ID="${EfsFileSystem}"
-                export RDS_SECRETS_ARN="${RDSSecretsArn}"
+                export FILE_SYSTEM_ID="${FileSystem}"
+                export DB_SECRETS_ARN="${SecretCredentials}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/workerset.setup.sh
                 /opt/turbine/workerset.setup.sh
 
-  WorkersetSecurityGroup:
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
         The security group used by the Airflow worker instances. It exposes the
         a special port where the Airflow webserver can fetch logs directly.
       VpcId: !Ref VPCID
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-          IpProtocol: TCP
-          FromPort: 8793
-          ToPort: 8793
+      # SecurityGroupIngress:
+      #   - SourceSecurityGroupId: !Ref InstancesSecurityGroup
+      #     IpProtocol: TCP
+      #     FromPort: 8793
+      #     ToPort: 8793
       Tags:
         - Key: Name
           Value: turbine-workerset-sg
@@ -171,6 +164,83 @@ Resources:
         - Key: Name
           Value: turbine-worker
           PropagateAtLaunch: true
+
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: TurbineWebserverCfnHupDescribePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:cloudformation
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+
+  #region Shared Filesystem
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-filesystem
+
+  MountTarget1A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref PrivateSubnet1AID
+      SecurityGroups:
+        - !Ref EfsMountSecurityGroup
+
+  MountTarget2A:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref PrivateSubnet2AID
+      SecurityGroups:
+        - !Ref EfsMountSecurityGroup
+
+  EfsMountSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        Security Rules with permissions for the shared filesystem across Airflow
+        instances.
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref SecurityGroup
+          IpProtocol: TCP
+          FromPort: 2049
+          ToPort: 2049
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: EfsMountSecurityGroup
+
+  #endregion
 
   CloudWatchMetricLambda:
     Type: AWS::Lambda::Function
@@ -289,8 +359,11 @@ Resources:
 
 Outputs:
   AutoScalingGroup:
-    Description: The workers autoscaling group
     Value: !Ref AutoScalingGroup
+  IamRole:
+    Value: !Ref IamRole
+  SecurityGroup:
+    Value: !Ref SecurityGroup
 
 Mappings:
   AWSAMIRegionMap:

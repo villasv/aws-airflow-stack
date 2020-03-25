@@ -9,6 +9,11 @@ BUCKET := s3://turbine-quickstart/quickstart-turbine-airflow-$(BRANCH)
 endif
 
 
+fair:
+	black .
+	pylint test/*.py functions/*.py
+	pytest -vv
+
 lint:
 	cfn-lint templates/*.template
 
