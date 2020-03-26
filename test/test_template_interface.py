@@ -1,9 +1,9 @@
-from templates import MASTER, CLUSTER, SCHEDULER
+from templates import MASTER, CLUSTER, SCHEDULER, WEBSERVER
 
 
 def test_if_all_parameters_are_grouped():
-    # TODO: add webserver, workerset
-    for template in [MASTER, CLUSTER, SCHEDULER]:
+    # TODO: add workerset
+    for template in [MASTER, CLUSTER, SCHEDULER, WEBSERVER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         grouped = [
             param
@@ -15,8 +15,8 @@ def test_if_all_parameters_are_grouped():
 
 
 def test_if_parameters_in_groups_are_ordered():
-    # TODO: add webserver, workerset
-    for template in [MASTER, CLUSTER, SCHEDULER]:
+    # TODO: add workerset
+    for template in [MASTER, CLUSTER, SCHEDULER, WEBSERVER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         grouped = [
             param
@@ -28,8 +28,8 @@ def test_if_parameters_in_groups_are_ordered():
 
 
 def test_if_all_parameters_are_labeled():
-    # TODO: add webserver, workerset
-    for template in [MASTER, CLUSTER, SCHEDULER]:
+    # TODO: add workerset
+    for template in [MASTER, CLUSTER, SCHEDULER, WEBSERVER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         labeled = list(interface["ParameterLabels"].keys())
         for param in template["Parameters"]:
@@ -37,8 +37,8 @@ def test_if_all_parameters_are_labeled():
 
 
 def test_if_parameters_labels_are_ordered():
-    # TODO: add webserver, workerset
-    for template in [MASTER, CLUSTER, SCHEDULER]:
+    # TODO: add workerset
+    for template in [MASTER, CLUSTER, SCHEDULER, WEBSERVER]:
         interface = template["Metadata"]["AWS::CloudFormation::Interface"]
         labeled = list(interface["ParameterLabels"].keys())
         params = list(template["Parameters"].keys())

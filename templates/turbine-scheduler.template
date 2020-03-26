@@ -58,6 +58,7 @@ Metadata:
       QSS3KeyPrefix:
         default: Quick Start S3 key prefix
 Parameters:
+
   PrivateSubnet1AID:
     Description: An existing private Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
@@ -70,6 +71,7 @@ Parameters:
       instances access to relevant external resources like the metadata database
       endpoints in the two provided subnets.
     Type: AWS::EC2::SecurityGroup::Id
+
   DatabaseSecret:
     Description: >-
       The AWS SecretsManager Secret resource name (ARN) of the secure secret
@@ -84,9 +86,11 @@ Parameters:
     Description: >-
       Name of the bucket where task logs are remotely stored.
     Type: String
+
   InstanceType:
     Description: EC2 instance type to use for the scheduler.
     Type: String
+
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
@@ -106,6 +110,7 @@ Parameters:
       - 'True'
     Default: 'False'
     Type: String
+
   QSS3BucketName:
     Description: >-
       S3 bucket name for the Quick Start assets. You can specify your own bucket

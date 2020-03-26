@@ -1,11 +1,11 @@
 import re
 from cfn_tools import dump_yaml
-from templates import MASTER, CLUSTER, SCHEDULER
+from templates import MASTER, CLUSTER, SCHEDULER, WEBSERVER
 
 
 def test_if_important_properties_are_specified():
-    # TODO: add webserver, workerset
-    targets = [MASTER, CLUSTER, SCHEDULER]
+    # TODO: add workerset
+    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
     for template in targets:
         for specs in template["Parameters"].values():
             assert "Description" in specs
@@ -17,8 +17,8 @@ def test_if_important_properties_are_specified():
 
 
 def test_if_properties_are_in_order():
-    # TODO: add webserver, workerset
-    targets = [MASTER, CLUSTER, SCHEDULER]
+    # TODO: add workerset
+    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
 
     def is_ordered(left, right, array):
         left_index = array.index(left) if left in array else None
@@ -45,8 +45,8 @@ def test_if_properties_are_in_order():
 
 
 def test_if_default_value_satisfies_pattern():
-    # TODO: add webserver, workerset
-    targets = [MASTER, CLUSTER, SCHEDULER]
+    # TODO: add workerset
+    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
     for template in targets:
         for specs in template["Parameters"].values():
             if "AllowedPattern" in specs and "Default" in specs:
@@ -54,16 +54,16 @@ def test_if_default_value_satisfies_pattern():
 
 
 def test_if_description_ends_in_dot():
-    # TODO: add webserver, workerset
-    targets = [MASTER, CLUSTER, SCHEDULER]
+    # TODO: add workerset
+    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
     for template in targets:
         for specs in template["Parameters"].values():
             assert specs["Description"].endswith(".")
 
 
 def test_if_constraint_description_ends_in_dot():
-    # TODO: add webserver, workerset
-    targets = [MASTER, CLUSTER, SCHEDULER]
+    # TODO: add workerset
+    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
     for template in targets:
         for specs in template["Parameters"].values():
             if "ConstraintDescription" in specs:

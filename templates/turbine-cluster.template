@@ -77,6 +77,7 @@ Metadata:
       QSS3KeyPrefix:
         default: Quick Start S3 key prefix
 Parameters:
+
   VPCID:
     Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
@@ -101,6 +102,7 @@ Parameters:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     Default: 10.0.0.0/16
     Type: String
+
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
     Default: t3.micro
@@ -135,6 +137,7 @@ Parameters:
       instance.
     Default: 0.9
     Type: Number
+
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
@@ -164,6 +167,7 @@ Parameters:
     MaxValue: 65535
     Default: 8080
     Type: Number
+
   QSS3BucketName:
     Description: >-
       S3 bucket name for the Quick Start assets. You can specify your own bucket
