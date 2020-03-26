@@ -1,11 +1,15 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
   This template creates the Airflow supporting resources including an RDS
-  instance to host the Airflow metadata database, an SQS to be used as broker
-  backend, S3 buckets for logs and deployment packages, and then creates the
-  Airflow scheduler, webserver and workers nested stacks. **WARNING** This
-  template creates AWS resources. You will be billed for the AWS resources used
-  if you create a stack from this template. QS(0027)
+  instance to host the Airflow metadata database, an SQS queue to be used as
+  broker backend, S3 buckets for logs and deployment packages, and then creates
+  the Airflow scheduler, webserver and workers nested stacks. The nested Airflow
+  services stacks create the Airflow instances in highly available auto scaling
+  groups spanning two subnets, plus for the workers stack an EFS shared network
+  directory and a custom cloudwatch load metric function to guide the auto
+  scaling alarm triggers. **WARNING** This template creates AWS resources. You
+  will be billed for the AWS resources used if you create a stack from this
+  template. QS(0027)
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -333,14 +337,13 @@ Resources:
           - !Ref QSS3KeyPrefix
           - templates/turbine-scheduler.template
       Parameters:
-        VPCID: !Ref VPCID
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        SecurityGroup: !Ref InstancesSecurityGroup
-        InstanceType: !Ref SchedulerInstanceType
-        LogsBucket: !Ref LogsBucket
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        DatabaseSecret: !Ref Secret
         QueueName: !GetAtt TaskQueue.QueueName
-        SecretCredentials: !Ref Secret
+        LogsBucket: !Ref LogsBucket
+        InstanceType: !Ref SchedulerInstanceType
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
@@ -360,15 +363,15 @@ Resources:
         VPCID: !Ref VPCID
         PublicSubnet1ID: !Ref PublicSubnet1ID
         PublicSubnet2ID: !Ref PublicSubnet2ID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IngressCIDR: !Ref AllowHTTPAccessCIDR
-        IngressPort: !Ref WebServerPort
-        InstanceType: !Ref WebserverInstanceType
-        LogsBucket: !Ref LogsBucket
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        AllowHTTPAccessCIDR: !Ref AllowHTTPAccessCIDR
+        DatabaseSecret: !Ref Secret
         QueueName: !GetAtt TaskQueue.QueueName
-        SecretCredentials: !Ref Secret
+        LogsBucket: !Ref LogsBucket
+        InstanceType: !Ref WebserverInstanceType
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
+        WebServerPort: !Ref WebServerPort
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
     DependsOn:
@@ -386,15 +389,15 @@ Resources:
         VPCID: !Ref VPCID
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        DatabaseSecret: !Ref Secret
+        QueueName: !GetAtt TaskQueue.QueueName
+        LogsBucket: !Ref LogsBucket
         InstanceType: !Ref WorkerInstanceType
         MinGroupSize: !Ref MinGroupSize
         MaxGroupSize: !Ref MaxGroupSize
-        GrowthThreshold: !Ref GrowthThreshold
         ShrinkThreshold: !Ref ShrinkThreshold
-        LogsBucket: !Ref LogsBucket
-        QueueName: !GetAtt TaskQueue.QueueName
-        SecretCredentials: !Ref Secret
+        GrowthThreshold: !Ref GrowthThreshold
         LoadExampleDags: !Ref LoadExampleDags
         LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName

@@ -1,16 +1,18 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  This template creates a Quick Start VPC stack and a Turbine-Airflow cluster
+  This template creates a Quick Start VPC stack and a Turbine Airflow cluster
   stack. The Quick Start VPC stack creates a Multi-AZ VPC infrastructure with
-  two private subnets and managed NAT gateways in the two public subnets. If you
-  deploy the Quick Start in a region that doesn't support NAT gateways, NAT
-  instances are deployed instead. The Turbine-Airflow cluster stack creates the
-  Airflow supporting resources including an RDS instance to host the Airflow
-  metadata database, an SQS to be used as broker backend, S3 buckets for logs
-  and deployment packages, and then creates the Airflow scheduler, webserver and
-  workers nested stacks. **WARNING** This template creates AWS resources. You
-  will be billed for the AWS resources used if you create a stack from this
-  template. QS(0027)
+  two private subnets and managed NAT gateways in the two public subnets. The
+  Turbine Airflow cluster stack creates the Airflow supporting resources
+  including an RDS instance to host the Airflow metadata database, an SQS queue
+  to be used as broker backend, S3 buckets for logs and deployment packages, and
+  then creates the Airflow scheduler, webserver and workers nested stacks. The
+  nested Airflow services stacks create the Airflow instances in highly
+  available auto scaling groups spanning two subnets, plus for the workers stack
+  an EFS shared network directory and a custom cloudwatch load metric function
+  to guide the auto scaling alarm triggers. **WARNING** This template creates
+  AWS resources. You will be billed for the AWS resources used if you create a
+  stack from this template. QS(0027)
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:

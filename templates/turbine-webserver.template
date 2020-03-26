@@ -1,4 +1,9 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the Airflow web server instance in a highly available
+  auto scaling group spanning two public subnets. **WARNING** This template
+  creates AWS resources. You will be billed for the AWS resources used if you
+  create a stack from this template. QS(0027)
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:

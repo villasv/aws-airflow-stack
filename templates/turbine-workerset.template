@@ -1,4 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the Airflow worker instances in a highly available auto
+  scaling group spanning two private subnets, plus an EFS to work as shared
+  network directory and a custom cloudwatch load metric function to guide the
+  auto scaling alarm triggers. **WARNING** This template creates AWS resources.
+  You will be billed for the AWS resources used if you create a stack from this
+  template. QS(0027)
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
