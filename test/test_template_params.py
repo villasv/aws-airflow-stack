@@ -1,12 +1,10 @@
 import re
 from cfn_tools import dump_yaml
-from templates import MASTER, CLUSTER, SCHEDULER, WEBSERVER
+from templates import ALL, MASTER, CLUSTER, SCHEDULER, WEBSERVER, WORKERSET
 
 
 def test_if_important_properties_are_specified():
-    # TODO: add workerset
-    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
-    for template in targets:
+    for template in ALL:
         for specs in template["Parameters"].values():
             assert "Description" in specs
             assert "Type" in specs
@@ -17,9 +15,6 @@ def test_if_important_properties_are_specified():
 
 
 def test_if_properties_are_in_order():
-    # TODO: add workerset
-    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
-
     def is_ordered(left, right, array):
         left_index = array.index(left) if left in array else None
         right_index = array.index(right) if right in array else None
@@ -27,7 +22,7 @@ def test_if_properties_are_in_order():
             return True
         return left_index < right_index
 
-    for template in targets:
+    for template in ALL:
         for spec in template["Parameters"].values():
             props = list(spec.keys())
 
@@ -45,26 +40,20 @@ def test_if_properties_are_in_order():
 
 
 def test_if_default_value_satisfies_pattern():
-    # TODO: add workerset
-    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
-    for template in targets:
+    for template in ALL:
         for specs in template["Parameters"].values():
             if "AllowedPattern" in specs and "Default" in specs:
                 assert re.match(specs["AllowedPattern"], specs["Default"])
 
 
 def test_if_description_ends_in_dot():
-    # TODO: add workerset
-    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
-    for template in targets:
+    for template in ALL:
         for specs in template["Parameters"].values():
             assert specs["Description"].endswith(".")
 
 
 def test_if_constraint_description_ends_in_dot():
-    # TODO: add workerset
-    targets = [MASTER, CLUSTER, SCHEDULER, WEBSERVER]
-    for template in targets:
+    for template in ALL:
         for specs in template["Parameters"].values():
             if "ConstraintDescription" in specs:
                 assert specs["ConstraintDescription"].endswith(".")
@@ -73,9 +62,9 @@ def test_if_constraint_description_ends_in_dot():
 def test_consistency():
     pairs = [
         (MASTER, CLUSTER),
-        # (CLUSTER, SCHEDULER),
-        # (CLUSTER, WEBSERVER),
-        # (CLUSTER, WORKERSET),
+        (CLUSTER, SCHEDULER),
+        (CLUSTER, WEBSERVER),
+        (CLUSTER, WORKERSET),
     ]
     for (t_outer, t_inner) in pairs:
         for param1, specs1 in t_outer["Parameters"].items():

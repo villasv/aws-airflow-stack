@@ -1,6 +1,73 @@
 AWSTemplateFormatVersion: 2010-09-09
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC network configuration
+        Parameters:
+          - VPCID
+          - PrivateSubnet1AID
+          - PrivateSubnet2AID
+          - SecurityGroupID
+      - Label:
+          default: Turbine cluster configuration
+        Parameters:
+          - DatabaseSecret
+          - QueueName
+          - LogsBucket
+      - Label:
+          default: Turbine workerset configuration
+        Parameters:
+          - InstanceType
+          - MinGroupSize
+          - MaxGroupSize
+          - ShrinkThreshold
+          - GrowthThreshold
+      - Label:
+          default: Apache Airflow configuration
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultCons
+      - Label:
+          default: AWS Quick Start configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
+    ParameterLabels:
+      VPCID:
+        default: VPC ID
+      PrivateSubnet1AID:
+        default: Private subnet 1 ID
+      PrivateSubnet2AID:
+        default: Private subnet 2 ID
+      SecurityGroupID:
+        default: Security group ID
+      DatabaseSecret:
+        default: Database secret
+      QueueName:
+        default: Queue name
+      LogsBucket:
+        default: Logs bucket
+      InstanceType:
+        default: Scheduler instance type
+      MinGroupSize:
+        default: Minimum group size
+      MaxGroupSize:
+        default: Maximum group size
+      ShrinkThreshold:
+        default: Shrink threshold
+      GrowthThreshold:
+        default: Growth threshold
+      LoadExampleDags:
+        default: Load example DAGs
+      LoadDefaultCons:
+        default: Load default connections
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
 Parameters:
-  # Networking
+
   VPCID:
     Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
@@ -10,88 +77,97 @@ Parameters:
   PrivateSubnet2AID:
     Description: An existing private Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
+  SecurityGroupID:
+    Description: >-
+      Security Group ID of an externally managed security group that gives
+      instances access to relevant external resources like the metadata database
+      endpoints in the two provided subnets.
+    Type: AWS::EC2::SecurityGroup::Id
+
+  DatabaseSecret:
+    Description: >-
+      The AWS SecretsManager Secret resource name (ARN) of the secure secret
+      storing the metadata database connection credentials.
+    Type: String
+  QueueName:
+    Description: >-
+      Name of the queue to be used as message broker between the scheduler and
+      worker instances.
+    Type: String
+  LogsBucket:
+    Description: >-
+      Name of the bucket where task logs are remotely stored.
+    Type: String
+
   InstanceType:
+    Description: >-
+      EC2 instance type to use for the scheduler.
     Type: String
   MinGroupSize:
     Description: The minimum number of active worker instances.
-    Type: Number
     Default: 0
+    Type: Number
   MaxGroupSize:
     Description: The maximum number of active worker instances.
-    Type: Number
     Default: 10
+    Type: Number
   ShrinkThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or below
       will trigger the AutoScaling group to Scale In, deallocating one worker
       instance.
-    Type: Number
     Default: 0.5
+    Type: Number
   GrowthThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or above
       will trigger the AutoScaling group to Scale Out, allocating one worker
       instance.
-    Type: Number
     Default: 0.9
-  SecretKeyName:
-    Type: String
-  LogsBucket:
-    Type: String
-  QueueName:
-    Type: String
+    Type: Number
 
-  # Cluster Resources
-  SecretCredentials:
-    Description: >-
-      The AWS SecretsManager Secret resource name (ARN) of the secure secret
-      storing the metadata database connection credentials.
-    Type: String
-
-  # Airflow Config
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
       stack for demonstrating a few topologies, operators and scheduling
       strategies.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
+    Type: String
   LoadDefaultCons:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
+    Type: String
 
-  # Quick Start Overrides
   QSS3BucketName:
     Description: >-
       S3 bucket name for the Quick Start assets. You can specify your own bucket
       providing assets and submodules, if you want to override the Quick Start
       behavior for your specific implementation.
-    Type: String
-    Default: turbine-quickstart
-    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
     ConstraintDescription: >-
       Quick Start bucket name can include numbers, lowercase letters, uppercase
       letters, and hyphens (-). It cannot start or end with a hyphen (-).
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    Default: turbine-quickstart
+    Type: String
   QSS3KeyPrefix:
     Description: >-
       S3 key prefix for the Quick Start assets. You can scpeficy your own
       "directory" providing the stack templates, if you want to override the
       Quick Start behavior for your specific implementation.
-    Type: String
-    Default: quickstart-turbine-airflow/
-    AllowedPattern: '^[0-9a-zA-Z-/]*$'
     ConstraintDescription: >-
       Quick Start key prefix can include numbers, lowercase letters, uppercase
       letters, hyphens (-), and forward slash (/).
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    Default: quickstart-turbine-airflow/
+    Type: String
 
 Resources:
 
@@ -106,6 +182,7 @@ Resources:
       InstanceType: !Ref InstanceType
       SecurityGroups:
         - !Ref SecurityGroup
+        - !Ref SecurityGroupID
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -122,11 +199,10 @@ Resources:
             setup:
               command: !Sub |
                 export AWS_STACK_NAME="${AWS::StackName}"
-                export SECRET_KEY_NAME="${SecretKeyName}"
                 export QUEUE_NAME="${QueueName}"
                 export LOGS_BUCKET="${LogsBucket}"
                 export FILE_SYSTEM_ID="${FileSystem}"
-                export DB_SECRETS_ARN="${SecretCredentials}"
+                export DB_SECRETS_ARN="${DatabaseSecret}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
@@ -140,11 +216,11 @@ Resources:
         The security group used by the Airflow worker instances. It exposes the
         a special port where the Airflow webserver can fetch logs directly.
       VpcId: !Ref VPCID
-      # SecurityGroupIngress:
-      #   - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-      #     IpProtocol: TCP
-      #     FromPort: 8793
-      #     ToPort: 8793
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref SecurityGroupID
+          IpProtocol: TCP
+          FromPort: 8793
+          ToPort: 8793
       Tags:
         - Key: Name
           Value: turbine-workerset-sg
