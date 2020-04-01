@@ -220,7 +220,7 @@ Resources:
                   - - arn:aws:cloudformation
                     - !Ref AWS::Region
                     - !Ref AWS::AccountId
-                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+                    - !Sub stack/${AWS::StackName}/*
         - PolicyName: !Sub TurbineAirflowSchedulerGetSecretPolicy-${AWS::StackName}
           PolicyDocument:
             Version: 2012-10-17
@@ -253,8 +253,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:Get*
-                  - s3:Put*
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
                 Resource: !Sub arn:aws:s3:::${LogsBucket}/*
 
 Outputs:
