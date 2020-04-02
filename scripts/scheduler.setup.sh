@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -e
 
 . "$(dirname $0)/commons.setup.sh"
 

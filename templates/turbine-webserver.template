@@ -199,6 +199,7 @@ Resources:
                 export DB_SECRETS_ARN="${DatabaseSecret}"
                 export LOAD_EXAMPLES="${LoadExampleDags}"
                 export LOAD_DEFAULTS="${LoadDefaultCons}"
+                export WEB_SERVER_PORT="${WebServerPort}"
                 aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
                 chmod +x /opt/turbine/webserver.setup.sh
                 /opt/turbine/webserver.setup.sh
@@ -235,41 +236,6 @@ Resources:
           Value: turbine-webserver
           PropagateAtLaunch: true
 
-  WebserverInitMetadata:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          setup:
-            - service
-          default:
-            - sysconf
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                exec /usr/local/bin/airflow webserver
-        sysconf:
-          commands:
-            webvars:
-              command: !Sub |
-                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
-                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
-                if [ $PUBLIC = "200" ]
-                then HOSTNAME=$PUB_IPV4
-                else HOSTNAME=$LOC_IPV4
-                fi
-                BASE_URL=$http://$HOSTNAME:${WebServerPort}
-                echo "AIRFLOW__WEBSERVER__BASE_URL=$BASE_URL" \
-                  >> /etc/sysconfig/airflow.env
-                echo "AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebServerPort}" \
-                  >> /etc/sysconfig/airflow.env
-
   IamInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -291,7 +257,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
-        - PolicyName: TurbineWebserverCfnHupDescribePolicy
+        - PolicyName: !Sub TurbineAirflowWebserverDescribeStackPolicy-${AWS::StackName}
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -303,7 +269,25 @@ Resources:
                   - - arn:aws:cloudformation
                     - !Ref AWS::Region
                     - !Ref AWS::AccountId
-                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+                    - !Sub stack/${AWS::StackName}/*
+        - PolicyName: !Sub TurbineAirflowWebserverGetSecretPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseSecret
+        - PolicyName: !Sub TurbineAirflowWebserverLogsRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
 
 Outputs:
   AutoScalingGroup:

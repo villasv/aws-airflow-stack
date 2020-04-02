@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -e
 yum install -y jq
 jsonvar() { jq -n --argjson doc "$1" -r "\$doc.$2"; }
 
@@ -56,10 +56,10 @@ FERNET_KEY=$(python3 -c "if True:#
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),length=32,salt=b'$FERNET_SALT',
-        iterations=100000,backend=default_backend(),
+        algorithm=hashes.SHA256(),length=32,iterations=100000,
+		backend=default_backend(),salt=b'${FERNET_SALT//\'/\\\'}',
     )
-    key = kdf.derive(b'$DB_PASS')
+    key = kdf.derive(b'${DB_PASS_ESC//\'/\\\'}')
     key_encoded = urlsafe_b64encode(key)
     print(key_encoded.decode('utf8'))")
 export FERNET_KEY
