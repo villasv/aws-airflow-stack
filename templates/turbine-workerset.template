@@ -269,7 +269,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
       Policies:
-        - PolicyName: TurbineWebserverCfnHupDescribePolicy
+        - PolicyName: !Sub TurbineAirflowWorkersetDescribeStackPolicy-${AWS::StackName}
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -281,9 +281,44 @@ Resources:
                   - - arn:aws:cloudformation
                     - !Ref AWS::Region
                     - !Ref AWS::AccountId
-                    - !Sub stack/${AWS::StackName}/LaunchConfiguration
+                    - !Sub stack/${AWS::StackName}/*
+        - PolicyName: !Sub TurbineAirflowWorkersetGetSecretPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseSecret
+        - PolicyName: !Sub TurbineAirflowWorkersetQueueRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ListQueues
+                Resource:
+                  - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${QueueName}
+        - PolicyName: !Sub TurbineAirflowWorkersetLogsRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
 
-  #region Shared Filesystem
   FileSystem:
     Type: AWS::EFS::FileSystem
     Properties:
@@ -322,8 +357,6 @@ Resources:
       Tags:
         - Key: Name
           Value: EfsMountSecurityGroup
-
-  #endregion
 
   CloudWatchMetricLambda:
     Type: AWS::Lambda::Function

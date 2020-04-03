@@ -197,7 +197,6 @@ Parameters:
 
 Resources:
 
-  #region Metadata Database
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
@@ -254,7 +253,6 @@ Resources:
       SecretId: !Ref Secret
       TargetId: !Ref DBInstance
       TargetType: AWS::RDS::DBInstance
-  #endregion
 
   TaskQueue:
     Type: AWS::SQS::Queue
@@ -405,7 +403,6 @@ Resources:
     DependsOn:
       - SecretTargetAttachment
 
-  #region CodeDeploy Setup
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
@@ -437,7 +434,6 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
-  #endregion
 
 Outputs:
   DeploymentsBucket:
