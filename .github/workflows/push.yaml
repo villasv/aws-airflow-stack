@@ -14,9 +14,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v1
       - name: Install Dev Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r dev-requirements.txt
+        run: pip install -r dev-requirements.txt
       - name: Lint Templates
         run: make lint
 
@@ -32,9 +30,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v1
       - name: Install Dev Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r dev-requirements.txt
+        run: pip install -r dev-requirements.txt
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -56,9 +52,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v1
       - name: Install Dev Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r dev-requirements.txt
+        run: pip install -r dev-requirements.txt
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:

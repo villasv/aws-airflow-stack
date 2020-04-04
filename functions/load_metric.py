@@ -79,7 +79,7 @@ def get_metrics(timestamp):
                         "Namespace": "AWS/AutoScaling",
                         "MetricName": "GroupInServiceInstances",
                         "Dimensions": [
-                            {"Name": "AutoScalingGroupName", "Value": f"{group}",}
+                            {"Name": "AutoScalingGroupName", "Value": f"{group}"}
                         ],
                     },
                     "Period": 300,

@@ -10,7 +10,8 @@ endif
 
 lint:
 	black . --check
-	pylint test/*.py functions/*.py
+	flake8 .
+	pylint **/*.py
 	cfn-lint templates/*.template
 
 nuke:
