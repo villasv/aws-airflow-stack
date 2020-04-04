@@ -1,0 +1,8 @@
+git+git://github.com/PyCQA/astroid.git#egg=astroid
+awscli
+black
+cfn-lint
+cfn-tools
+git+git://github.com/PyCQA/pylint.git#egg=pylint
+pytest
+taskcat

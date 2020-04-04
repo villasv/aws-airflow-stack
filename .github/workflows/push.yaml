@@ -13,8 +13,10 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install CFN Lint
-        run: pip install cfn-lint
+      - name: Install Dev Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
       - name: Lint Templates
         run: make lint
 
@@ -29,8 +31,10 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install TaskCat
-        run: pip install git+git://github.com/villasv/taskcat.git@b1011e8f080bad5d0a7cec65559e3c160787d17f#egg=taskcat
+      - name: Install Dev Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -51,8 +55,10 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install AWS CLI
-        run: pip install awscli
+      - name: Install Dev Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
