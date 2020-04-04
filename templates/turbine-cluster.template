@@ -256,7 +256,6 @@ Resources:
 
   TaskQueue:
     Type: AWS::SQS::Queue
-    Properties: {}
 
   LogsBucket:
     Type: AWS::S3::Bucket
@@ -274,57 +273,6 @@ Resources:
       Tags:
         - Key: Name
           Value: airflow-instances-sg
-
-  ManagedPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Action:
-              - secretsmanager:GetSecretValue
-            Resource: !Ref Secret
-          - Effect: Allow
-            Action:
-              - s3:Get*
-              - s3:List*
-            Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-          - Effect: Allow
-            Action:
-              - sqs:ListQueues
-            Resource:
-              - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*
-          - Effect: Allow
-            Action:
-              - sqs:ChangeMessageVisibility
-              - sqs:DeleteMessage
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-              - sqs:ReceiveMessage
-              - sqs:SendMessage
-            Resource: !Sub
-              - arn:aws:sqs:*:${AWS::AccountId}:${TaskQueueName}
-              - TaskQueueName: !GetAtt TaskQueue.QueueName
-          - Effect: Allow
-            Action:
-              - s3:Get*
-              - s3:Put*
-            Resource: !Sub arn:aws:s3:::${LogsBucket}/*
-          - Effect: Allow
-            Action:
-              - autoscaling:RecordLifecycleActionHeartbeat
-              - autoscaling:CompleteLifecycleAction
-            Resource: !Join
-              - ':'
-              - - arn:aws:autoscaling
-                - !Ref AWS::Region
-                - !Ref AWS::AccountId
-                - autoScalingGroup:*:*
-          - Effect: Allow
-            Action:
-              - autoscaling:DescribeScalingActivities
-            Resource: '*'
 
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
