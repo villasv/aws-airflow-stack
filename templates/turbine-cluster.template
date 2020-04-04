@@ -245,7 +245,7 @@ Resources:
         SecretStringTemplate: '{"username": "airflow"}'
         GenerateStringKey: "password"
         PasswordLength: 16
-        ExcludeCharacters: '"@/\'
+        ExcludePunctuation: True
 
   SecretTargetAttachment:
     Type: AWS::SecretsManager::SecretTargetAttachment
