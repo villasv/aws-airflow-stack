@@ -1,0 +1,4 @@
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/systemctl daemon-reload
+ExecStart=/opt/turbine/restart-services.sh

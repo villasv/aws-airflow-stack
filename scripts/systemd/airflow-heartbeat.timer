@@ -1,0 +1,5 @@
+[Timer]
+OnCalendar=*:0/1
+
+[Install]
+WantedBy=airflow.service

@@ -1,52 +1,210 @@
 AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the Airflow web server instance in a highly available
+  auto scaling group spanning two public subnets. **WARNING** This template
+  creates AWS resources. You will be billed for the AWS resources used if you
+  create a stack from this template. QS(0027)
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC network configuration
+        Parameters:
+          - VPCID
+          - PublicSubnet1ID
+          - PublicSubnet2ID
+          - SecurityGroupID
+          - AllowHTTPAccessCIDR
+      - Label:
+          default: Turbine Cluster configuration
+        Parameters:
+          - DatabaseSecret
+          - QueueName
+          - LogsBucket
+      - Label:
+          default: Turbine webserver configuration
+        Parameters:
+          - InstanceType
+      - Label:
+          default: Apache Airflow configuration
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultCons
+          - WebServerPort
+      - Label:
+          default: AWS Quick Start configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
+    ParameterLabels:
+      VPCID:
+        default: VPC ID
+      PublicSubnet1ID:
+        default: Public subnet 1 ID
+      PublicSubnet2ID:
+        default: Public subnet 2 ID
+      SecurityGroupID:
+        default: Security group ID
+      AllowHTTPAccessCIDR:
+        default: Allowed HTTP access CIDR
+      DatabaseSecret:
+        default: Database secret
+      QueueName:
+        default: Queue name
+      LogsBucket:
+        default: Logs bucket
+      InstanceType:
+        default: Workers instance type
+      LoadExampleDags:
+        default: Load example DAGs
+      LoadDefaultCons:
+        default: Load default connections
+      WebServerPort:
+        default: Web server port
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
 Parameters:
+
   VPCID:
+    Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
   PublicSubnet1ID:
+    Description: An existing public Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2ID:
+    Description: An existing public Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-  InstancesSecurityGroup:
+  SecurityGroupID:
+    Description: >-
+      Security Group ID of an externally managed security group that gives
+      instances access to relevant external resources like the metadata database
+      endpoints in the two provided subnets.
     Type: AWS::EC2::SecurityGroup::Id
-  IngressCIDR:
-    Type: String
-    AllowedPattern: >-
-      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-  IngressPort:
-    Type: Number
-  IamInstanceProfile:
-    Type: String
-  IamRole:
-    Type: String
-  ImageId:
-    Type: AWS::EC2::Image::Id
-  InstanceType:
-    Type: String
-  SharedCloudInitStack:
+  AllowHTTPAccessCIDR:
+    Description: >-
+      The IPv4 CIDR block to allow HTTP access in the webserver. Using the same
+      CIDR for the VPC is a secure default. Using 0.0.0.0/0 allows access from
+      everywhere, which is convenient but less secure.
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28.
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Default: 10.0.0.0/16
     Type: String
 
+  DatabaseSecret:
+    Description: >-
+      The AWS SecretsManager Secret resource name (ARN) of the secure secret
+      storing the metadata database connection credentials.
+    Type: String
+  QueueName:
+    Description: >-
+      Name of the queue to be used as message broker between the scheduler and
+      worker instances.
+    Type: String
+  LogsBucket:
+    Description: >-
+      Name of the bucket where task logs are remotely stored.
+    Type: String
+
+  InstanceType:
+    Description: >-
+      EC2 instance type to use for the scheduler.
+    Type: String
+
+  LoadExampleDags:
+    Description: >-
+      Load the example DAGs distributed with Airflow. Useful if deploying a
+      stack for demonstrating a few topologies, operators and scheduling
+      strategies.
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+    Type: String
+  LoadDefaultCons:
+    Description: >-
+      Load the default connections initialized by Airflow. Most consider these
+      unnecessary, which is why the default is to not load them.
+    AllowedValues:
+      - 'False'
+      - 'True'
+    Default: 'False'
+    Type: String
+  WebServerPort:
+    Description: >-
+      The port Airflow webserver will be listening.
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
+    MinValue: 1024
+    MaxValue: 65535
+    Default: 8080
+    Type: Number
+
+  QSS3BucketName:
+    Description: >-
+      S3 bucket name for the Quick Start assets. You can specify your own bucket
+      providing assets and submodules, if you want to override the Quick Start
+      behavior for your specific implementation.
+    ConstraintDescription: >-
+      Quick Start bucket name can include numbers, lowercase letters, uppercase
+      letters, and hyphens (-). It cannot start or end with a hyphen (-).
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    Default: turbine-quickstart
+    Type: String
+  QSS3KeyPrefix:
+    Description: >-
+      S3 key prefix for the Quick Start assets. You can scpeficy your own
+      "directory" providing the stack templates, if you want to override the
+      Quick Start behavior for your specific implementation.
+    ConstraintDescription: >-
+      Quick Start key prefix can include numbers, lowercase letters, uppercase
+      letters, hyphens (-), and forward slash (/).
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    Default: quickstart-turbine-airflow/
+    Type: String
 Resources:
 
   LaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       IamInstanceProfile: !Ref IamInstanceProfile
-      ImageId: !Ref ImageId
+      ImageId: !FindInMap
+        - AWSAMIRegionMap
+        - !Ref AWS::Region
+        - AMZNLINUX2
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref InstancesSecurityGroup
-        - !Ref WebserverSecurityGroup
+        - !Ref SecurityGroup
+        - !Ref SecurityGroupID
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          echo 'TURBINE_MACHINE=WEBSERVER' > /etc/environment
           /opt/aws/bin/cfn-init -v \
-            --region ${AWS::Region} \
-            --role ${IamRole} \
-            --stack ${SharedCloudInitStack} \
-            --resource SharedCloudInitMetadata
+            --stack ${AWS::StackName} \
+            --resource LaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $?
+            --stack ${AWS::StackName} \
+            --resource LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            setup:
+              command: !Sub |
+                export AWS_STACK_NAME="${AWS::StackName}"
+                export LOGS_BUCKET="${LogsBucket}"
+                export QUEUE_NAME="${QueueName}"
+                export DB_SECRETS_ARN="${DatabaseSecret}"
+                export LOAD_EXAMPLES="${LoadExampleDags}"
+                export LOAD_DEFAULTS="${LoadDefaultCons}"
+                export WEB_SERVER_PORT="${WebServerPort}"
+                aws s3 sync s3://${QSS3BucketName}/${QSS3KeyPrefix}scripts /opt/turbine
+                chmod +x /opt/turbine/webserver.setup.sh
+                /opt/turbine/webserver.setup.sh
 
-  WebserverSecurityGroup:
+  SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: >-
@@ -54,10 +212,10 @@ Resources:
         the specified port for web access in from a given ip range.
       VpcId: !Ref VPCID
       SecurityGroupIngress:
-        - CidrIp: !Ref IngressCIDR
+        - CidrIp: !Ref AllowHTTPAccessCIDR
           IpProtocol: TCP
-          FromPort: !Ref IngressPort
-          ToPort: !Ref IngressPort
+          FromPort: !Ref WebServerPort
+          ToPort: !Ref WebServerPort
       Tags:
         - Key: Name
           Value: turbine-webserver-sg
@@ -78,6 +236,96 @@ Resources:
           Value: turbine-webserver
           PropagateAtLaunch: true
 
+  IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        - PolicyName: !Sub TurbineAirflowWebserverDescribeStackPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackResource
+                Resource: !Join
+                  - ':'
+                  - - arn:aws:cloudformation
+                    - !Ref AWS::Region
+                    - !Ref AWS::AccountId
+                    - !Sub stack/${AWS::StackName}/*
+        - PolicyName: !Sub TurbineAirflowWebserverGetSecretPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseSecret
+        - PolicyName: !Sub TurbineAirflowWebserverLogsRWPolicy-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
+
 Outputs:
   AutoScalingGroup:
     Value: !Ref AutoScalingGroup
+  IamRole:
+    Value: !Ref IamRole
+  SecurityGroup:
+    Value: !Ref SecurityGroup
+
+Mappings:
+  AWSAMIRegionMap:
+    ap-northeast-1:
+      AMZNLINUX2: ami-052652af12b58691f
+    ap-northeast-2:
+      AMZNLINUX2: ami-0db78afd3d150fc18
+    ap-south-1:
+      AMZNLINUX2: ami-03b5297d565ef30a6
+    ap-southeast-1:
+      AMZNLINUX2: ami-0cbc6aae997c6538a
+    ap-southeast-2:
+      AMZNLINUX2: ami-08fdde86b93accf1c
+    ca-central-1:
+      AMZNLINUX2: ami-0bf54ac1b628cf143
+    eu-central-1:
+      AMZNLINUX2: ami-0ec1ba09723e5bfac
+    eu-west-1:
+      AMZNLINUX2: ami-04d5cc9b88f9d1d39
+    eu-west-2:
+      AMZNLINUX2: ami-0cb790308f7591fa6
+    eu-west-3:
+      AMZNLINUX2: ami-07eda9385feb1e969
+    sa-east-1:
+      AMZNLINUX2: ami-0b032e878a66c3b68
+    us-east-1:
+      AMZNLINUX2: ami-0fc61db8544a617ed
+    us-east-2:
+      AMZNLINUX2: ami-0e01ce4ee18447327
+    us-west-1:
+      AMZNLINUX2: ami-09a7fe78668f1e2c0
+    us-west-2:
+      AMZNLINUX2: ami-0ce21b51cb31a48b8

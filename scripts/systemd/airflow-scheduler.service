@@ -1,0 +1,14 @@
+[Unit]
+Description=Airflow scheduler daemon
+Wants=airflow-confapply-agent.path
+
+[Service]
+EnvironmentFile=/etc/sysconfig/airflow.env
+ExecStart=/usr/local/bin/airflow scheduler
+User=ec2-user
+Group=ec2-user
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

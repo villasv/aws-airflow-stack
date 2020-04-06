@@ -1,0 +1,15 @@
+[Unit]
+Description=Airflow webserver daemon
+Wants=airflow-confapply-agent.path
+
+[Service]
+EnvironmentFile=/etc/sysconfig/airflow.env
+ExecStart=/usr/local/bin/airflow webserver --pid /run/airflow/webserver.pid
+User=ec2-user
+Group=ec2-user
+Restart=on-failure
+RestartSec=5s
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

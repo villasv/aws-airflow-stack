@@ -1,0 +1,6 @@
+[Service]
+ExecStart=/opt/aws/bin/cfn-hup
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

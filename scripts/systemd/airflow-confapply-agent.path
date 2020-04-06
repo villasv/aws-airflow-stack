@@ -1,0 +1,9 @@
+[Unit]
+After=airflow-scheduler.service airflow-webserver.service airflow-workerset.service
+PartOf=airflow-scheduler.service airflow-webserver.service airflow-workerset.service
+
+[Path]
+PathModified=/etc/sysconfig/airflow.env
+
+[Install]
+WantedBy=airflow-scheduler.service airflow-webserver.service airflow-workerset.service

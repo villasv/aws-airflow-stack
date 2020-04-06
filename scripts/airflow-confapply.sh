@@ -1,8 +1,8 @@
 #!/bin/bash -e
 systemctl is-enabled --quiet airflow-scheduler &&\
-    systemctl stop airflow-scheduler
+    systemctl restart airflow-scheduler
 systemctl is-enabled --quiet airflow-webserver &&\
-    systemctl stop airflow-webserver
+    systemctl restart airflow-webserver
 systemctl is-enabled --quiet airflow-workerset &&\
-    systemctl stop airflow-workerset
+    systemctl restart airflow-workerset
 exit 0

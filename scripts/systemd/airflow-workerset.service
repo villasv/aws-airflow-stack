@@ -1,0 +1,16 @@
+[Unit]
+Description=Airflow celery worker daemon
+Wants=airflow-confapply-agent.path
+
+[Service]
+EnvironmentFile=/etc/sysconfig/airflow.env
+ExecStart=/usr/local/bin/airflow worker
+User=ec2-user
+Group=ec2-user
+Restart=on-failure
+RestartSec=10s
+KillMode=mixed
+TimeoutStopSec=24h
+
+[Install]
+WantedBy=multi-user.target

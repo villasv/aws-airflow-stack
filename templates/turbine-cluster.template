@@ -1,139 +1,278 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  The Turbine-Airflow cluster stack, composed mainly of the Airflow web server,
-  the Airflow scheduler, and the Airflow worker nested stacks. Supporting
-  resources include an RDS to host the Airflow metadata database, an SQS to be
-  used as broker backend, S3 buckets for logs and deployment bundles, an EFS to
-  serve as shared directory, and a custom CloudWatch metric measured by a timed
-  AWS Lambda.
+  This template creates the Airflow supporting resources including an RDS
+  instance to host the Airflow metadata database, an SQS queue to be used as
+  broker backend, S3 buckets for logs and deployment packages, and then creates
+  the Airflow scheduler, webserver and workers nested stacks. The nested Airflow
+  services stacks create the Airflow instances in highly available auto scaling
+  groups spanning two subnets, plus for the workers stack an EFS shared network
+  directory and a custom cloudwatch load metric function to guide the auto
+  scaling alarm triggers. **WARNING** This template creates AWS resources. You
+  will be billed for the AWS resources used if you create a stack from this
+  template. QS(0027)
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC network configuration
+        Parameters:
+          - VPCID
+          - PublicSubnet1ID
+          - PublicSubnet2ID
+          - PrivateSubnet1AID
+          - PrivateSubnet2AID
+          - AllowHTTPAccessCIDR
+      - Label:
+          default: Turbine Cluster configuration
+        Parameters:
+          - SchedulerInstanceType
+          - WebserverInstanceType
+          - WorkerInstanceType
+          - MinGroupSize
+          - MaxGroupSize
+          - ShrinkThreshold
+          - GrowthThreshold
+      - Label:
+          default: Apache Airflow configuration
+        Parameters:
+          - LoadExampleDags
+          - LoadDefaultCons
+          - WebServerPort
+      - Label:
+          default: AWS Quick Start configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
+    ParameterLabels:
+      VPCID:
+        default: VPC ID
+      PublicSubnet1ID:
+        default: Public subnet 1 ID
+      PublicSubnet2ID:
+        default: Public subnet 2 ID
+      PrivateSubnet1AID:
+        default: Private subnet 1 ID
+      PrivateSubnet2AID:
+        default: Private subnet 2 ID
+      AllowHTTPAccessCIDR:
+        default: Allowed HTTP access CIDR
+      SchedulerInstanceType:
+        default: Scheduler instance type
+      WebserverInstanceType:
+        default: Web server instance type
+      WorkerInstanceType:
+        default: Workers instance type
+      MinGroupSize:
+        default: Minimum group size
+      MaxGroupSize:
+        default: Maximum group size
+      ShrinkThreshold:
+        default: Shrink threshold
+      GrowthThreshold:
+        default: Growth threshold
+      LoadExampleDags:
+        default: Load example DAGs
+      LoadDefaultCons:
+        default: Load default connections
+      WebServerPort:
+        default: Web server port
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
 Parameters:
 
-  # Networking
   VPCID:
-    Description: An existing VPC for the cluster
+    Description: An existing VPC for the cluster.
     Type: AWS::EC2::VPC::Id
   PublicSubnet1ID:
-    Description: An existing public Subnet in some Availability Zone
+    Description: An existing public Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2ID:
-    Description: An existing public Subnet in another Availability Zone
+    Description: An existing public Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet1AID:
-    Description: An existing private Subnet in some Availability Zone
+    Description: An existing private Subnet in some Availability Zone.
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2AID:
-    Description: An existing private Subnet in another Availability Zone
+    Description: An existing private Subnet in another Availability Zone.
     Type: AWS::EC2::Subnet::Id
-  AllowedWebBlock:
+  AllowHTTPAccessCIDR:
     Description: >-
-      The IPv4 CIDR block to allow HTTP access in the webserver. The default of
-      0.0.0.0/0 allows HTTP from everywhere, which is convenient but less
-      secure.
+      The IPv4 CIDR block to allow HTTP access in the webserver. Using the same
+      CIDR for the VPC is a secure default. Using 0.0.0.0/0 allows access from
+      everywhere, which is convenient but less secure.
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28.
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Default: 10.0.0.0/16
     Type: String
-    AllowedPattern: >-
-      ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
-    Default: 0.0.0.0/0
-  WebserverPort:
-    Description: >-
-      The port Airflow webserver will be listening.
-    Type: Number
-    Default: 8080
-    MinValue: 1024
-    MaxValue: 65535
-    ConstraintDescription: >-
-      Ports below 1024 can be opened only with root privileges and the airflow
-      process does not run as such.
 
-  # Cluster Settings
   SchedulerInstanceType:
     Description: EC2 instance type to use for the scheduler.
-    Type: String
     Default: t3.micro
+    Type: String
   WebserverInstanceType:
     Description: EC2 instance type to use for the webserver.
-    Type: String
     Default: t3.micro
+    Type: String
   WorkerInstanceType:
     Description: EC2 instance type to use for the workers.
-    Type: String
     Default: t3.medium
+    Type: String
   MinGroupSize:
     Description: The minimum number of active worker instances.
+    Default: 0
     Type: Number
-    Default: 1
   MaxGroupSize:
     Description: The maximum number of active worker instances.
-    Type: Number
     Default: 10
+    Type: Number
   ShrinkThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or below
       will trigger the AutoScaling group to Scale In, deallocating one worker
       instance.
-    Type: Number
     Default: 0.5
+    Type: Number
   GrowthThreshold:
     Description: >-
       The threshold for the average queue size from which going equal or above
       will trigger the AutoScaling group to Scale Out, allocating one worker
       instance.
-    Type: Number
     Default: 0.9
-  DbMasterUsername:
-    Description: The username to be used in the airflow database.
-    Type: String
-    Default: airflow
-  DbMasterPassword:
-    Description: The password to be used in the airflow database.
-    Type: String
-    NoEcho: true
+    Type: Number
 
-  # Airflow Config
   LoadExampleDags:
     Description: >-
       Load the example DAGs distributed with Airflow. Useful if deploying a
       stack for demonstrating a few topologies, operators and scheduling
       strategies.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
-  LoadDefaultConn:
+    Type: String
+  LoadDefaultCons:
     Description: >-
       Load the default connections initialized by Airflow. Most consider these
       unnecessary, which is why the default is to not load them.
-    Type: String
     AllowedValues:
       - 'False'
       - 'True'
     Default: 'False'
+    Type: String
+  WebServerPort:
+    Description: >-
+      The port Airflow webserver will be listening.
+    ConstraintDescription: >-
+      Ports below 1024 can be opened only with root privileges and the airflow
+      process does not run as such.
+    MinValue: 1024
+    MaxValue: 65535
+    Default: 8080
+    Type: Number
 
-  # Quick Start Overrides
   QSS3BucketName:
     Description: >-
       S3 bucket name for the Quick Start assets. You can specify your own bucket
       providing assets and submodules, if you want to override the Quick Start
       behavior for your specific implementation.
-    Type: String
-    Default: turbine-quickstart
-    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
     ConstraintDescription: >-
       Quick Start bucket name can include numbers, lowercase letters, uppercase
       letters, and hyphens (-). It cannot start or end with a hyphen (-).
+    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
+    Default: turbine-quickstart
+    Type: String
   QSS3KeyPrefix:
     Description: >-
       S3 key prefix for the Quick Start assets. You can scpeficy your own
       "directory" providing the stack templates, if you want to override the
       Quick Start behavior for your specific implementation.
-    Type: String
-    Default: quickstart-turbine-airflow/
-    AllowedPattern: '^[0-9a-zA-Z-/]*$'
     ConstraintDescription: >-
       Quick Start key prefix can include numbers, lowercase letters, uppercase
       letters, hyphens (-), and forward slash (/).
+    AllowedPattern: '^[0-9a-zA-Z-/]*$'
+    Default: quickstart-turbine-airflow/
+    Type: String
 
 Resources:
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: >
+        Associates the Database Instances with the selected VPC Subnets.
+      SubnetIds:
+        - !Ref PrivateSubnet1AID
+        - !Ref PrivateSubnet2AID
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      DBName: airflow
+      Engine: postgres
+      MasterUsername: !Join
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref Secret
+          - ':SecretString:username}}'
+      MasterUserPassword: !Join
+        - ''
+        - - '{{resolve:secretsmanager:'
+          - !Ref Secret
+          - ':SecretString:password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref SecurityGroup
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Rules with permissions for database connections for Airflow.
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
+          IpProtocol: TCP
+          FromPort: 5432
+          ToPort: 5432
+      VpcId: !Ref VPCID
+
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "airflow"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludePunctuation: True
+
+  SecretTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref Secret
+      TargetId: !Ref DBInstance
+      TargetType: AWS::RDS::DBInstance
+
+  TaskQueue:
+    Type: AWS::SQS::Queue
+
+  LogsBucket:
+    Type: AWS::S3::Bucket
+
+  DeploymentsBucket:
+    Type: AWS::S3::Bucket
+
+  InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >-
+        The security group shared by all Airflow instances used as inbound rule
+        for the other more specific resource security groups.
+      VpcId: !Ref VPCID
+      Tags:
+        - Key: Name
+          Value: airflow-instances-sg
 
   SchedulerStack:
     Type: AWS::CloudFormation::Stack
@@ -144,20 +283,19 @@ Resources:
           - !Ref QSS3KeyPrefix
           - templates/turbine-scheduler.template
       Parameters:
-        VPCID: !Ref VPCID
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
-        ImageId: !FindInMap
-          - AWSAMIRegionMap
-          - !Ref AWS::Region
-          - AMZNLINUX2
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        DatabaseSecret: !Ref Secret
+        QueueName: !GetAtt TaskQueue.QueueName
+        LogsBucket: !Ref LogsBucket
         InstanceType: !Ref SchedulerInstanceType
-        SharedCloudInitStack: !Ref AWS::StackName
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
     DependsOn:
-      - SharedCloudInitMetadata
+      - SecretTargetAttachment
 
   WebserverStack:
     Type: AWS::CloudFormation::Stack
@@ -171,19 +309,19 @@ Resources:
         VPCID: !Ref VPCID
         PublicSubnet1ID: !Ref PublicSubnet1ID
         PublicSubnet2ID: !Ref PublicSubnet2ID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IngressCIDR: !Ref AllowedWebBlock
-        IngressPort: !Ref WebserverPort
-        IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
-        ImageId: !FindInMap
-          - AWSAMIRegionMap
-          - !Ref AWS::Region
-          - AMZNLINUX2
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        AllowHTTPAccessCIDR: !Ref AllowHTTPAccessCIDR
+        DatabaseSecret: !Ref Secret
+        QueueName: !GetAtt TaskQueue.QueueName
+        LogsBucket: !Ref LogsBucket
         InstanceType: !Ref WebserverInstanceType
-        SharedCloudInitStack: !Ref AWS::StackName
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
+        WebServerPort: !Ref WebServerPort
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
     DependsOn:
-      - SharedCloudInitMetadata
+      - SecretTargetAttachment
 
   WorkerSetStack:
     Type: AWS::CloudFormation::Stack
@@ -197,50 +335,38 @@ Resources:
         VPCID: !Ref VPCID
         PrivateSubnet1AID: !Ref PrivateSubnet1AID
         PrivateSubnet2AID: !Ref PrivateSubnet2AID
-        InstancesSecurityGroup: !Ref InstancesSecurityGroup
-        IamInstanceProfile: !Ref AirflowProfile
-        IamRole: !Ref AirflowRole
-        ImageId: !FindInMap
-          - AWSAMIRegionMap
-          - !Ref AWS::Region
-          - AMZNLINUX2
-        InstanceType: !Ref WorkerInstanceType
-        MinSize: !Ref MinGroupSize
-        MaxSize: !Ref MaxGroupSize
-        GrowthThreshold: !Ref GrowthThreshold
-        ShrinkThreshold: !Ref ShrinkThreshold
+        SecurityGroupID: !Ref InstancesSecurityGroup
+        DatabaseSecret: !Ref Secret
         QueueName: !GetAtt TaskQueue.QueueName
-        SharedCloudInitStack: !Ref AWS::StackName
+        LogsBucket: !Ref LogsBucket
+        InstanceType: !Ref WorkerInstanceType
+        MinGroupSize: !Ref MinGroupSize
+        MaxGroupSize: !Ref MaxGroupSize
+        ShrinkThreshold: !Ref ShrinkThreshold
+        GrowthThreshold: !Ref GrowthThreshold
+        LoadExampleDags: !Ref LoadExampleDags
+        LoadDefaultCons: !Ref LoadDefaultCons
         QSS3BucketName: !Ref QSS3BucketName
         QSS3KeyPrefix: !Ref QSS3KeyPrefix
-
     DependsOn:
-      - SharedCloudInitMetadata
-
-  LogsBucket:
-    Type: AWS::S3::Bucket
-
-  DeploymentsBucket:
-    Type: AWS::S3::Bucket
+      - SecretTargetAttachment
 
   CodeDeployApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
-      ApplicationName: !Sub ${AWS::StackName}-deployment-application
+      ApplicationName: !Ref AWS::StackName
       ComputePlatform: Server
 
   CodeDeployDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       ApplicationName: !Ref CodeDeployApplication
-      DeploymentGroupName: !Sub ${AWS::StackName}-deployment-group
+      DeploymentGroupName: !Ref AWS::StackName
       AutoScalingGroups:
         - !GetAtt SchedulerStack.Outputs.AutoScalingGroup
         - !GetAtt WebserverStack.Outputs.AutoScalingGroup
         - !GetAtt WorkerSetStack.Outputs.AutoScalingGroup
-      ServiceRoleArn: !GetAtt
-        - CodeDeployServiceRole
-        - Arn
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
 
   CodeDeployServiceRole:
     Type: AWS::IAM::Role
@@ -255,519 +381,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole'
-
-  EfsFileSystem:
-    Type: AWS::EFS::FileSystem
-    Properties:
-      FileSystemTags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-filesystem
-
-  EfsMountTarget1A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet1AID
-      SecurityGroups:
-        - !Ref Access
-
-  EfsMountTarget2A:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EfsFileSystem
-      SubnetId: !Ref PrivateSubnet2AID
-      SecurityGroups:
-        - !Ref Access
-
-  DBs:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Associates the Database Instances with the selected VPC Subnets.
-      SubnetIds:
-        - !Ref PrivateSubnet1AID
-        - !Ref PrivateSubnet2AID
-
-  Database:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      AllocatedStorage: '20'
-      DBInstanceClass: db.t2.micro
-      DBName: airflow
-      Engine: postgres
-      MasterUsername: !Ref DbMasterUsername
-      MasterUserPassword: !Ref DbMasterPassword
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-database
-      DBSubnetGroupName: !Ref DBs
-      VPCSecurityGroups:
-        - !Ref Connection
-
-  TaskQueue:
-    Type: AWS::SQS::Queue
-    Properties: {}
-
-  InstancesSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        The security group shared by all Airflow instances used as inbound rule
-        for the other more specific resource security groups.
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: airflow-instances-sg
-
-  Access:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: >-
-        Security Rules with permissions for the shared filesystem across Airflow
-        instances.
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-          IpProtocol: TCP
-          FromPort: 2049
-          ToPort: 2049
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-access'
-
-  Connection:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security Rules with permissions for database connections for Airflow.
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref InstancesSecurityGroup
-          IpProtocol: TCP
-          FromPort: 5432
-          ToPort: 5432
-      VpcId: !Ref VPCID
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-connection
-
-  AirflowRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
-      Policies:
-        - PolicyName: !Sub ${AWS::StackName}-cfn-describe
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - cloudformation:DescribeStackResource
-                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*
-        - PolicyName: !Sub ${AWS::StackName}-ssm-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                  - ssm:PutParameter
-                Resource:
-                  - !Sub arn:aws:ssm:*:${AWS::AccountId}:*/*
-        - PolicyName: !Sub ${AWS::StackName}-queue-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - sqs:ListQueues
-                Resource:
-                  - !Sub arn:aws:sqs:*:${AWS::AccountId}:*
-              - Effect: Allow
-                Action:
-                  - sqs:ChangeMessageVisibility
-                  - sqs:DeleteMessage
-                  - sqs:GetQueueAttributes
-                  - sqs:GetQueueUrl
-                  - sqs:ReceiveMessage
-                  - sqs:SendMessage
-                Resource: !Sub
-                  - arn:aws:sqs:*:${AWS::AccountId}:${queue}
-                  - queue: !GetAtt
-                      - TaskQueue
-                      - QueueName
-        - PolicyName: !Sub ${AWS::StackName}-deployments-r-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:List*
-                Resource: !Sub arn:aws:s3:::${DeploymentsBucket}/*
-              - Effect: Allow
-                Action:
-                  - codedeploy:List*
-                Resource: !Sub arn:aws:codedeploy:*:${AWS::AccountId}:deploymentgroup:*
-        - PolicyName: !Sub ${AWS::StackName}-logs-rw-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:Get*
-                  - s3:Put*
-                Resource: !Sub arn:aws:s3:::${LogsBucket}/*
-        - PolicyName: !Sub ${AWS::StackName}-lifecycle-heartbeat
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - autoscaling:RecordLifecycleActionHeartbeat
-                  - autoscaling:CompleteLifecycleAction
-                Resource: !Sub arn:aws:autoscaling:*:${AWS::AccountId}:autoScalingGroup:*:*
-              - Effect: Allow
-                Action:
-                  - autoscaling:DescribeScalingActivities
-                Resource: '*'
-
-  AirflowProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref AirflowRole
-
-  SharedCloudInitMetadata:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Properties: {}
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          default:
-            - filesys
-            - runtime
-            - secrets
-            - sysconf
-            - migrate
-            - service
-            - lchooks
-            - metahup
-            - cdagent
-        filesys:
-          commands:
-            mkdir:
-              test: test ! -d /airflow
-              command: |
-                mkdir /airflow
-                chown -R ec2-user /airflow
-            mount:
-              test: test ! -d /mnt/efs
-              command: !Sub |
-                mkdir /mnt/efs
-                fspec="${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com:/"
-                param="nfsvers=4.1,rsize=1048576,wsize=1048576"
-                param="$param,hard,timeo=600,retrans=2,noresvport"
-                echo "$fspec /mnt/efs nfs $param,_netdev 0 0" >> /etc/fstab
-                mount /mnt/efs && chown -R ec2-user /mnt/efs
-        runtime:
-          packages:
-            yum:
-              git: []
-              gcc: []
-              gcc-c++: []
-              jq: []
-              lapack-devel: []
-              libcurl-devel: []
-              libxml2-devel: []
-              libxslt-devel: []
-              openssl-devel: []
-              postgresql-devel: []
-              python3: []
-              python3-devel: []
-              python3-pip: []
-              python3-wheel: []
-          commands:
-            install:
-              command: |
-                PYCURL_SSL_LIBRARY=openssl pip3 install \
-                  --no-cache-dir --compile --ignore-installed \
-                  pycurl
-                SLUGIFY_USES_TEXT_UNIDECODE=yes pip3 install \
-                  celery[sqs] \
-                  apache-airflow[celery,postgres,s3,crypto]==1.10.9
-        secrets:
-          commands:
-            generate:
-              command: !Sub |
-                export $(cat /etc/environment | xargs)
-
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Secret generation reserved for the scheduler"
-                  exit 0
-                fi
-                FERNET_KEY=$(aws ssm get-parameter \
-                  --name ${AWS::StackName}-fernet-key \
-                  --region '${AWS::Region}' \
-                  --query 'Parameter.Value')
-                if [ "$FERNET_KEY" = "" ]; then
-                  FERNET_KEY=$(python3 -c "if True:#
-                    from cryptography.fernet import Fernet
-                    key = Fernet.generate_key().decode()
-                    print(key)")
-                  aws ssm put-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --value $FERNET_KEY \
-                    --type SecureString
-                fi
-            retrieve:
-              command: !Sub |
-                while [ "$FERNET_KEY" = "" ]; do
-                  echo "Waiting for Fernet key to be available..."
-                  sleep 1
-                  FERNET_KEY=$(aws ssm get-parameter \
-                    --name ${AWS::StackName}-fernet-key \
-                    --region '${AWS::Region}' \
-                    --with-decryption \
-                    --query 'Parameter.Value' \
-                    --output text)
-                done
-                echo "FERNET_KEY=$FERNET_KEY" >> /etc/environment
-        sysconf:
-          files:
-            /etc/sysconfig/airflow:
-              content: !Sub
-                - |
-                  TURBINE_MACHINE=${!TURBINE_MACHINE}
-                  AWS_DEFAULT_REGION=${AWS::Region}
-                  AIRFLOW_HOME=/airflow
-                  AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-                  AIRFLOW__CORE__FERNET_KEY=${!FERNET_KEY}
-                  AIRFLOW__CORE__LOAD_EXAMPLES=${LoadExampleDags}
-                  TURBINE__CORE__LOAD_DEFAULTS=${LoadDefaultConn}
-                  AIRFLOW__CORE__SQL_ALCHEMY_CONN=${DbUri}
-                  AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://${LogsBucket}
-                  AIRFLOW__CORE__REMOTE_LOGGING=True
-                  AIRFLOW__WEBSERVER__BASE_URL=http://${!HOSTNAME}:${WebserverPort}
-                  AIRFLOW__WEBSERVER__WEB_SERVER_PORT=${WebserverPort}
-                  AIRFLOW__CELERY__BROKER_URL=sqs://
-                  AIRFLOW__CELERY__DEFAULT_QUEUE=${QueueName}
-                  AIRFLOW__CELERY__RESULT_BACKEND=db+${DbUri}
-                  AIRFLOW__CELERY_BROKER_TRANSPORT_OPTIONS__REGION=${AWS::Region}
-                - QueueName: !GetAtt TaskQueue.QueueName
-                  DbUri: !Join
-                  - ''
-                  - - postgresql://
-                    - !Ref DbMasterUsername
-                    - ':'
-                    - !Ref DbMasterPassword
-                    - '@'
-                    - !GetAtt Database.Endpoint.Address
-                    - /airflow
-          commands:
-            envsubst:
-              command: |
-                export $(cat /etc/environment | xargs)
-
-                PUBLIC=$(curl -s -o /dev/null -w "%{http_code}" \
-                  http://169.254.169.254/latest/meta-data/public-ipv4)
-                PUB_IPV4=$(ec2-metadata -v | awk '{print $2}')
-                LOC_IPV4=$(ec2-metadata -o | awk '{print $2}')
-                if [ $PUBLIC = "200" ]
-                then HOSTNAME=$PUB_IPV4
-                else HOSTNAME=$LOC_IPV4
-                fi
-
-                echo "$(envsubst </etc/sysconfig/airflow)" > /etc/sysconfig/airflow
-        migrate:
-          commands:
-            migration:
-              command: |
-                export $(cat /etc/environment | xargs)
-                export $(cat /etc/sysconfig/airflow | xargs)
-                if [ "$TURBINE_MACHINE" != "SCHEDULER" ]; then
-                  echo "Database setup reserved for the scheduler"
-                  exit 0
-                fi
-                if [ "$TURBINE__CORE__LOAD_DEFAULTS" == "True" ]; then
-                  su -c '/usr/local/bin/airflow initdb' ec2-user
-                else
-                  su -c '/usr/local/bin/airflow upgradedb' ec2-user
-                fi
-        service:
-          files:
-            /usr/bin/turbine:
-              mode: 755
-              content: |
-                #!/bin/sh
-                if [ "$TURBINE_MACHINE" == "SCHEDULER" ]
-                then exec /usr/local/bin/airflow scheduler
-                elif [ "$TURBINE_MACHINE" == "WEBSERVER" ]
-                then exec /usr/local/bin/airflow webserver
-                elif [ "$TURBINE_MACHINE" == "WORKER" ]
-                then exec /usr/local/bin/airflow worker
-                else echo "TURBINE_MACHINE value unknown" && exit 1
-                fi
-            /usr/lib/tmpfiles.d/airflow.conf:
-              content: |
-                D /run/airflow 0755 ec2-user ec2-user
-            /usr/lib/systemd/system/airflow.service:
-              content: |
-                [Service]
-                EnvironmentFile=/etc/sysconfig/airflow
-                User=ec2-user
-                Group=ec2-user
-                ExecStart=/usr/bin/turbine
-                Restart=always
-                RestartSec=5s
-                KillMode=mixed
-                TimeoutStopSec=24h
-                [Install]
-                WantedBy=multi-user.target
-            /usr/lib/systemd/system/watcher.path:
-              content: |
-                [Unit]
-                After=airflow.service
-                PartOf=airflow.service
-                [Path]
-                PathModified=/etc/sysconfig/airflow
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/watcher.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStartPre=/usr/bin/systemctl daemon-reload
-                ExecStart=/usr/bin/systemctl restart airflow
-          commands:
-            setup:
-              command: !Sub |
-                HAS_DEPLOYMENT=$(aws deploy list-deployments \
-                  --application-name ${AWS::StackName}-deployment-application \
-                  --deployment-group ${AWS::StackName}-deployment-group \
-                  --region ${AWS::Region} | \
-                  jq '.deployments | has(0)')
-
-                systemctl enable airflow.service watcher.path
-
-                if [ "$HAS_DEPLOYMENT" = "false" ]; then
-                  systemctl start airflow
-                else
-                  echo "Deployment pending, deferring service start"
-                fi
-        lchooks:
-          files:
-            /usr/bin/lchkill:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                INSTANCE_ID=$(ec2-metadata -i | awk '{print $2}')
-                TERMINATE_MESSAGE="Terminating EC2 instance <$INSTANCE_ID>"
-                TERMINATING=$(aws autoscaling describe-scaling-activities \
-                  --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                  --max-items 100 \
-                  --region '${AWS::Region}' | \
-                  jq --arg TERMINATE_MESSAGE "$TERMINATE_MESSAGE" \
-                  '.Activities[]
-                  | select(.Description
-                  | test($TERMINATE_MESSAGE)) != []')
-
-                if [ "$TERMINATING" = "true" ]; then
-                  systemctl stop airflow
-                fi
-            /usr/lib/systemd/system/lchkill.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchkill.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchkill
-            /usr/bin/lchbeat:
-              mode: 755
-              content: !Sub |
-                #!/bin/sh
-                SERVICE_STATUS=$(systemctl is-active airflow)
-
-                if [ "$SERVICE_STATUS" = "deactivating" ]; then
-                  aws autoscaling record-lifecycle-action-heartbeat \
-                    --instance-id $(ec2-metadata -i | awk '{print $2}') \
-                    --lifecycle-hook-name '${AWS::StackName}-scaling-lfhook' \
-                    --auto-scaling-group-name '${AWS::StackName}-scaling-group' \
-                    --region '${AWS::Region}'
-                fi
-            /usr/lib/systemd/system/lchbeat.timer:
-              content: |
-                [Timer]
-                OnCalendar=*:0/1
-                [Install]
-                WantedBy=airflow.service
-            /usr/lib/systemd/system/lchbeat.service:
-              content: |
-                [Service]
-                Type=oneshot
-                ExecStart=/usr/bin/lchbeat
-          commands:
-            setup:
-              command: |
-                if [ "$TURBINE_MACHINE" = "WORKER" ]; then
-                  systemctl enable lchkill.timer lchbeat.timer
-                fi
-        metahup:
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                role=${AirflowRole}
-                interval=1
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.Meta.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v \
-                  --region ${AWS::Region} \
-                  --role ${AirflowRole} \
-                  --stack ${AWS::StackName} \
-                  --resource Meta
-                runas=root
-            /lib/systemd/system/cfn-hup.service:
-              content: |
-                [Service]
-                ExecStart=/opt/aws/bin/cfn-hup
-                Restart=always
-                [Install]
-                WantedBy=multi-user.target
-          commands:
-            setup:
-              command: |
-                systemctl enable cfn-hup.service
-                systemctl start cfn-hup.service
-        cdagent:
-          packages:
-            yum:
-              ruby: []
-              wget: []
-          commands:
-            install:
-              command: !Sub |
-                wget https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install
-                chmod +x ./install
-                ./install auto
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
 
 Outputs:
   DeploymentsBucket:
@@ -776,72 +390,3 @@ Outputs:
     Value: !Ref CodeDeployApplication
   CodeDeployDeploymentGroup:
     Value: !Ref CodeDeployDeploymentGroup
-
-Mappings:
-  AWSAMIRegionMap:
-    ap-northeast-1:
-      AMZNLINUX2: ami-00d101850e971728d
-    ap-northeast-2:
-      AMZNLINUX2: ami-08ab3f7e72215fe91
-    ap-south-1:
-      AMZNLINUX2: ami-00e782930f1c3dbc7
-    ap-southeast-1:
-      AMZNLINUX2: ami-0b5a47f8865280111
-    ap-southeast-2:
-      AMZNLINUX2: ami-0fb7513bcdc525c3b
-    ca-central-1:
-      AMZNLINUX2: ami-08a9b721ecc5b0a53
-    eu-central-1:
-      AMZNLINUX2: ami-0ebe657bc328d4e82
-    eu-west-1:
-      AMZNLINUX2: ami-030dbca661d402413
-    eu-west-2:
-      AMZNLINUX2: ami-0009a33f033d8b7b6
-    eu-west-3:
-      AMZNLINUX2: ami-0ebb3a801d5fb8b9b
-    sa-east-1:
-      AMZNLINUX2: ami-058141e091292ecf0
-    us-east-1:
-      AMZNLINUX2: ami-0c6b1d09930fac512
-    us-east-2:
-      AMZNLINUX2: ami-0ebbf2179e615c338
-    us-west-1:
-      AMZNLINUX2: ami-015954d5e5548d13b
-    us-west-2:
-      AMZNLINUX2: ami-0cb72367e98845d43
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-      - Label:
-          default: Networking
-        Parameters:
-          - VPCID
-          - PublicSubnet1ID
-          - PublicSubnet2ID
-          - PrivateSubnet1AID
-          - PrivateSubnet2AID
-          - AllowedWebBlock
-          - WebserverPort
-      - Label:
-          default: Cluster Settings
-        Parameters:
-          - SchedulerInstanceType
-          - WebserverInstanceType
-          - WorkerInstanceType
-          - MinGroupSize
-          - MaxGroupSize
-          - ShrinkThreshold
-          - GrowthThreshold
-          - DbMasterUsername
-          - DbMasterPassword
-      - Label:
-          default: Airflow Config
-        Parameters:
-          - LoadExampleDags
-          - LoadDefaultConn
-      - Label:
-          default: Quick Start Overrides
-        Parameters:
-          - QSS3BucketName
-          - QSS3KeyPrefix

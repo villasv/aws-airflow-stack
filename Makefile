@@ -1,7 +1,6 @@
 ifndef BRANCH
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 endif
-
 ifeq ($(BRANCH),master)
 BUCKET := s3://turbine-quickstart/quickstart-turbine-airflow
 else
@@ -10,6 +9,9 @@ endif
 
 
 lint:
+	black . --check
+	flake8 .
+	pylint **/*.py
 	cfn-lint templates/*.template
 
 nuke:
@@ -19,7 +21,9 @@ pack:
 	7z a ./functions/package.zip ./functions/*.py
 
 sync: pack
+	aws s3 rm $(BUCKET) --recursive
 	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
 
 test: pack
+	pytest -vv
 	taskcat test run --input-file ./ci/taskcat.yaml

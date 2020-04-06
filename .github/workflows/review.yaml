@@ -1,10 +1,15 @@
 name: Stack Release Pipeline
 
-on: [push]
+on:
+  pull_request_review:
+    types:
+      - submitted
+
 
 jobs:
 
   lint:
+    if: contains(github.event.review.body, '/lint')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -13,15 +18,14 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install Dev Dependencies
-        run: pip install -r dev-requirements.txt
+      - name: Install CFN Lint
+        run: pip install cfn-lint
       - name: Lint Templates
         run: make lint
 
   test:
-    if: contains(github.ref, 'refs/heads/master')
+    if: contains(github.event.review.body, '/test')
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -29,8 +33,8 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install Dev Dependencies
-        run: pip install -r dev-requirements.txt
+      - name: Install TaskCat
+        run: pip install git+git://github.com/villasv/taskcat.git@b1011e8f080bad5d0a7cec65559e3c160787d17f#egg=taskcat
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -41,9 +45,8 @@ jobs:
         run: make test
 
   sync:
-    if: contains(github.ref, 'refs/heads/master')
+    if: contains(github.event.review.body, '/sync')
     runs-on: ubuntu-latest
-    needs: test
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -51,8 +54,8 @@ jobs:
           submodules: true
       - name: Setup Python
         uses: actions/setup-python@v1
-      - name: Install Dev Dependencies
-        run: pip install -r dev-requirements.txt
+      - name: Install AWS CLI
+        run: pip install awscli
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
