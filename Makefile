@@ -1,11 +1,15 @@
-ifndef BRANCH
-BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+prefix := quickstart-turbine-airflow
+bucket := s3://turbine-quickstart
+
+ifndef branch
+branch := $(shell git rev-parse --abbrev-ref HEAD)
 endif
-ifeq ($(BRANCH),master)
-BUCKET := s3://turbine-quickstart/quickstart-turbine-airflow
-else
-BUCKET := s3://turbine-quickstart/quickstart-turbine-airflow-$(BRANCH)
+ifneq ($(branch),master)
+prefix := $(prefix)-$(branch)
 endif
+
+regions := $(shell yq -r '.Mappings.AWSAMIRegionMap | keys[]' \
+	templates/turbine-scheduler.template)
 
 
 lint:
@@ -20,9 +24,13 @@ nuke:
 pack:
 	7z a ./functions/package.zip ./functions/*.py
 
-sync: pack
-	aws s3 rm $(BUCKET) --recursive
-	aws s3 sync --exclude '.*' --acl public-read . $(BUCKET)
+targets := $(addprefix sync-,$(regions))
+sync: pack $(targets)
+	aws s3 rm $(bucket)/$(prefix) --recursive
+	aws s3 sync --exclude '.*' --acl public-read . $(bucket)/$(prefix)
+sync-%: pack
+	aws s3 rm $(bucket)-$*/$(prefix) --recursive
+	aws s3 sync --exclude '.*' --acl public-read . $(bucket)-$*/$(prefix)
 
 test: pack
 	pytest -vv
