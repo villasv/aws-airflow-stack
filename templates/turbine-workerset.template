@@ -176,6 +176,9 @@ Parameters:
     Default: quickstart-turbine-airflow/
     Type: String
 
+Conditions:
+  UsingDefaultBucket: !Equals [!Ref QSS3BucketName, 'turbine-quickstart']
+
 Resources:
 
   LaunchConfiguration:
@@ -364,7 +367,10 @@ Resources:
       Runtime: python3.7
       Handler: load_metric.handler
       Code:
-        S3Bucket: !Ref QSS3BucketName
+        S3Bucket: !If
+          - UsingDefaultBucket
+          - !Sub ${QSS3BucketName}-${AWS::Region}
+          - !Ref QSS3BucketName
         S3Key: !Sub ${QSS3KeyPrefix}functions/package.zip
       Environment:
         Variables:
