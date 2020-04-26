@@ -22,15 +22,16 @@ nuke:
 	aws-nuke -c ci/awsnuke.yaml --force --quiet --no-dry-run
 
 pack:
-	7z a ./functions/package.zip ./functions/*.py
+	7z a ./functions/package.zip ./functions/*.py -stl
 
-targets := $(addprefix sync-,$(regions))
-sync: pack $(targets)
-	aws s3 rm $(bucket)/$(prefix) --recursive
-	aws s3 sync --exclude '.*' --acl public-read . $(bucket)/$(prefix)
-sync-%: pack
-	aws s3 rm $(bucket)-$*/$(prefix) --recursive
+s3-%: pack
+	# aws s3 rm $(bucket)-$*/$(prefix) --recursive
 	aws s3 sync --exclude '.*' --acl public-read . $(bucket)-$*/$(prefix)
+
+targets := $(addprefix s3-,$(regions))
+sync: pack $(targets)
+	# aws s3 rm $(bucket)/$(prefix) --recursive
+	aws s3 sync --exclude '.*' --acl public-read . $(bucket)/$(prefix)
 
 test: pack
 	pytest -vv
