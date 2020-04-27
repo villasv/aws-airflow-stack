@@ -25,13 +25,11 @@ pack:
 	7z a ./functions/package.zip ./functions/*.py -stl
 
 s3-%: pack
-	# aws s3 rm $(bucket)-$*/$(prefix) --recursive
-	aws s3 sync --exclude '.*' --acl public-read . $(bucket)-$*/$(prefix)
+	aws s3 sync --delete --exclude '.*' --acl public-read . $(bucket)-$*/$(prefix)
 
 targets := $(addprefix s3-,$(regions))
 sync: pack $(targets)
-	# aws s3 rm $(bucket)/$(prefix) --recursive
-	aws s3 sync --exclude '.*' --acl public-read . $(bucket)/$(prefix)
+	aws s3 sync --delete --exclude '.*' --acl public-read . $(bucket)/$(prefix)
 
 test: pack
 	pytest -vv
