@@ -11,6 +11,7 @@ tinkered with, allowing it to be used in real production environments with
 little extra effort. Deploy in a few clicks, personalize in a few fields,
 configure in a few commands.
 
+
 ## Overview
 
 ![stack diagram](/.github/img/stack-diagram.png)
@@ -19,8 +20,7 @@ The stack is composed mainly of three services: the Airflow web server, the
 Airflow scheduler, and the Airflow worker. Supporting resources include an RDS
 to host the Airflow metadata database, an SQS to be used as broker backend, S3
 buckets for logs and deployment bundles, an EFS to serve as shared directory,
-and a custom CloudWatch metric measured by a timed AWS Lambda. All other
-resources are the usual boilerplate to keep the wind blowing.
+and a custom CloudWatch metric measured by a timed AWS Lambda.
 
 ### Deployment and File Sharing
 
@@ -53,6 +53,7 @@ the latter is a very advanced scenario and would be best handled by Celery's own
 scaling mechanism or offloading the computation to another system (like Spark or
 Kubernetes) and use Airflow only for orchestration.
 
+
 ## Get It Working
 
 ### 0. Prerequisites
@@ -70,8 +71,8 @@ branch (defaults to your last used region):
 [![Launch](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/images/cloudformation-launch-stack-button.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?templateURL=https://turbine-quickstart.s3.amazonaws.com/quickstart-turbine-airflow/templates/turbine-master.template)
 
 The stack resources take around 15 minutes to create, while the airflow
-installation and bootstrap another 3 to 5 minutes. After that you can already
-access the Airflow UI and deploy your own Airflow DAGs.
+installation another 3 to 5 minutes. After that you can already access the
+Airflow UI and deploy your own Airflow DAGs.
 
 ### 2. Upstream your files
 
@@ -96,8 +97,6 @@ Sometimes the cluster operators will want to perform some additional setup,
 debug or just inspect the Airflow services and database. The stack is designed
 to minimize this need, but just in case it also offers decent internal tooling
 for those scenarios.
-
-### Using Systems Manager Sessions
 
 Instead of the usual SSH procedure, this stack encourages the use of AWS Systems
 Manager Sessions for increased security and auditing capabilities. You can still
@@ -125,7 +124,7 @@ coming, or the `--no-pager` to directly dump the text lines, but it offers [much
 more](https://www.freedesktop.org/software/systemd/man/journalctl.html).
 
 ```bash
-$ sudo journalctl -u airflow -n 50
+$ sudo journalctl -u airflow-scheduler -n 50
 ```
 
 
@@ -144,26 +143,19 @@ $ sudo journalctl -u airflow -n 50
     Workers have lifecycle hooks that make sure to wait for Celery to finish its
     tasks before allowing EC2 to terminate that instance (except maybe for Spot
     Instances going out of capacity). If you want to kill running tasks, you
-    will need to SSH into worker instances and stop the airflow service
-    forcefully.
+    will need to forcefully stop the airflow systemd services (via AWS Systems
+    Manager).
 
 3. Is there any documentation around the architectural decisions?
 
-    Yes, most of them should be available in the project's GitHub
-    [Wiki](https://github.com/villasv/aws-airflow-stack/wiki). It doesn't mean
-    those decisions are final, but reading them beforehand will help formulating
-    new proposals.
+    Yes, they should be available in the project's GitHub [Wiki][]. It doesn't
+    mean those decisions are final, but reading them beforehand will help
+    formulating new proposals.
+
+[Wiki]: https://github.com/villasv/aws-airflow-stack/wiki
+
 
 ## Contributing
-
->This project aims to be constantly evolving with up to date tooling and newer
->AWS features, as well as improving its design qualities and maintainability.
->Requests for Enhancement should be abundant and anyone is welcome to pick them
->up.
->
->Stacks can get quite opinionated. If you have a divergent fork, you may open a
->Request for Comments and we will index it. Hopefully this will help to build a
->diverse set of possible deployment models for various production needs.
 
 See the [contribution guidelines](/CONTRIBUTING.md) for details.
 
@@ -173,6 +165,7 @@ Conduct](/CODE_OF_CONDUCT.md).
 Did this project help you? Consider buying me a cup of coffee ;-)
 
 [![Buy me a coffee!](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/villasv)
+
 
 ## Licensing
 
