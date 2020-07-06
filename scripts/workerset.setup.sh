@@ -2,7 +2,7 @@
 
 . "$(dirname $0)/commons.setup.sh"
 
-if [ -d "/mnt/efs" ]; then
+if [ ! -d "/mnt/efs" ]; then
     mkdir /mnt/efs
     FSPEC="${FILE_SYSTEM_ID}.efs.$AWS_REGION.amazonaws.com:/"
     PARAMS="nfsvers=4.1,rsize=1048576,wsize=1048576"
