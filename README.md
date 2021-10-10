@@ -1,3 +1,5 @@
+> ⚠️ This project is no longer receiving updates. We have moved on from using CloudFormation to manage our infrastructure and recommend others doing the same. As of 2021/2022, we think CDK and Terraform are now the best in class for IaC. Also, Airflow for Kubernetes has gotten more traction and we have moved into EKS for our self-managed Airflow. If you're looking for Open Source Airflow deployment options, we recommend [Astronomer](https://www.astronomer.io/).
+
 <img src=".github/img/logo.png" align="right" width="25%" />
 
 # Turbine [![GitHub Release](https://img.shields.io/github/release/villasv/aws-airflow-stack.svg?style=flat-square&logo=github)](https://github.com/villasv/aws-airflow-stack/releases/latest) [![Build Status](https://img.shields.io/github/workflow/status/villasv/aws-airflow-stack/Stack%20Release%20Pipeline?style=flat-square&logo=github&logoColor=white&label=build)](https://github.com/villasv/aws-airflow-stack/actions?query=workflow%3A%22Stack+Release+Pipeline%22+branch%3Amaster) [![CFN Deploy](https://img.shields.io/badge/CFN-deploy-green.svg?style=flat-square&logo=amazon-aws)](#get-it-working)
