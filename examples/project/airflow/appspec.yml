@@ -10,3 +10,6 @@ hooks:
   ApplicationStop:
     - location: scripts/cdapp_stop.sh
       runas: root
+  AfterInstall:
+    - location: scripts/cdapp_deps.sh
+      runas: root
